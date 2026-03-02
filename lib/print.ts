@@ -73,6 +73,7 @@ export async function printReceipt(data: {
   customer?: string
   paymentType: string
   createdAt?: Date
+  originalTotal?: number
 }) {
   const date = data.createdAt || new Date()
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
@@ -144,10 +145,23 @@ export async function printReceipt(data: {
     </thead>
     <tbody>
       ${itemsHtml}
+      ${data.originalTotal ? `
+      <tr class="total-row">
+        <td colspan="3">JAMI:</td>
+        <td style="text-align:right">${data.originalTotal.toLocaleString('uz-UZ')}</td>
+      </tr>
+      <tr>
+        <td colspan="3" style="color:#555">Chegirma:</td>
+        <td style="text-align:right;color:#555">-${(data.originalTotal - data.total).toLocaleString('uz-UZ')}</td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="3">YAKUNIY:</td>
+        <td style="text-align:right">${data.total.toLocaleString('uz-UZ')}</td>
+      </tr>` : `
       <tr class="total-row">
         <td colspan="3">JAMI:</td>
         <td style="text-align:right">${data.total.toLocaleString('uz-UZ')}</td>
-      </tr>
+      </tr>`}
     </tbody>
   </table>
   <div class="divider"></div>

@@ -41,6 +41,9 @@ export default function KassaPage() {
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [customTotal, setCustomTotal] = useState<number | null>(null)
+  const [editingTotal, setEditingTotal] = useState(false)
+  const [editTotalValue, setEditTotalValue] = useState('')
 
   const fetchProducts = useCallback(async () => {
     const res = await fetch(`/api/products?search=${encodeURIComponent(search)}`)
@@ -55,6 +58,7 @@ export default function KassaPage() {
   }
 
   function addToCart(product: Product) {
+    setCustomTotal(null)
     setCart(prev => {
       const existing = prev.find(c => c._id === product._id)
       if (existing) {
@@ -66,16 +70,34 @@ export default function KassaPage() {
   }
 
   function updateQty(id: string, qty: number) {
+    setCustomTotal(null)
     if (qty <= 0) { setCart(prev => prev.filter(c => c._id !== id)); return }
     setCart(prev => prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c, qty) } : c))
   }
 
   const total = cart.reduce((s, c) => s + c.price * c.qty, 0)
+  const finalTotal = customTotal ?? total
+  const discount = customTotal !== null ? total - customTotal : 0
   const paid = Number(paidAmount) || 0
-  const change = paid - total
-  const debt = total - paid
-  const isDebt = paid < total
-  const isOverpaid = paid > total
+  const change = paid - finalTotal
+  const debt = finalTotal - paid
+  const isDebt = paid < finalTotal
+  const isOverpaid = paid > finalTotal
+
+  function startEditTotal() {
+    setEditTotalValue(String(finalTotal))
+    setEditingTotal(true)
+  }
+
+  function commitEditTotal() {
+    const val = Number(editTotalValue)
+    if (val > 0 && val !== total) {
+      setCustomTotal(val)
+    } else {
+      setCustomTotal(null)
+    }
+    setEditingTotal(false)
+  }
 
   function openPayDialog() {
     setPaidAmount('')
@@ -113,8 +135,8 @@ export default function KassaPage() {
       }
     }
 
-    const actualPaid = Math.min(paid, total) // overpaid case — record as total
-    const paymentType = paid >= total ? 'full' : paid > 0 ? 'partial' : 'debt'
+    const actualPaid = Math.min(paid, finalTotal) // overpaid case — record as finalTotal
+    const paymentType = paid >= finalTotal ? 'full' : paid > 0 ? 'partial' : 'debt'
 
     const res = await fetch('/api/sales', {
       method: 'POST',
@@ -128,7 +150,7 @@ export default function KassaPage() {
           costPrice: c.costPrice,
           salePrice: c.price,
         })),
-        total,
+        total: finalTotal,
         paid: actualPaid,
         cashier: session?.user.id,
         customer: customerId,
@@ -142,8 +164,9 @@ export default function KassaPage() {
     // Print receipt
     await printReceipt({
       items: cart.map(c => ({ productName: c.name, qty: c.qty, unit: c.unit, salePrice: c.price })),
-      total,
+      total: finalTotal,
       paid: actualPaid,
+      originalTotal: discount > 0 ? total : undefined,
       cashier: session?.user?.name || 'Kassir',
       customer: clientName.trim() || undefined,
       paymentType,
@@ -159,6 +182,7 @@ export default function KassaPage() {
     }
 
     setCart([])
+    setCustomTotal(null)
     setPayDialog(false)
   }
 
@@ -251,9 +275,41 @@ export default function KassaPage() {
 
             {cart.length > 0 && (
               <>
-                <div className="border-t pt-3 mt-3 flex justify-between text-sm">
-                  <span className="text-slate-500">Jami:</span>
-                  <span className="font-bold text-slate-800">{formatPrice(total)}</span>
+                <div className="border-t pt-3 mt-3 space-y-1">
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Asl jami:</span>
+                      <span className="text-slate-400 line-through">{formatPrice(total)}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600">Chegirma:</span>
+                      <span className="text-green-600 font-medium">-{formatPrice(discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Jami:</span>
+                    {editingTotal ? (
+                      <input
+                        className="w-28 text-right text-sm font-bold border rounded px-1 py-0.5"
+                        type="number"
+                        value={editTotalValue}
+                        onChange={e => setEditTotalValue(e.target.value)}
+                        onBlur={commitEditTotal}
+                        onKeyDown={e => e.key === 'Enter' && commitEditTotal()}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className={`font-bold cursor-pointer select-none ${discount > 0 ? 'text-green-700' : 'text-slate-800'}`}
+                        onDoubleClick={startEditTotal}
+                        title="2 marta bosing tahrirlash uchun"
+                      >
+                        {formatPrice(finalTotal)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => setCart([])}>
@@ -282,7 +338,13 @@ export default function KassaPage() {
             {/* Total */}
             <div className="bg-slate-50 rounded-lg p-3 text-center">
               <div className="text-xs text-slate-500 mb-1">Jami summa</div>
-              <div className="text-2xl font-bold text-slate-800">{formatPrice(total)}</div>
+              {discount > 0 && (
+                <div className="text-sm text-slate-400 line-through">{formatPrice(total)}</div>
+              )}
+              <div className="text-2xl font-bold text-slate-800">{formatPrice(finalTotal)}</div>
+              {discount > 0 && (
+                <div className="text-xs text-green-600 mt-1">Chegirma: -{formatPrice(discount)}</div>
+              )}
             </div>
 
             {/* Customer info */}
