@@ -33,6 +33,7 @@ export async function GET(req: Request) {
       .sort({ createdAt: -1 })
       .limit(100)
       .lean()
+      .allowDiskUse(true)
 
     return NextResponse.json(sales)
   } catch (err) { return errorResponse(err) }

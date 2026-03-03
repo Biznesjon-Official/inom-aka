@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     if (category) filter.category = category
     if (active !== 'all') filter.isActive = true
 
-    const products = await Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200).lean()
+    const products = await Product.find(filter).sort({ createdAt: -1 }).limit(200).allowDiskUse(true).populate('category').lean()
     return NextResponse.json(products)
   } catch (err) {
     console.error('Products GET error:', err)
