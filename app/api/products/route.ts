@@ -17,13 +17,13 @@ export async function GET(req: Request) {
     if (category) filter.category = category
     if (active !== 'all') filter.isActive = true
 
-    const selectFields = fields === 'list'
-      ? 'name category unit costPrice salePrice discountPrice discountThreshold stock isActive createdAt'
-      : undefined
+    const products = await Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200).lean()
 
-    let query = Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200)
-    if (selectFields) query = query.select(selectFields)
-    const products = await query.lean()
+    if (fields === 'list') {
+      // Strip heavy fields from response
+      const light = products.map(({ image, description, ...rest }: Record<string, unknown>) => rest)
+      return NextResponse.json(light)
+    }
     return NextResponse.json(products)
   } catch (err) {
     console.error('Products GET error:', err)
