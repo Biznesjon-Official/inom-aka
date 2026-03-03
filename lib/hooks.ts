@@ -17,15 +17,8 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
   loading: boolean
   refresh: () => void
 } {
-  const [data, setData] = useState<T | null>(() => {
-    if (!url) return null
-    const cached = fetchCache.get(url)
-    return cached ? (cached.data as T) : null
-  })
-  const [loading, setLoading] = useState(() => {
-    if (!url) return false
-    return !fetchCache.has(url)
-  })
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(true)
   const urlRef = useRef(url)
   urlRef.current = url
 
@@ -33,12 +26,15 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
     if (!isBackground) setLoading(true)
     try {
       const res = await fetch(fetchUrl)
-      if (!res.ok) return
       const json = await res.json()
-      fetchCache.set(fetchUrl, { data: json, ts: Date.now() })
-      if (urlRef.current === fetchUrl) {
-        setData(json)
+      if (res.ok) {
+        fetchCache.set(fetchUrl, { data: json, ts: Date.now() })
+        if (urlRef.current === fetchUrl) {
+          setData(json)
+        }
       }
+    } catch {
+      // Network error — keep existing data
     } finally {
       if (urlRef.current === fetchUrl) {
         setLoading(false)
@@ -60,7 +56,6 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
     if (cached) {
       setData(cached.data as T)
       setLoading(false)
-      // Background revalidate if stale
       if (Date.now() - cached.ts > ttl) {
         doFetch(url, true)
       }
