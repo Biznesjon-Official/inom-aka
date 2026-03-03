@@ -19,4 +19,7 @@ const SaleSchema = new Schema({
   note: { type: String },
 }, { timestamps: true })
 
+SaleSchema.index({ cashier: 1, createdAt: -1 })
+SaleSchema.index({ customer: 1, createdAt: -1 })
+
 export default models.Sale || model('Sale', SaleSchema)

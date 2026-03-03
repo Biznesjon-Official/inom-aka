@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import Product from '@/models/Product'
+import { escapeRegex } from '@/lib/utils'
 
 export async function GET(req: Request) {
   await connectDB()
@@ -10,11 +11,16 @@ export async function GET(req: Request) {
   const active = searchParams.get('active')
 
   const filter: Record<string, unknown> = {}
-  if (search) filter.name = { $regex: search, $options: 'i' }
+  if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' }
   if (category) filter.category = category
   if (active !== 'all') filter.isActive = true
 
-  const products = await Product.find(filter).populate('category').sort({ createdAt: -1 })
+  const fields = searchParams.get('fields')
+  let query = Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200)
+  if (fields === 'list') {
+    query = query.select('-image -description')
+  }
+  const products = await query.lean()
   return NextResponse.json(products)
 }
 

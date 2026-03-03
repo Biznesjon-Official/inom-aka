@@ -7,4 +7,7 @@ const ExpenseSchema = new Schema({
   date: { type: Date, default: Date.now },
 }, { timestamps: true })
 
+ExpenseSchema.index({ source: 1, date: -1 })
+ExpenseSchema.index({ date: -1 })
+
 export default models.Expense || model('Expense', ExpenseSchema)

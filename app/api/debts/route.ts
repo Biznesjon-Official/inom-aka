@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import Debt from '@/models/Debt'
 import Customer from '@/models/Customer'
+import { escapeRegex } from '@/lib/utils'
 
 export async function GET(req: Request) {
   await connectDB()
@@ -15,8 +16,10 @@ export async function GET(req: Request) {
 
   const debts = await Debt.find(filter)
     .populate('customer', 'name phone')
-    .populate('sale')
+    .populate('sale', 'total paid createdAt paymentType')
     .sort({ createdAt: -1 })
+    .limit(100)
+    .lean()
 
   return NextResponse.json(debts)
 }
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
   }
 
   // Find or create customer
-  let customer = await Customer.findOne({ name: { $regex: `^${customerName}$`, $options: 'i' } })
+  let customer = await Customer.findOne({ name: { $regex: `^${escapeRegex(customerName)}$`, $options: 'i' } })
   if (!customer) {
     customer = await Customer.create({ name: customerName, phone: customerPhone || undefined })
   }

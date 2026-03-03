@@ -20,6 +20,8 @@ export async function GET(req: Request) {
   const expenses = await Expense.find(filter)
     .populate('source', 'name')
     .sort({ date: -1 })
+    .limit(200)
+    .lean()
 
   return NextResponse.json(expenses)
 }

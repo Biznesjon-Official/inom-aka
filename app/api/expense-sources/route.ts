@@ -4,7 +4,7 @@ import ExpenseSource from '@/models/ExpenseSource'
 
 export async function GET() {
   await connectDB()
-  const sources = await ExpenseSource.find().sort({ name: 1 })
+  const sources = await ExpenseSource.find().sort({ name: 1 }).lean()
   return NextResponse.json(sources)
 }
 

@@ -17,4 +17,7 @@ const DebtSchema = new Schema({
   note: { type: String },
 }, { timestamps: true })
 
+DebtSchema.index({ customer: 1, status: 1 })
+DebtSchema.index({ status: 1, createdAt: -1 })
+
 export default models.Debt || model('Debt', DebtSchema)

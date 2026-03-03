@@ -1,30 +1,41 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
+import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
 import Customer from '@/models/Customer'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await connectDB()
-  const { id } = await params
-  const { amount, note } = await req.json()
+  try {
+    await connectDB()
+    const { id } = await params
+    const { amount, note } = await req.json()
 
-  const debt = await Debt.findById(id)
-  if (!debt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (typeof amount !== 'number' || amount <= 0) {
+      return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
+    }
 
-  const payment = { amount, date: new Date(), note }
-  debt.payments.push(payment)
-  debt.paidAmount += amount
-  debt.remainingAmount -= amount
-  if (debt.remainingAmount <= 0) {
-    debt.remainingAmount = 0
-    debt.status = 'paid'
-  }
-  await debt.save()
+    const debt = await Debt.findById(id)
+    if (!debt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Update customer total debt
-  await Customer.findByIdAndUpdate(debt.customer, {
-    $inc: { totalDebt: -amount },
-  })
+    if (amount > debt.remainingAmount) {
+      return NextResponse.json({ error: 'Amount exceeds remaining debt' }, { status: 400 })
+    }
 
-  return NextResponse.json(debt)
+    const payment = { amount, date: new Date(), note }
+    debt.payments.push(payment)
+    debt.paidAmount += amount
+    debt.remainingAmount -= amount
+    if (debt.remainingAmount <= 0) {
+      debt.remainingAmount = 0
+      debt.status = 'paid'
+    }
+    await debt.save()
+
+    // Update customer total debt
+    await Customer.findByIdAndUpdate(debt.customer, {
+      $inc: { totalDebt: -amount },
+    })
+
+    return NextResponse.json(debt)
+  } catch (err) { return errorResponse(err) }
 }

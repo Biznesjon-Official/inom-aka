@@ -86,6 +86,7 @@ export default function XarajatlarPage() {
   }
 
   async function deleteExpense(id: string) {
+    if (!confirm('O\'chirishni tasdiqlaysizmi?')) return
     await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
     setExpenses(prev => prev.filter(e => e._id !== id))
     toast.success('O\'chirildi')

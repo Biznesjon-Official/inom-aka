@@ -14,22 +14,53 @@ export async function GET() {
   weekStart.setDate(weekStart.getDate() - 6)
   weekStart.setHours(0, 0, 0, 0)
 
-  const [todaySales, todayExpenses, activeDebts, weekSales] = await Promise.all([
-    Sale.find({ createdAt: { $gte: todayStart } }),
-    Expense.find({ date: { $gte: todayStart } }),
-    Debt.find({ status: 'active' }),
-    Sale.find({ createdAt: { $gte: weekStart } }).sort({ createdAt: 1 }),
+  const [todayStats, todayProfitAgg, todayExpenseAgg, debtAgg, weekAgg] = await Promise.all([
+    // Today: count, revenue, total
+    Sale.aggregate([
+      { $match: { createdAt: { $gte: todayStart } } },
+      { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$paid' }, total: { $sum: '$total' } } },
+    ]),
+    // Today: profit (needs unwind)
+    Sale.aggregate([
+      { $match: { createdAt: { $gte: todayStart } } },
+      { $unwind: '$items' },
+      { $group: { _id: null, profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } } } },
+    ]),
+    // Today expenses
+    Expense.aggregate([
+      { $match: { date: { $gte: todayStart } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    // Total active debt
+    Debt.aggregate([
+      { $match: { status: 'active' } },
+      { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
+    ]),
+    // Week chart: group by sale first, then by date
+    Sale.aggregate([
+      { $match: { createdAt: { $gte: weekStart } } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
+          paid: { $first: '$paid' },
+          profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          revenue: { $sum: '$paid' },
+          profit: { $sum: '$profit' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
   ])
 
-  const todayRevenue = todaySales.reduce((s, x) => s + x.paid, 0)
-  const todayTotal = todaySales.reduce((s, x) => s + x.total, 0)
-  const todayProfit = todaySales.reduce((s: number, x) =>
-    s + x.items.reduce((a: number, i: { salePrice: number; costPrice: number; qty: number }) =>
-      a + (i.salePrice - i.costPrice) * i.qty, 0), 0)
-  const todayExpenseTotal = todayExpenses.reduce((s, x) => s + x.amount, 0)
-  const totalDebt = activeDebts.reduce((s, x) => s + x.remainingAmount, 0)
+  const today = todayStats[0] || { count: 0, revenue: 0, total: 0 }
 
-  // Group week sales by day
+  // Build week chart with all 7 days
   const dayMap: Record<string, { revenue: number; profit: number }> = {}
   for (let i = 6; i >= 0; i--) {
     const d = new Date()
@@ -37,30 +68,26 @@ export async function GET() {
     const key = d.toISOString().slice(0, 10)
     dayMap[key] = { revenue: 0, profit: 0 }
   }
-  for (const sale of weekSales) {
-    const key = new Date(sale.createdAt).toISOString().slice(0, 10)
-    if (dayMap[key]) {
-      dayMap[key].revenue += sale.paid
-      dayMap[key].profit += sale.items.reduce(
-        (a: number, i: { salePrice: number; costPrice: number; qty: number }) =>
-          a + (i.salePrice - i.costPrice) * i.qty, 0)
+  for (const day of weekAgg) {
+    if (dayMap[day._id]) {
+      dayMap[day._id] = { revenue: day.revenue, profit: day.profit }
     }
   }
 
   const chart = Object.entries(dayMap).map(([date, v]) => ({
-    date: date.slice(5), // MM-DD
+    date: date.slice(5),
     ...v,
   }))
 
   return NextResponse.json({
     today: {
-      sales: todaySales.length,
-      revenue: todayRevenue,
-      total: todayTotal,
-      profit: todayProfit,
-      expenses: todayExpenseTotal,
+      sales: today.count,
+      revenue: today.revenue,
+      total: today.total,
+      profit: todayProfitAgg[0]?.profit || 0,
+      expenses: todayExpenseAgg[0]?.total || 0,
     },
-    totalDebt,
+    totalDebt: debtAgg[0]?.total || 0,
     chart,
   })
 }

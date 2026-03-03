@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 
 export async function GET() {
   await connectDB()
-  const workers = await User.find({ role: 'worker' }).select('-password').sort({ name: 1 })
+  const workers = await User.find({ role: 'worker' }).select('-password').sort({ name: 1 }).lean()
   return NextResponse.json(workers)
 }
 
