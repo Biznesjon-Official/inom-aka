@@ -10,20 +10,12 @@ export async function GET(req: Request) {
     const search = searchParams.get('search')
     const category = searchParams.get('category')
     const active = searchParams.get('active')
-    const fields = searchParams.get('fields')
-
     const filter: Record<string, unknown> = {}
     if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' }
     if (category) filter.category = category
     if (active !== 'all') filter.isActive = true
 
     const products = await Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200).lean()
-
-    if (fields === 'list') {
-      // Strip heavy fields from response
-      const light = products.map(({ image, description, ...rest }: Record<string, unknown>) => rest)
-      return NextResponse.json(light)
-    }
     return NextResponse.json(products)
   } catch (err) {
     console.error('Products GET error:', err)

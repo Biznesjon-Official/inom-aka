@@ -35,7 +35,7 @@ export default function TovarlarPage() {
 
   const debouncedSearch = useDebounce(search)
   const productsUrl = (() => {
-    const params = new URLSearchParams({ search: debouncedSearch, fields: 'list' })
+    const params = new URLSearchParams({ search: debouncedSearch })
     if (catFilter !== 'all') params.set('category', catFilter)
     return `/api/products?${params}`
   })()

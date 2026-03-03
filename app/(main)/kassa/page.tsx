@@ -44,7 +44,7 @@ export default function KassaPage() {
   const [editTotalValue, setEditTotalValue] = useState('')
 
   const debouncedSearch = useDebounce(search)
-  const productsUrl = `/api/products?fields=list&search=${encodeURIComponent(debouncedSearch)}`
+  const productsUrl = `/api/products?search=${encodeURIComponent(debouncedSearch)}`
   const { data: fetchedProducts, loading: productsLoading } = useFetchWithCache<Product[]>(productsUrl)
   const products = fetchedProducts || []
 
