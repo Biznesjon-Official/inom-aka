@@ -33,6 +33,7 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
     if (!isBackground) setLoading(true)
     try {
       const res = await fetch(fetchUrl)
+      if (!res.ok) return
       const json = await res.json()
       fetchCache.set(fetchUrl, { data: json, ts: Date.now() })
       if (urlRef.current === fetchUrl) {

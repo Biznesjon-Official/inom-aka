@@ -4,24 +4,31 @@ import Product from '@/models/Product'
 import { escapeRegex } from '@/lib/utils'
 
 export async function GET(req: Request) {
-  await connectDB()
-  const { searchParams } = new URL(req.url)
-  const search = searchParams.get('search')
-  const category = searchParams.get('category')
-  const active = searchParams.get('active')
+  try {
+    await connectDB()
+    const { searchParams } = new URL(req.url)
+    const search = searchParams.get('search')
+    const category = searchParams.get('category')
+    const active = searchParams.get('active')
+    const fields = searchParams.get('fields')
 
-  const filter: Record<string, unknown> = {}
-  if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' }
-  if (category) filter.category = category
-  if (active !== 'all') filter.isActive = true
+    const filter: Record<string, unknown> = {}
+    if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' }
+    if (category) filter.category = category
+    if (active !== 'all') filter.isActive = true
 
-  const fields = searchParams.get('fields')
-  let query = Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200)
-  if (fields === 'list') {
-    query = query.select('-image -description')
+    const selectFields = fields === 'list'
+      ? 'name category unit costPrice salePrice discountPrice discountThreshold stock isActive createdAt'
+      : undefined
+
+    let query = Product.find(filter).populate('category').sort({ createdAt: -1 }).limit(200)
+    if (selectFields) query = query.select(selectFields)
+    const products = await query.lean()
+    return NextResponse.json(products)
+  } catch (err) {
+    console.error('Products GET error:', err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-  const products = await query.lean()
-  return NextResponse.json(products)
 }
 
 export async function POST(req: Request) {
