@@ -51,19 +51,22 @@ export default function TovarlarPage() {
     setDialog(true)
   }
 
-  const openEdit = useCallback((p: Product) => {
+  const openEdit = useCallback(async (p: Product) => {
     setEditing(p)
+    // Fetch full product with image (list excludes image for performance)
+    const res = await fetch(`/api/products/${p._id}`)
+    const full = res.ok ? await res.json() : p
     setForm({
-      name: p.name,
-      categoryId: p.category?._id || '',
-      unit: p.unit,
-      costPrice: p.costPrice.toString(),
-      salePrice: p.salePrice.toString(),
-      discountPrice: p.discountPrice?.toString() || '',
-      discountThreshold: p.discountThreshold?.toString() || '',
-      description: p.description || '',
-      image: p.image || '',
-      stock: p.stock?.toString() || '0',
+      name: full.name,
+      categoryId: full.category?._id || '',
+      unit: full.unit,
+      costPrice: full.costPrice.toString(),
+      salePrice: full.salePrice.toString(),
+      discountPrice: full.discountPrice?.toString() || '',
+      discountThreshold: full.discountThreshold?.toString() || '',
+      description: full.description || '',
+      image: full.image || '',
+      stock: full.stock?.toString() || '0',
     })
     setDialog(true)
   }, [])
