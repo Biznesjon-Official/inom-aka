@@ -27,7 +27,7 @@ export function printLabel(product: {
   wholesalePrice?: number
   unit: string
   category?: string
-}) {
+}, shopName: string = "Inomaka Do'kon") {
   const barcodeUrl = generateBarcode(product._id)
 
   const html = `<!DOCTYPE html>
@@ -57,7 +57,7 @@ export function printLabel(product: {
 </style>
 </head>
 <body>
-  <div class="shop">Inomaka Do'kon</div>
+  <div class="shop">${shopName}</div>
   <div class="name">${product.name}</div>
   ${product.category ? `<div class="cat">${product.category}</div>` : ''}
   <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>
@@ -88,7 +88,11 @@ export async function printReceipt(data: {
   paymentType: string
   createdAt?: Date
   originalTotal?: number
+  shopName?: string
+  receiptFooter?: string
 }) {
+  const shopName = data.shopName || "Inomaka Do'kon"
+  const receiptFooter = data.receiptFooter || 'Rahmat! Yana tashrif buyuring.'
   const date = data.createdAt || new Date()
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
   const change = data.paid - data.total
@@ -141,7 +145,7 @@ export async function printReceipt(data: {
 </style>
 </head>
 <body>
-  <div class="shop-name">Inomaka Do'kon</div>
+  <div class="shop-name">${shopName}</div>
   <div class="center" style="font-size:10px">Chek #${receiptNo}</div>
   <div class="divider"></div>
   <div class="info"><span>Sana:</span><span>${dateStr}</span></div>
@@ -183,7 +187,7 @@ export async function printReceipt(data: {
   ${change > 0 ? `<div class="info"><span>Qaytim:</span><span class="bold">${change.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
   ${debt > 0 ? `<div class="debt-line">⚠ QARZ: ${debt.toLocaleString('uz-UZ')} so'm</div>` : ''}
   <div class="qr"><img src="${qrUrl}" alt="qr" /></div>
-  <div class="footer">Rahmat! Yana tashrif buyuring.<br>Inomaka Do'kon</div>
+  <div class="footer">${receiptFooter}<br>${shopName}</div>
 </body>
 </html>`
   openPrintWindow(html)

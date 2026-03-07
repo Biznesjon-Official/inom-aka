@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, Package, BookOpen,
-  TrendingDown, Users, UserCog, LogOut, Store
+  TrendingDown, Users, UserCog, Settings, LogOut, Store, Warehouse, FileBarChart
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,10 +14,13 @@ const adminNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/kassa', label: 'Kassa', icon: ShoppingCart },
   { href: '/tovarlar', label: 'Tovarlar', icon: Package },
+  { href: '/ombor', label: 'Ombor kirimi', icon: Warehouse },
   { href: '/qarzlar', label: 'Qarz daftarcha', icon: BookOpen },
   { href: '/xarajatlar', label: 'Xarajatlar', icon: TrendingDown },
   { href: '/mijozlar', label: 'Mijozlar', icon: Users },
   { href: '/ishchilar', label: 'Ishchilar', icon: UserCog },
+  { href: '/hisobot', label: 'Hisobot', icon: FileBarChart },
+  { href: '/sozlamalar', label: 'Sozlamalar', icon: Settings },
 ]
 
 const workerNav = [

@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatPrice } from '@/lib/utils'
+import { useDebounce } from '@/lib/hooks'
 
 interface PaymentDialogProps {
   open: boolean
@@ -19,6 +20,64 @@ interface PaymentDialogProps {
   onClientNameChange: (value: string) => void
   onClientPhoneChange: (value: string) => void
   onCheckout: () => void
+}
+
+interface CustomerSuggestion {
+  _id: string
+  name: string
+  phone?: string
+}
+
+function CustomerAutocomplete({ value, phone, onChange, onPhoneChange, required }: {
+  value: string; phone: string; onChange: (v: string) => void; onPhoneChange: (v: string) => void; required: boolean
+}) {
+  const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debouncedSearch = useDebounce(value, 200)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!debouncedSearch || debouncedSearch.length < 2) { setSuggestions([]); return }
+    fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: CustomerSuggestion[]) => { setSuggestions(data.slice(0, 5)); setShowSuggestions(true) })
+  }, [debouncedSearch])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function selectCustomer(c: CustomerSuggestion) {
+    onChange(c.name)
+    if (c.phone) onPhoneChange(c.phone)
+    setShowSuggestions(false)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="space-y-1.5">
+        <Label>Mijoz ismi {required && <span className="text-red-500">*</span>}</Label>
+        <Input placeholder="Ism qidirish..." value={value}
+          onChange={e => { onChange(e.target.value); setShowSuggestions(true) }}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} />
+      </div>
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+          {suggestions.map(c => (
+            <button key={c._id} type="button" className="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm"
+              onClick={() => selectCustomer(c)}>
+              <div className="font-medium text-slate-800">{c.name}</div>
+              {c.phone && <div className="text-xs text-slate-400">{c.phone}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export const PaymentDialog = React.memo(function PaymentDialog({
@@ -49,11 +108,13 @@ export const PaymentDialog = React.memo(function PaymentDialog({
           </div>
 
           <div className="space-y-2">
-            <div className="space-y-1.5">
-              <Label>Mijoz ismi {isDebt && <span className="text-red-500">*</span>}</Label>
-              <Input placeholder="Ism (ixtiyoriy)" value={clientName}
-                onChange={e => onClientNameChange(e.target.value)} />
-            </div>
+            <CustomerAutocomplete
+              value={clientName}
+              phone={clientPhone}
+              onChange={onClientNameChange}
+              onPhoneChange={onClientPhoneChange}
+              required={isDebt}
+            />
             <div className="space-y-1.5">
               <Label>Telefon raqam {isDebt && <span className="text-red-500">*</span>}</Label>
               <Input placeholder="+998 XX XXX XX XX" value={clientPhone}

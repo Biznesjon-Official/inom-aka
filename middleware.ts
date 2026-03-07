@@ -40,5 +40,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/qarzlar/:path*', '/xarajatlar/:path*', '/mijozlar/:path*', '/ishchilar/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*'],
+  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/qarzlar/:path*', '/xarajatlar/:path*', '/mijozlar/:path*', '/ishchilar/:path*', '/sozlamalar/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*', '/api/settings/:path*'],
 }
