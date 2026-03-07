@@ -48,6 +48,7 @@ export default function MijozlarPage() {
   const debouncedSearch = useDebounce(search)
   const fetchCustomers = useCallback(async () => {
     const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
+    if (!res.ok) return toast.error('Mijozlarni yuklashda xato')
     setCustomers(await res.json())
   }, [debouncedSearch])
 
@@ -103,7 +104,8 @@ export default function MijozlarPage() {
   async function handleDelete(e: React.MouseEvent, id: string) {
     e.stopPropagation()
     if (!confirm('O\'chirishni tasdiqlaysizmi?')) return
-    await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
     toast.success('O\'chirildi')
     fetchCustomers()
   }

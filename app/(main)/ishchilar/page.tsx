@@ -29,6 +29,7 @@ export default function IshchilarPage() {
 
   const fetchWorkers = useCallback(async () => {
     const res = await fetch('/api/workers')
+    if (!res.ok) return toast.error('Ishchilarni yuklashda xato')
     setWorkers(await res.json())
   }, [])
 
@@ -37,6 +38,7 @@ export default function IshchilarPage() {
   async function openStats(id: string) {
     setSelectedWorker(id)
     const res = await fetch(`/api/workers/${id}`)
+    if (!res.ok) return toast.error('Statistikani yuklashda xato')
     const data = await res.json()
     setStats({ today: data.today, month: data.month })
     setStatsDialog(true)
@@ -70,11 +72,12 @@ export default function IshchilarPage() {
   }
 
   async function toggleActive(w: Worker) {
-    await fetch(`/api/workers/${w._id}`, {
+    const res = await fetch(`/api/workers/${w._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !w.isActive }),
     })
+    if (!res.ok) return toast.error('Holatni o\'zgartirishda xato')
     fetchWorkers()
   }
 

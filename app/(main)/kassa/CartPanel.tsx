@@ -1,5 +1,5 @@
 import React from 'react'
-import { Plus, Minus, Trash2, ShoppingCart, X } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, X, Save, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -29,20 +29,41 @@ interface CartPanelProps {
   onStartEditTotal: () => void
   onCommitEditTotal: () => void
   onEditTotalChange: (value: string) => void
+  onSaveCart: () => void
+  onLoadCart: () => void
+  savedCartsCount: number
 }
 
 export const CartPanel = React.memo(function CartPanel({
   cart, total, finalTotal, discount, editingTotal, editTotalValue,
   onUpdateQty, onClear, onPay, onStartEditTotal, onCommitEditTotal, onEditTotalChange,
+  onSaveCart, onLoadCart, savedCartsCount,
 }: CartPanelProps) {
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <ShoppingCart className="w-4 h-4" />
-          Savat
-          {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4" />
+            Savat
+            {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
+          </CardTitle>
+          <div className="flex gap-1">
+            {cart.length > 0 && (
+              <button className="p-1.5 hover:bg-blue-50 rounded" title="Savatni saqlash" onClick={onSaveCart}>
+                <Save className="w-3.5 h-3.5 text-blue-500" />
+              </button>
+            )}
+            <button className="p-1.5 hover:bg-emerald-50 rounded relative" title="Saqlangan ro'yxatlar" onClick={onLoadCart}>
+              <FolderOpen className="w-3.5 h-3.5 text-emerald-500" />
+              {savedCartsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 text-white text-[9px] rounded-full flex items-center justify-center">
+                  {savedCartsCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {cart.length === 0 && <div className="text-center text-slate-400 py-6 text-sm">Savat bo&apos;sh</div>}

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, ShoppingCart, TrendingDown, BookOpen } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -20,7 +21,10 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
 
   useEffect(() => {
-    fetch('/api/dashboard').then(r => r.json()).then(setData)
+    fetch('/api/dashboard').then(r => {
+      if (!r.ok) { toast.error('Dashboard ma\'lumotlarini yuklashda xato'); return }
+      r.json().then(setData)
+    })
   }, [])
 
   if (!data) {

@@ -34,8 +34,8 @@ export const TovarProductCard = React.memo(function TovarProductCard({ product: 
           <div className="flex items-start justify-between gap-2">
             <div className="font-medium text-slate-800 text-sm line-clamp-1">{p.name}</div>
             <div className="flex gap-1 flex-shrink-0">
-              <button className="p-1 hover:bg-blue-50 rounded" title="Label chiqarish" onClick={async () => {
-                await printLabel({ name: p.name, salePrice: p.salePrice, unit: p.unit, category: p.category?.name, discountPrice: p.discountPrice, discountThreshold: p.discountThreshold })
+              <button className="p-1 hover:bg-blue-50 rounded" title="Label chiqarish" onClick={() => {
+                printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, unit: p.unit, category: p.category?.name, discountPrice: p.discountPrice, discountThreshold: p.discountThreshold })
               }}>
                 <Printer className="w-3.5 h-3.5 text-blue-400" />
               </button>

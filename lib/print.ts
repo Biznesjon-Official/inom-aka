@@ -1,12 +1,27 @@
 // Thermal printer via browser window.print()
 // XPrinter: set paper width to 80mm in printer settings (or 58mm)
 import QRCode from 'qrcode'
+import JsBarcode from 'jsbarcode'
 
 async function generateQR(text: string): Promise<string> {
   return QRCode.toDataURL(text, { width: 100, margin: 1, color: { dark: '#000', light: '#fff' } })
 }
 
-export async function printLabel(product: {
+function generateBarcode(data: string): string {
+  const canvas = document.createElement('canvas')
+  JsBarcode(canvas, data, {
+    format: 'CODE128',
+    width: 2,
+    height: 40,
+    displayValue: true,
+    fontSize: 12,
+    margin: 2,
+  })
+  return canvas.toDataURL('image/png')
+}
+
+export function printLabel(product: {
+  _id: string
   name: string
   salePrice: number
   unit: string
@@ -14,8 +29,7 @@ export async function printLabel(product: {
   discountPrice?: number
   discountThreshold?: number
 }) {
-  const qrData = `${product.name} | ${product.salePrice} so'm/${product.unit}`
-  const qrUrl = await generateQR(qrData)
+  const barcodeUrl = generateBarcode(product._id)
 
   const html = `<!DOCTYPE html>
 <html>
@@ -34,13 +48,13 @@ export async function printLabel(product: {
     box-sizing: border-box;
   }
   .shop { text-align: center; font-weight: bold; font-size: 13px; border-bottom: 1px dashed #000; padding-bottom: 2mm; margin-bottom: 2mm; }
-  .name { font-weight: bold; font-size: 14px; word-break: break-word; margin-bottom: 2mm; }
-  .cat { font-size: 10px; color: #555; margin-bottom: 2mm; }
+  .name { font-weight: bold; font-size: 14px; word-break: break-word; margin-bottom: 2mm; text-align: center; }
+  .cat { font-size: 10px; color: #555; margin-bottom: 2mm; text-align: center; }
   .price { font-size: 18px; font-weight: bold; text-align: center; border: 1px solid #000; padding: 1mm 2mm; margin: 2mm 0; }
   .unit { font-size: 10px; text-align: center; color: #555; }
   .discount { font-size: 10px; border-top: 1px dashed #000; margin-top: 2mm; padding-top: 1mm; }
-  .qr { text-align: center; margin-top: 3mm; }
-  .qr img { width: 22mm; height: 22mm; }
+  .barcode { text-align: center; margin-top: 3mm; }
+  .barcode img { width: 48mm; height: auto; }
 </style>
 </head>
 <body>
@@ -52,7 +66,7 @@ export async function printLabel(product: {
   ${product.discountPrice && product.discountThreshold
     ? `<div class="discount">${product.discountThreshold}+ ${product.unit}: ${Number(product.discountPrice).toLocaleString('uz-UZ')} so'm</div>`
     : ''}
-  <div class="qr"><img src="${qrUrl}" alt="qr" /></div>
+  <div class="barcode"><img src="${barcodeUrl}" alt="barcode" /></div>
 </body>
 </html>`
   openPrintWindow(html)
@@ -66,6 +80,7 @@ export interface ReceiptItem {
 }
 
 export async function printReceipt(data: {
+  receiptNo: number
   items: ReceiptItem[]
   total: number
   paid: number
@@ -79,7 +94,7 @@ export async function printReceipt(data: {
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
   const change = data.paid - data.total
   const debt = data.total - data.paid
-  const receiptNo = Math.floor(Math.random() * 90000 + 10000).toString()
+  const receiptNo = data.receiptNo.toString()
 
   const qrData = `Inomaka | Chek #${receiptNo} | ${dateStr} | ${data.total.toLocaleString('uz-UZ')} so'm`
   const qrUrl = await generateQR(qrData)

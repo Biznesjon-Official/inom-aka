@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 export function useDebounce<T>(value: T, delay = 300): T {
   const [debounced, setDebounced] = useState(value)
@@ -65,4 +65,46 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
   }, [url, ttl, doFetch])
 
   return { data, loading, refresh }
+}
+
+// Barcode scanner hook — detects rapid keystrokes ending with Enter
+export function useBarcodeScan(onScan: (code: string) => void) {
+  const bufferRef = useRef('')
+  const lastKeyTime = useRef(0)
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ignore if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      const now = Date.now()
+      const timeDiff = now - lastKeyTime.current
+
+      if (timeDiff > 100) {
+        // Too slow — reset buffer (human typing)
+        bufferRef.current = ''
+      }
+
+      if (e.key === 'Enter') {
+        const code = bufferRef.current.trim()
+        if (code.length >= 6) {
+          onScanRef.current(code)
+        }
+        bufferRef.current = ''
+        return
+      }
+
+      if (e.key.length === 1) {
+        bufferRef.current += e.key
+      }
+
+      lastKeyTime.current = now
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 }

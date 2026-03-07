@@ -27,11 +27,15 @@ export default function XarajatlarPage() {
     const params = new URLSearchParams()
     if (filterSource !== 'all') params.set('source', filterSource)
     const res = await fetch(`/api/expenses?${params}`)
+    if (!res.ok) return toast.error('Xarajatlarni yuklashda xato')
     setExpenses(await res.json())
   }, [filterSource])
 
   useEffect(() => {
-    fetch('/api/expense-sources').then(r => r.json()).then(setSources)
+    fetch('/api/expense-sources').then(r => {
+      if (!r.ok) { toast.error('Manbalarni yuklashda xato'); return }
+      r.json().then(setSources)
+    })
   }, [])
 
   useEffect(() => { fetchExpenses() }, [fetchExpenses])
@@ -50,6 +54,7 @@ export default function XarajatlarPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSource),
     })
+    if (!res.ok) return toast.error('Manba qo\'shishda xato')
     const src = await res.json()
     setSources(prev => [...prev, src])
     setNewSource({ name: '', description: '' })
@@ -58,7 +63,8 @@ export default function XarajatlarPage() {
 
   async function deleteSource(id: string) {
     if (!confirm('O\'chirishni tasdiqlaysizmi?')) return
-    await fetch(`/api/expense-sources/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/expense-sources/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
     setSources(prev => prev.filter(s => s._id !== id))
     toast.success('O\'chirildi')
   }
@@ -87,7 +93,8 @@ export default function XarajatlarPage() {
 
   async function deleteExpense(id: string) {
     if (!confirm('O\'chirishni tasdiqlaysizmi?')) return
-    await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
     setExpenses(prev => prev.filter(e => e._id !== id))
     toast.success('O\'chirildi')
   }

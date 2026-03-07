@@ -36,6 +36,7 @@ export default function QarzlarPage() {
 
   const fetchDebts = useCallback(async () => {
     const res = await fetch(`/api/debts?status=${status}`)
+    if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
     const data = await res.json()
     setDebts(Array.isArray(data) ? data : [])
   }, [status])

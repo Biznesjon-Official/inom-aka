@@ -2,15 +2,18 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Search } from 'lucide-react'
+import { Search, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/utils'
-import { useDebounce, useFetchWithCache } from '@/lib/hooks'
+import { useDebounce, useFetchWithCache, useBarcodeScan } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 import { ProductCard } from './ProductCard'
 import { CartPanel } from './CartPanel'
 import { PaymentDialog } from './PaymentDialog'
 import SalesLog from './SalesLog'
+import BarcodeScanner from './BarcodeScanner'
 
 interface Product {
   _id: string
@@ -30,6 +33,14 @@ interface CartItem extends Product {
   price: number
 }
 
+interface SavedCart {
+  _id: string
+  name: string
+  items: { product: Product; qty: number }[]
+  createdBy?: { name: string }
+  createdAt: string
+}
+
 export default function KassaPage() {
   const { data: session } = useSession()
   const [search, setSearch] = useState('')
@@ -42,6 +53,12 @@ export default function KassaPage() {
   const [customTotal, setCustomTotal] = useState<number | null>(null)
   const [editingTotal, setEditingTotal] = useState(false)
   const [editTotalValue, setEditTotalValue] = useState('')
+
+  // Saved carts
+  const [savedCarts, setSavedCarts] = useState<SavedCart[]>([])
+  const [savedCartsDialog, setSavedCartsDialog] = useState(false)
+  const [saveNameDialog, setSaveNameDialog] = useState(false)
+  const [saveName, setSaveName] = useState('')
 
   const debouncedSearch = useDebounce(search)
   const productsUrl = `/api/products?search=${encodeURIComponent(debouncedSearch)}`
@@ -66,6 +83,74 @@ export default function KassaPage() {
       return [...prev, { ...product, qty: 1, price: getItemPrice(product, 1) }]
     })
   }, [])
+
+  // Barcode scanner — fetch product by ID and add to cart
+  const handleBarcodeScan = useCallback(async (code: string) => {
+    try {
+      const res = await fetch(`/api/products/${code}`)
+      if (!res.ok) return toast.error('Mahsulot topilmadi')
+      const product: Product = await res.json()
+      addToCart(product)
+      toast.success(`${product.name} qo'shildi`)
+    } catch {
+      toast.error('Skaner xatosi')
+    }
+  }, [addToCart])
+
+  useBarcodeScan(handleBarcodeScan)
+
+  // Saved carts functions
+  const fetchSavedCarts = useCallback(async () => {
+    const res = await fetch('/api/saved-carts')
+    if (res.ok) setSavedCarts(await res.json())
+  }, [])
+
+  const handleSaveCart = useCallback(() => {
+    setSaveName('')
+    setSaveNameDialog(true)
+  }, [])
+
+  const confirmSaveCart = useCallback(async () => {
+    if (!saveName.trim()) return toast.error('Nom kiriting')
+    const res = await fetch('/api/saved-carts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: saveName.trim(),
+        items: cart.map(c => ({ product: c._id, qty: c.qty })),
+        createdBy: session?.user?.id,
+      }),
+    })
+    if (!res.ok) return toast.error('Saqlashda xato')
+    toast.success('Ro\'yxat saqlandi')
+    setSaveNameDialog(false)
+    fetchSavedCarts()
+  }, [saveName, cart, session, fetchSavedCarts])
+
+  const loadSavedCart = useCallback((sc: SavedCart) => {
+    const newCart: CartItem[] = []
+    for (const item of sc.items) {
+      if (!item.product) continue
+      const p = item.product
+      newCart.push({ ...p, qty: item.qty, price: getItemPrice(p, item.qty) })
+    }
+    setCart(newCart)
+    setCustomTotal(null)
+    setSavedCartsDialog(false)
+    toast.success(`"${sc.name}" yuklandi`)
+  }, [])
+
+  const deleteSavedCart = useCallback(async (id: string) => {
+    const res = await fetch(`/api/saved-carts/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
+    setSavedCarts(prev => prev.filter(c => c._id !== id))
+    toast.success('O\'chirildi')
+  }, [])
+
+  const openSavedCarts = useCallback(() => {
+    fetchSavedCarts()
+    setSavedCartsDialog(true)
+  }, [fetchSavedCarts])
 
   const updateQty = useCallback((id: string, qty: number) => {
     setCustomTotal(null)
@@ -112,6 +197,7 @@ export default function KassaPage() {
     let customerId: string | undefined
     if (clientName.trim()) {
       const existing = await fetch(`/api/customers?search=${encodeURIComponent(clientName.trim())}`)
+      if (!existing.ok) { setLoading(false); return toast.error('Mijoz qidirishda xato') }
       const list = await existing.json()
       const found = list.find((c: { name: string; phone?: string }) =>
         c.name.toLowerCase() === clientName.trim().toLowerCase()
@@ -124,6 +210,7 @@ export default function KassaPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: clientName.trim(), phone: clientPhone.trim() || undefined }),
         })
+        if (!created.ok) { setLoading(false); return toast.error('Mijoz yaratishda xato') }
         const c = await created.json()
         customerId = c._id
       }
@@ -155,7 +242,11 @@ export default function KassaPage() {
 
     if (!res.ok) return toast.error('Xato yuz berdi')
 
+    const result = await res.json()
+    const receiptNo = result.sale?.receiptNo || 0
+
     await printReceipt({
+      receiptNo,
       items: cart.map(c => ({ productName: c.name, qty: c.qty, unit: c.unit, salePrice: c.price })),
       total: finalTotal,
       paid: actualPaid,
@@ -184,7 +275,10 @@ export default function KassaPage() {
     <div className="flex flex-col lg:flex-row gap-4 h-full">
       {/* Products panel */}
       <div className="flex-1 space-y-4">
-        <h1 className="text-xl font-bold text-slate-800">Kassa</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-slate-800">Kassa</h1>
+          <BarcodeScanner onScan={handleBarcodeScan} />
+        </div>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -228,6 +322,9 @@ export default function KassaPage() {
           onStartEditTotal={startEditTotal}
           onCommitEditTotal={commitEditTotal}
           onEditTotalChange={setEditTotalValue}
+          onSaveCart={handleSaveCart}
+          onLoadCart={openSavedCarts}
+          savedCartsCount={savedCarts.length}
         />
 
         <div className="mt-4">
@@ -251,6 +348,62 @@ export default function KassaPage() {
         onClientPhoneChange={setClientPhone}
         onCheckout={handleCheckout}
       />
+
+      {/* Save cart name dialog */}
+      <Dialog open={saveNameDialog} onOpenChange={setSaveNameDialog}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Ro&apos;yxatni saqlash</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Ro'yxat nomi"
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmSaveCart()}
+              autoFocus
+            />
+            <div className="text-xs text-slate-500">{cart.length} ta mahsulot saqlanadi</div>
+            <Button className="w-full" onClick={confirmSaveCart}>Saqlash</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Saved carts dialog */}
+      <Dialog open={savedCartsDialog} onOpenChange={setSavedCartsDialog}>
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Saqlangan ro&apos;yxatlar</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {savedCarts.map(sc => (
+              <div key={sc._id} className="p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div>
+                    <div className="font-medium text-sm text-slate-800">{sc.name}</div>
+                    <div className="text-xs text-slate-400">
+                      {new Date(sc.createdAt).toLocaleDateString('uz-UZ')}
+                      {sc.createdBy?.name && ` — ${sc.createdBy.name}`}
+                    </div>
+                  </div>
+                  <button className="p-1 hover:bg-red-50 rounded" onClick={() => deleteSavedCart(sc._id)}>
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  </button>
+                </div>
+                <div className="text-xs text-slate-500 mb-2">
+                  {sc.items.filter(i => i.product).map(i => `${i.product.name} x${i.qty}`).join(', ')}
+                </div>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => loadSavedCart(sc)}>
+                  Savatga yuklash
+                </Button>
+              </div>
+            ))}
+            {savedCarts.length === 0 && (
+              <div className="text-center text-slate-400 py-6">Saqlangan ro&apos;yxat yo&apos;q</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
