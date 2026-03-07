@@ -17,6 +17,11 @@ const ReturnItemSchema = new Schema({
   returnedAt: { type: Date, default: Date.now },
 }, { _id: false })
 
+const SalePaymentSchema = new Schema({
+  method: { type: String, enum: ['cash', 'card', 'terminal'], required: true },
+  amount: { type: Number, required: true },
+}, { _id: false })
+
 const SaleSchema = new Schema({
   receiptNo: { type: Number, unique: true },
   items: [SaleItemSchema],
@@ -25,6 +30,7 @@ const SaleSchema = new Schema({
   cashier: { type: Types.ObjectId, ref: 'User', required: true },
   customer: { type: Types.ObjectId, ref: 'Customer' },
   paymentType: { type: String, enum: ['full', 'partial', 'debt'], required: true },
+  payments: [SalePaymentSchema],
   note: { type: String },
   returnedItems: [ReturnItemSchema],
   returnedTotal: { type: Number, default: 0 },

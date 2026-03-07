@@ -3,6 +3,8 @@ import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
 import Customer from '@/models/Customer'
+import Expense from '@/models/Expense'
+import ExpenseSource from '@/models/ExpenseSource'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -35,6 +37,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await Customer.findByIdAndUpdate(debt.customer, {
       $inc: { totalDebt: -amount },
     })
+
+    // If personal payable debt — create expense
+    if (debt.type === 'personal' && debt.direction === 'payable') {
+      let source = await ExpenseSource.findOne({ name: 'Shaxsiy qarz to\'lovi' })
+      if (!source) {
+        source = await ExpenseSource.create({ name: 'Shaxsiy qarz to\'lovi', description: 'Shaxsiy qarz to\'lovlari uchun avtomatik manba' })
+      }
+      await Expense.create({
+        source: source._id,
+        amount,
+        description: note || `Shaxsiy qarz to'lovi`,
+        date: new Date(),
+      })
+    }
 
     return NextResponse.json(debt)
   } catch (err) { return errorResponse(err) }

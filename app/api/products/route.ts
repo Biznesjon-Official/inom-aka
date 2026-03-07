@@ -16,8 +16,7 @@ export async function GET(req: Request) {
     if (category) filter.category = category
     if (active !== 'all') filter.isActive = true
 
-    // Exclude image from list query to avoid MongoDB 32MB sort memory limit
-    const products = await Product.find(filter, { image: 0 })
+    const products = await Product.find(filter)
       .populate('category')
       .sort({ createdAt: -1 })
       .limit(200)

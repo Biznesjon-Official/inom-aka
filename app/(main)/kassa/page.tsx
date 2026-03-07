@@ -2,7 +2,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Search, Trash2 } from 'lucide-react'
+import { Search, Trash2, LayoutGrid, List } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { useDebounce, useFetchWithCache, useBarcodeScan } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 import { ProductCard } from './ProductCard'
 import { CartPanel } from './CartPanel'
-import { PaymentDialog } from './PaymentDialog'
+import { PaymentDialog, type SalePayment } from './PaymentDialog'
 import SalesLog from './SalesLog'
 import BarcodeScanner from './BarcodeScanner'
 
@@ -45,10 +45,10 @@ export default function KassaPage() {
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
-  const [paidAmount, setPaidAmount] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientPhone, setClientPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [customTotal, setCustomTotal] = useState<number | null>(null)
   const [editingTotal, setEditingTotal] = useState(false)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -177,17 +177,16 @@ export default function KassaPage() {
   }, [editTotalValue, total])
 
   function openPayDialog() {
-    setPaidAmount('')
     setClientName('')
     setClientPhone('')
     setPayDialog(true)
   }
 
-  async function handleCheckout() {
-    const paid = Number(paidAmount) || 0
+  async function handleCheckout(payments: SalePayment[]) {
+    const paid = payments.reduce((s, p) => s + p.amount, 0)
     const isDebt = paid < finalTotal
     if (cart.length === 0) return toast.error('Savat bo\'sh')
-    if (!paidAmount || paid < 0) return toast.error('To\'langan summani kiriting')
+    if (payments.length === 0) return toast.error('To\'lov usulini tanlang')
     if (isDebt && !clientName.trim()) return toast.error('Qarz bo\'lganda mijoz ismi majburiy')
     if (isDebt && !clientPhone.trim()) return toast.error('Qarz bo\'lganda telefon raqam majburiy')
 
@@ -235,6 +234,7 @@ export default function KassaPage() {
         cashier: session?.user.id,
         customer: customerId,
         paymentType,
+        payments,
       }),
     })
     setLoading(false)
@@ -276,7 +276,17 @@ export default function KassaPage() {
       <div className="flex-1 space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800">Kassa</h1>
-          <BarcodeScanner onScan={handleBarcodeScan} />
+          <div className="flex items-center gap-2">
+            <div className="flex border rounded-lg overflow-hidden">
+              <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
+                <LayoutGrid className="w-4 h-4 text-slate-600" />
+              </button>
+              <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+                <List className="w-4 h-4 text-slate-600" />
+              </button>
+            </div>
+            <BarcodeScanner onScan={handleBarcodeScan} />
+          </div>
         </div>
 
         <div className="relative">
@@ -285,25 +295,66 @@ export default function KassaPage() {
             onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {productsLoading && products.length === 0
-            ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
-                  <div className="aspect-square bg-slate-200" />
-                  <div className="p-2.5 space-y-2">
-                    <div className="h-4 bg-slate-200 rounded w-3/4" />
-                    <div className="h-3 bg-slate-200 rounded w-1/2" />
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+            {productsLoading && products.length === 0
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-slate-200" />
+                    <div className="p-2.5 space-y-2">
+                      <div className="h-4 bg-slate-200 rounded w-3/4" />
+                      <div className="h-3 bg-slate-200 rounded w-1/2" />
+                    </div>
                   </div>
-                </div>
-              ))
-            : products.map(p => (
-                <ProductCard key={p._id} product={p} onClick={addToCart} />
-              ))
-          }
-          {!productsLoading && products.length === 0 && (
-            <div className="col-span-full text-center text-slate-400 py-8">Mahsulot topilmadi</div>
-          )}
-        </div>
+                ))
+              : products.map(p => (
+                  <ProductCard key={p._id} product={p} onClick={addToCart} />
+                ))
+            }
+            {!productsLoading && products.length === 0 && (
+              <div className="col-span-full text-center text-slate-400 py-8">Mahsulot topilmadi</div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl overflow-x-auto shadow-sm max-h-[60vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b text-left text-slate-500">
+                  <th className="px-3 py-2.5 font-medium">Nom</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Narx</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Stok</th>
+                  <th className="px-3 py-2.5 font-medium text-right w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => {
+                  const outOfStock = (p.stock ?? 0) <= 0
+                  return (
+                    <tr key={p._id} className={`border-b last:border-0 ${outOfStock ? 'opacity-50' : 'hover:bg-slate-50 cursor-pointer'}`}
+                      onClick={() => !outOfStock && addToCart(p)}>
+                      <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
+                      <td className="px-3 py-2 text-right text-blue-600 font-medium">{formatPrice(p.salePrice)}</td>
+                      <td className={`px-3 py-2 text-right ${outOfStock ? 'text-red-600' : 'text-slate-600'}`}>
+                        {p.stock} {p.unit}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {!outOfStock && (
+                          <button className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center"
+                            onClick={e => { e.stopPropagation(); addToCart(p) }}>
+                            <span className="text-white text-lg leading-none">+</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {!productsLoading && products.length === 0 && (
+                  <tr><td colSpan={4} className="text-center text-slate-400 py-8">Mahsulot topilmadi</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Cart panel */}
@@ -338,13 +389,13 @@ export default function KassaPage() {
         total={total}
         finalTotal={finalTotal}
         discount={discount}
-        paidAmount={paidAmount}
         clientName={clientName}
         clientPhone={clientPhone}
         loading={loading}
-        onPaidAmountChange={setPaidAmount}
+        cart={cart}
         onClientNameChange={setClientName}
         onClientPhoneChange={setClientPhone}
+        onTotalChange={setCustomTotal}
         onCheckout={handleCheckout}
       />
 

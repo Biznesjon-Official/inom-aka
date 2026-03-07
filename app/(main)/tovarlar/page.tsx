@@ -1,12 +1,15 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Search, Trash2 } from 'lucide-react'
+import { Plus, Search, Trash2, LayoutGrid, List, Package, AlertTriangle, Pencil, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDebounce, useFetchWithCache } from '@/lib/hooks'
+import { formatPrice } from '@/lib/utils'
+import { printLabel } from '@/lib/print'
 import { TovarProductCard } from './ProductCard'
 import { ProductDialog, type ProductForm } from './ProductDialog'
 
@@ -32,6 +35,12 @@ export default function TovarlarPage() {
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [newCat, setNewCat] = useState('')
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+
+  // Product stats
+  const { data: stats } = useFetchWithCache<{
+    totalProducts: number; totalCostValue: number; totalSaleValue: number; lowStockCount: number
+  }>('/api/product-stats')
 
   const debouncedSearch = useDebounce(search)
   const productsUrl = (() => {
@@ -113,9 +122,67 @@ export default function TovarlarPage() {
 
   return (
     <div className="space-y-4">
+      {/* Stat cards */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500 font-medium">Umumiy tovarlar</span>
+                <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5 text-blue-500" />
+                </div>
+              </div>
+              <div className="text-lg font-bold text-slate-800">{stats.totalProducts} ta</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500 font-medium">Jami tannarx</span>
+                <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5 text-orange-500" />
+                </div>
+              </div>
+              <div className="text-lg font-bold text-slate-800">{formatPrice(stats.totalCostValue)}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500 font-medium">Jami sotuv narx</span>
+                <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5 text-green-500" />
+                </div>
+              </div>
+              <div className="text-lg font-bold text-slate-800">{formatPrice(stats.totalSaleValue)}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500 font-medium">Kam qolgan</span>
+                <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                </div>
+              </div>
+              <div className="text-lg font-bold text-slate-800">{stats.lowStockCount} ta</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-800">Tovarlar</h1>
         <div className="flex gap-2">
+          <div className="flex border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
+              <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+              <List className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
           <Button variant="outline" size="sm" onClick={() => setCatDialog(true)}>Kategoriyalar</Button>
           <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Qo&apos;shish</Button>
         </div>
@@ -137,26 +204,76 @@ export default function TovarlarPage() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-        {productsLoading && products.length === 0
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
-                <div className="aspect-[4/3] bg-slate-200" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 bg-slate-200 rounded w-3/4" />
-                  <div className="h-4 bg-slate-200 rounded w-1/2" />
-                  <div className="h-3 bg-slate-200 rounded w-1/3" />
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+          {productsLoading && products.length === 0
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                  <div className="aspect-[4/3] bg-slate-200" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-4 bg-slate-200 rounded w-1/2" />
+                    <div className="h-3 bg-slate-200 rounded w-1/3" />
+                  </div>
                 </div>
-              </div>
-            ))
-          : products.map(p => (
-              <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} />
-            ))
-        }
-        {!productsLoading && products.length === 0 && (
-          <div className="col-span-full text-center text-slate-400 py-12">Mahsulot topilmadi</div>
-        )}
-      </div>
+              ))
+            : products.map(p => (
+                <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} />
+              ))
+          }
+          {!productsLoading && products.length === 0 && (
+            <div className="col-span-full text-center text-slate-400 py-12">Mahsulot topilmadi</div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="px-4 py-3 font-medium">Nom</th>
+                <th className="px-4 py-3 font-medium">Kategoriya</th>
+                <th className="px-4 py-3 font-medium text-right">Tannarx</th>
+                <th className="px-4 py-3 font-medium text-right">Sotuv narx</th>
+                <th className="px-4 py-3 font-medium text-right">Stok</th>
+                <th className="px-4 py-3 font-medium text-right">Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(p => {
+                const outOfStock = (p.stock ?? 0) <= 0
+                const lowStock = (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5
+                return (
+                  <tr key={p._id} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{p.name}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{p.category?.name || '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600">{formatPrice(p.costPrice)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-blue-600">{formatPrice(p.salePrice)}</td>
+                    <td className={`px-4 py-2.5 text-right font-medium ${outOfStock ? 'text-red-600' : lowStock ? 'text-amber-600' : 'text-slate-700'}`}>
+                      {p.stock} {p.unit}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button className="p-1.5 hover:bg-blue-50 rounded" onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name })}>
+                          <Printer className="w-3.5 h-3.5 text-blue-500" />
+                        </button>
+                        <button className="p-1.5 hover:bg-slate-100 rounded" onClick={() => openEdit(p)}>
+                          <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                        </button>
+                        <button className="p-1.5 hover:bg-red-50 rounded" onClick={() => handleDelete(p._id)}>
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!productsLoading && products.length === 0 && (
+                <tr><td colSpan={6} className="text-center text-slate-400 py-12">Mahsulot topilmadi</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Product dialog */}
       <ProductDialog

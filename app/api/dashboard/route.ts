@@ -33,6 +33,7 @@ export async function GET() {
       chartSalesAgg, chartExpenseAgg,
       topProductsAgg,
       lowStockProducts,
+      productStatsAgg,
     ] = await Promise.all([
       // Today sales
       Sale.aggregate([
@@ -138,6 +139,17 @@ export async function GET() {
         .sort({ stock: 1 })
         .limit(10)
         .lean(),
+      // Product stats for dashboard
+      Product.aggregate([
+        { $match: { isActive: true } },
+        {
+          $group: {
+            _id: null,
+            totalProducts: { $sum: 1 },
+            warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } },
+          },
+        },
+      ]),
     ])
 
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
@@ -193,6 +205,8 @@ export async function GET() {
         netProfit: lastMonthProfit - lastMonthExpenses,
       },
       totalDebt: debtAgg[0]?.total || 0,
+      totalProducts: productStatsAgg[0]?.totalProducts || 0,
+      warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
       chart,
       topProducts: topProductsAgg,
       lowStock: lowStockProducts,

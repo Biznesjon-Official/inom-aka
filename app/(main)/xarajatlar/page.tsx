@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { formatPrice } from '@/lib/utils'
 
 interface ExpenseSource { _id: string; name: string; description?: string }
@@ -209,7 +210,7 @@ export default function XarajatlarPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Summa *</Label>
-              <Input type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
+              <NumberInput value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} min={0} />
             </div>
             <div className="space-y-1.5">
               <Label>Sana</Label>

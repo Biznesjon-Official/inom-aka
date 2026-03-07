@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatPrice } from '@/lib/utils'
+import { NumberInput } from '@/components/ui/NumberInput'
 
 interface CartItem {
   _id: string
@@ -114,15 +115,15 @@ export const CartPanel = React.memo(function CartPanel({
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Jami:</span>
                 {editingTotal ? (
-                  <input
-                    className="w-28 text-right text-sm font-bold border rounded px-1 py-0.5"
-                    type="number"
-                    value={editTotalValue}
-                    onChange={e => onEditTotalChange(e.target.value)}
-                    onBlur={onCommitEditTotal}
-                    onKeyDown={e => e.key === 'Enter' && onCommitEditTotal()}
-                    autoFocus
-                  />
+                  <div className="w-28" onKeyDown={e => e.key === 'Enter' && onCommitEditTotal()}>
+                    <NumberInput
+                      className="text-right text-sm font-bold h-7"
+                      value={editTotalValue}
+                      onChange={onEditTotalChange}
+                      autoFocus
+                      min={0}
+                    />
+                  </div>
                 ) : (
                   <span
                     className={`font-bold cursor-pointer select-none ${discount > 0 ? 'text-green-700' : 'text-slate-800'}`}

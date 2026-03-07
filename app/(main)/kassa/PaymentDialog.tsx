@@ -5,6 +5,19 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatPrice } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks'
+import { NumberInput } from '@/components/ui/NumberInput'
+
+interface CartItem {
+  _id: string
+  costPrice: number
+  qty: number
+  price: number
+}
+
+export interface SalePayment {
+  method: 'cash' | 'card' | 'terminal'
+  amount: number
+}
 
 interface PaymentDialogProps {
   open: boolean
@@ -12,14 +25,14 @@ interface PaymentDialogProps {
   total: number
   finalTotal: number
   discount: number
-  paidAmount: string
   clientName: string
   clientPhone: string
   loading: boolean
-  onPaidAmountChange: (value: string) => void
+  cart: CartItem[]
   onClientNameChange: (value: string) => void
   onClientPhoneChange: (value: string) => void
-  onCheckout: () => void
+  onTotalChange: (value: number | null) => void
+  onCheckout: (payments: SalePayment[]) => void
 }
 
 interface CustomerSuggestion {
@@ -80,13 +93,66 @@ function CustomerAutocomplete({ value, phone, onChange, onPhoneChange, required 
   )
 }
 
+const METHOD_LABELS: Record<string, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal' }
+
 export const PaymentDialog = React.memo(function PaymentDialog({
   open, onOpenChange, total, finalTotal, discount,
-  paidAmount, clientName, clientPhone, loading,
-  onPaidAmountChange, onClientNameChange, onClientPhoneChange, onCheckout,
+  clientName, clientPhone, loading, cart,
+  onClientNameChange, onClientPhoneChange, onTotalChange, onCheckout,
 }: PaymentDialogProps) {
-  const paid = Number(paidAmount) || 0
-  const isDebt = paid < finalTotal
+  const [payments, setPayments] = useState<SalePayment[]>([])
+  const [currentMethod, setCurrentMethod] = useState<'cash' | 'card' | 'terminal'>('cash')
+  const [currentAmount, setCurrentAmount] = useState('')
+  const [editingTotal, setEditingTotal] = useState(false)
+  const [editValue, setEditValue] = useState('')
+
+  const paidTotal = payments.reduce((s, p) => s + p.amount, 0)
+  const remaining = finalTotal - paidTotal
+  const isDebt = remaining > 0
+  const costTotal = cart.reduce((s, c) => s + c.costPrice * c.qty, 0)
+  const profit = finalTotal - costTotal
+
+  // Reset when dialog opens
+  useEffect(() => {
+    if (open) {
+      setPayments([])
+      setCurrentAmount('')
+      setCurrentMethod('cash')
+      setEditingTotal(false)
+    }
+  }, [open])
+
+  function addPayment() {
+    const amt = Number(currentAmount)
+    if (!amt || amt <= 0) return
+    setPayments(prev => [...prev, { method: currentMethod, amount: amt }])
+    setCurrentAmount('')
+  }
+
+  function removePayment(idx: number) {
+    setPayments(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function payFull(method: 'cash' | 'card' | 'terminal') {
+    if (remaining <= 0) return
+    setPayments(prev => [...prev, { method, amount: remaining }])
+    setCurrentAmount('')
+  }
+
+  function startEditTotal() {
+    setEditValue(String(finalTotal))
+    setEditingTotal(true)
+  }
+
+  function commitEditTotal() {
+    const val = Number(editValue)
+    if (val > 0 && val !== total) {
+      onTotalChange(val)
+    } else {
+      onTotalChange(null)
+    }
+    setEditingTotal(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,11 +167,99 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             {discount > 0 && (
               <div className="text-sm text-slate-400 line-through">{formatPrice(total)}</div>
             )}
-            <div className="text-2xl font-bold text-slate-800">{formatPrice(finalTotal)}</div>
+            {editingTotal ? (
+              <div className="flex justify-center" onKeyDown={e => e.key === 'Enter' && commitEditTotal()}>
+                <NumberInput
+                  className="text-center text-2xl font-bold w-48 h-10"
+                  value={editValue}
+                  onChange={setEditValue}
+                  autoFocus
+                  min={0}
+                />
+              </div>
+            ) : (
+              <div className="text-2xl font-bold text-slate-800 cursor-pointer" onClick={startEditTotal} title="Bosing tahrirlash uchun">
+                {formatPrice(finalTotal)}
+              </div>
+            )}
+            {editingTotal && (
+              <Button size="sm" variant="outline" className="mt-2" onClick={commitEditTotal}>Tasdiqlash</Button>
+            )}
             {discount > 0 && (
               <div className="text-xs text-green-600 mt-1">Chegirma: -{formatPrice(discount)}</div>
             )}
+            <div className={`text-xs mt-1 font-medium ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {profit >= 0 ? `Foyda: ${formatPrice(profit)}` : `Zarar: -${formatPrice(Math.abs(profit))}`}
+            </div>
           </div>
+
+          {/* Quick pay buttons */}
+          {remaining > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-slate-500">To&apos;liq to&apos;lash:</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button size="sm" variant="outline" onClick={() => payFull('cash')} className="text-xs">
+                  💵 Naqd
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => payFull('card')} className="text-xs">
+                  💳 Karta
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => payFull('terminal')} className="text-xs">
+                  📱 Terminal
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Split payment input */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-slate-500">Qo&apos;shimcha to&apos;lov:</Label>
+            <div className="flex gap-2">
+              <select className="border rounded-lg px-2 py-1.5 text-sm bg-white"
+                value={currentMethod} onChange={e => setCurrentMethod(e.target.value as 'cash' | 'card' | 'terminal')}>
+                <option value="cash">Naqd</option>
+                <option value="card">Karta</option>
+                <option value="terminal">Terminal</option>
+              </select>
+              <div className="flex-1" onKeyDown={e => e.key === 'Enter' && addPayment()}>
+                <NumberInput value={currentAmount} onChange={setCurrentAmount} placeholder="Summa" min={0} />
+              </div>
+              <Button size="sm" onClick={addPayment}>+</Button>
+            </div>
+          </div>
+
+          {/* Payments list */}
+          {payments.length > 0 && (
+            <div className="space-y-1">
+              {payments.map((p, i) => (
+                <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-1.5 text-sm">
+                  <span className="text-slate-600">{METHOD_LABELS[p.method]}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-slate-800">{formatPrice(p.amount)}</span>
+                    <button className="text-red-400 hover:text-red-600" onClick={() => removePayment(i)}>✕</button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between text-sm font-medium pt-1">
+                <span className="text-slate-500">To&apos;langan:</span>
+                <span className="text-slate-800">{formatPrice(paidTotal)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Status */}
+          {payments.length > 0 && (
+            <div className={`rounded-lg p-3 text-sm font-medium text-center ${
+              remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'
+            }`}>
+              {remaining <= 0
+                ? paidTotal > finalTotal
+                  ? `✓ To'liq. Qaytim: ${formatPrice(paidTotal - finalTotal)}`
+                  : `✓ To'liq to'landi`
+                : `⚠ Qarz: ${formatPrice(remaining)}`
+              }
+            </div>
+          )}
 
           <div className="space-y-2">
             <CustomerAutocomplete
@@ -122,34 +276,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Berilgan pul *</Label>
-            <Input
-              type="number"
-              placeholder="Summa kiriting"
-              value={paidAmount}
-              onChange={e => onPaidAmountChange(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          {paidAmount && paid >= 0 && (
-            <div className={`rounded-lg p-3 text-sm font-medium text-center ${
-              paid >= finalTotal
-                ? 'bg-green-50 text-green-700'
-                : 'bg-orange-50 text-orange-700'
-            }`}>
-              {paid >= finalTotal ? (
-                paid > finalTotal
-                  ? `✓ To'liq. Qaytim: ${formatPrice(paid - finalTotal)}`
-                  : `✓ To'liq to'landi`
-              ) : (
-                `⚠ Qarz: ${formatPrice(finalTotal - paid)}`
-              )}
-            </div>
-          )}
-
-          <Button className="w-full" onClick={onCheckout} disabled={loading}>
+          <Button className="w-full" onClick={() => onCheckout(payments)} disabled={loading || payments.length === 0}>
             {loading ? 'Saqlanmoqda...' : 'Tasdiqlash'}
           </Button>
         </div>

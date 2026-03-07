@@ -11,12 +11,14 @@ export async function GET(req: Request) {
     await connectDB()
     const { searchParams } = new URL(req.url)
     const cashier = searchParams.get('cashier')
+    const customer = searchParams.get('customer')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     const today = searchParams.get('today')
 
     const filter: Record<string, unknown> = {}
     if (cashier) filter.cashier = cashier
+    if (customer) filter.customer = customer
     if (today === '1') {
       const start = new Date()
       start.setHours(0, 0, 0, 0)

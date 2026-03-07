@@ -53,8 +53,8 @@ export const TovarProductCard = React.memo(function TovarProductCard({ product: 
           </span>
         )}
 
-        {/* Action buttons — visible on hover */}
-        <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons */}
+        <div className="absolute bottom-2 right-2 flex gap-1">
           <button
             className="w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow hover:bg-blue-50 transition-colors"
             title="Label chiqarish"

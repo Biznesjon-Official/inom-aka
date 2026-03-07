@@ -12,9 +12,12 @@ export async function GET(req: Request) {
     const status = searchParams.get('status')
     const customer = searchParams.get('customer')
 
+    const type = searchParams.get('type')
+
     const filter: Record<string, unknown> = {}
     if (status) filter.status = status
     if (customer) filter.customer = customer
+    if (type) filter.type = type
 
     const debts = await Debt.find(filter)
       .populate('customer', 'name phone')
@@ -30,7 +33,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectDB()
-    const { customerName, customerPhone, amount, note } = await req.json()
+    const { customerName, customerPhone, amount, note, type, direction } = await req.json()
 
     if (!customerName || !amount) {
       return NextResponse.json({ error: 'customerName and amount required' }, { status: 400 })
@@ -48,6 +51,8 @@ export async function POST(req: Request) {
       paidAmount: 0,
       remainingAmount: amount,
       note,
+      type: type || 'customer',
+      direction: direction || 'receivable',
     })
 
     await Customer.findByIdAndUpdate(customer._id, { $inc: { totalDebt: amount } })

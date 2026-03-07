@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { BookOpen, Search, CreditCard, Plus } from 'lucide-react'
+import { BookOpen, Search, CreditCard, Plus, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/utils'
+import { NumberInput } from '@/components/ui/NumberInput'
 
 interface Debt {
   _id: string
@@ -18,6 +19,9 @@ interface Debt {
   paidAmount: number
   remainingAmount: number
   status: string
+  type?: 'customer' | 'personal'
+  direction?: 'receivable' | 'payable'
+  note?: string
   createdAt: string
   payments: { amount: number; date: string; note?: string }[]
 }
@@ -32,14 +36,17 @@ export default function QarzlarPage() {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '' })
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [activeTab, setActiveTab] = useState<'customer' | 'personal'>('customer')
+  const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '', type: 'customer' as 'customer' | 'personal', direction: 'receivable' as 'receivable' | 'payable' })
 
   const fetchDebts = useCallback(async () => {
-    const res = await fetch(`/api/debts?status=${status}`)
+    const typeParam = activeTab === 'personal' ? '&type=personal' : '&type=customer'
+    const res = await fetch(`/api/debts?status=${status}${typeParam}`)
     if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
     const data = await res.json()
     setDebts(Array.isArray(data) ? data : [])
-  }, [status])
+  }, [status, activeTab])
 
   useEffect(() => { fetchDebts() }, [fetchDebts])
 
@@ -58,13 +65,20 @@ export default function QarzlarPage() {
     const res = await fetch('/api/debts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerName: addForm.customerName.trim(), customerPhone: addForm.customerPhone.trim() || undefined, amount: num, note: addForm.note || undefined }),
+      body: JSON.stringify({
+        customerName: addForm.customerName.trim(),
+        customerPhone: addForm.customerPhone.trim() || undefined,
+        amount: num,
+        note: addForm.note || undefined,
+        type: addForm.type,
+        direction: addForm.direction,
+      }),
     })
     setLoading(false)
     if (!res.ok) return toast.error('Xato yuz berdi')
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
-    setAddForm({ customerName: '', customerPhone: '', amount: '', note: '' })
+    setAddForm({ customerName: '', customerPhone: '', amount: '', note: '', type: 'customer', direction: 'receivable' })
     fetchDebts()
   }
 
@@ -99,9 +113,36 @@ export default function QarzlarPage() {
             <p className="text-sm text-slate-500">Umumiy qarz: <span className="font-bold text-orange-600">{formatPrice(totalDebt)}</span></p>
           )}
         </div>
-        <Button size="sm" onClick={() => setAddDialog(true)}>
-          <Plus className="w-4 h-4 mr-1" />Qarz qo&apos;shish
-        </Button>
+        <div className="flex gap-2">
+          <div className="flex border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('list')}>
+              <List className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
+              <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+          <Button size="sm" onClick={() => {
+            setAddForm(f => ({ ...f, type: activeTab === 'personal' ? 'personal' : 'customer', direction: activeTab === 'personal' ? 'payable' : 'receivable' }))
+            setAddDialog(true)
+          }}>
+            <Plus className="w-4 h-4 mr-1" />Qarz qo&apos;shish
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+        <button
+          className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'customer' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setActiveTab('customer')}>
+          Mijoz qarzlari
+        </button>
+        <button
+          className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'personal' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setActiveTab('personal')}>
+          Shaxsiy qarzlar
+        </button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
@@ -120,7 +161,7 @@ export default function QarzlarPage() {
         </Select>
       </div>
 
-      <div className="space-y-3">
+      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'space-y-3'}>
         {filtered.map(d => (
           <Card key={d._id} className="border-0 shadow-sm">
             <CardContent className="p-4">
@@ -133,6 +174,12 @@ export default function QarzlarPage() {
                     <div className="font-medium text-slate-800">{d.customer?.name}</div>
                     {d.customer?.phone && <div className="text-xs text-slate-400">{d.customer.phone}</div>}
                     <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
+                    {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
+                    {d.direction && (
+                      <span className={`text-[10px] font-medium ${d.direction === 'payable' ? 'text-red-500' : 'text-blue-500'}`}>
+                        {d.direction === 'payable' ? 'Men qarzdorman' : 'Menga qarzdor'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -156,7 +203,7 @@ export default function QarzlarPage() {
                 </div>
               )}
 
-              {d.payments.length > 0 && (
+              {d.payments.length > 0 && viewMode === 'list' && (
                 <div className="mt-3 border-t pt-3">
                   <div className="text-xs text-slate-400 mb-1.5">To&apos;lov tarixi:</div>
                   <div className="space-y-1">
@@ -173,7 +220,7 @@ export default function QarzlarPage() {
           </Card>
         ))}
         {filtered.length === 0 && (
-          <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>
+          <div className={`text-center text-slate-400 py-12 ${viewMode === 'grid' ? 'col-span-full' : ''}`}>Qarz topilmadi</div>
         )}
       </div>
 
@@ -183,8 +230,20 @@ export default function QarzlarPage() {
             <DialogTitle>Yangi qarz</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {addForm.type === 'personal' && (
+              <div className="space-y-1.5">
+                <Label>Yo&apos;nalish *</Label>
+                <Select value={addForm.direction} onValueChange={v => setAddForm(f => ({ ...f, direction: v as 'receivable' | 'payable' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="receivable">Menga qarzdor (olaman)</SelectItem>
+                    <SelectItem value="payable">Men qarzdorman (beraman)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
-              <Label>Mijoz ismi *</Label>
+              <Label>{addForm.type === 'personal' ? 'Ism' : 'Mijoz ismi'} *</Label>
               <Input value={addForm.customerName} onChange={e => setAddForm(f => ({ ...f, customerName: e.target.value }))} placeholder="Ism familiya" />
             </div>
             <div className="space-y-1.5">
@@ -193,7 +252,7 @@ export default function QarzlarPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Qarz summasi *</Label>
-              <Input type="number" value={addForm.amount} onChange={e => setAddForm(f => ({ ...f, amount: e.target.value }))} placeholder="Summa" />
+              <NumberInput value={addForm.amount} onChange={v => setAddForm(f => ({ ...f, amount: v }))} placeholder="Summa" min={0} />
             </div>
             <div className="space-y-1.5">
               <Label>Izoh</Label>
@@ -221,8 +280,8 @@ export default function QarzlarPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>To&apos;lov summasi</Label>
-                <Input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                  placeholder={`Maks: ${selectedDebt.remainingAmount}`} />
+                <NumberInput value={amount} onChange={setAmount}
+                  placeholder={`Maks: ${selectedDebt.remainingAmount}`} min={0} max={selectedDebt.remainingAmount} />
               </div>
               <div className="space-y-1.5">
                 <Label>Izoh (ixtiyoriy)</Label>

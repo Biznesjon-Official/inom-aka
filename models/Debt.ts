@@ -14,6 +14,9 @@ const DebtSchema = new Schema({
   remainingAmount: { type: Number, required: true },
   payments: [DebtPaymentSchema],
   status: { type: String, enum: ['active', 'paid'], default: 'active' },
+  type: { type: String, enum: ['customer', 'personal'], default: 'customer' },
+  direction: { type: String, enum: ['receivable', 'payable'], default: 'receivable' },
+  description: { type: String },
   note: { type: String },
 }, { timestamps: true })
 

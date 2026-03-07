@@ -16,6 +16,8 @@ interface DashboardData {
   month: { sales: number; revenue: number; profit: number; expenses: number; netProfit: number }
   lastMonth: { sales: number; revenue: number; profit: number; expenses: number; netProfit: number }
   totalDebt: number
+  totalProducts: number
+  warehouseValue: number
   chart: { date: string; revenue: number; profit: number; expense: number }[]
   topProducts: { name: string; qty: number; revenue: number }[]
   lowStock: { _id: string; name: string; stock: number; unit: string; salePrice: number }[]
@@ -67,6 +69,8 @@ export default function DashboardPage() {
     { label: 'Bugungi xarajat', value: formatPrice(data.today.expenses), icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' },
     { label: 'Sof foyda (bugun)', value: formatPrice(data.today.netProfit), icon: DollarSign, color: data.today.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600', bg: data.today.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50' },
     { label: 'Umumiy qarz', value: formatPrice(data.totalDebt), icon: BookOpen, color: 'text-orange-500', bg: 'bg-orange-50' },
+    { label: 'Umumiy tovarlar', value: data.totalProducts + ' ta', icon: Package, color: 'text-purple-500', bg: 'bg-purple-50' },
+    { label: 'Ombor qiymati', value: formatPrice(data.warehouseValue), icon: Package, color: 'text-indigo-500', bg: 'bg-indigo-50' },
   ]
 
   const monthStats = [
@@ -81,7 +85,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
 
       {/* Today stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-3">
         {todayStats.map(({ label, value, icon: Icon, color, bg }) => (
           <Card key={label} className="border-0 shadow-sm">
             <CardContent className="p-3">

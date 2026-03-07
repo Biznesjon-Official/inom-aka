@@ -22,6 +22,17 @@ interface CashbackData {
   payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string }[]
 }
 
+interface CustomerSale {
+  _id: string
+  receiptNo: number
+  total: number
+  paid: number
+  paymentType: string
+  items: { productName: string; qty: number; salePrice: number; unit: string }[]
+  cashier?: { name: string }
+  createdAt: string
+}
+
 const emptyForm = { name: '', phone: '', address: '', note: '', cashbackPercent: 0 }
 
 export default function MijozlarPage() {
@@ -38,6 +49,10 @@ export default function MijozlarPage() {
   const [period, setPeriod] = useState<'month' | 'year'>('month')
   const [cashbackData, setCashbackData] = useState<CashbackData | null>(null)
   const [cashbackLoading, setCashbackLoading] = useState(false)
+
+  // Customer sales
+  const [customerSales, setCustomerSales] = useState<CustomerSale[]>([])
+  const [salesLoading, setSalesLoading] = useState(false)
 
   // Payout form
   const [payoutAmount, setPayoutAmount] = useState('')
@@ -67,9 +82,22 @@ export default function MijozlarPage() {
     setCashbackLoading(false)
   }, [detailCustomer, period])
 
+  const fetchCustomerSales = useCallback(async () => {
+    if (!detailCustomer) return
+    setSalesLoading(true)
+    const res = await fetch(`/api/sales?customer=${detailCustomer._id}`)
+    if (res.ok) {
+      setCustomerSales(await res.json())
+    }
+    setSalesLoading(false)
+  }, [detailCustomer])
+
   useEffect(() => {
-    if (detailOpen) fetchCashback()
-  }, [detailOpen, fetchCashback])
+    if (detailOpen) {
+      fetchCashback()
+      fetchCustomerSales()
+    }
+  }, [detailOpen, fetchCashback, fetchCustomerSales])
 
   function openAdd() { setEditing(null); setForm(emptyForm); setDialog(true) }
   function openEdit(e: React.MouseEvent, c: Customer) {
@@ -83,6 +111,7 @@ export default function MijozlarPage() {
     setDetailCustomer(c)
     setPeriod('month')
     setCashbackData(null)
+    setCustomerSales([])
     setPayoutAmount('')
     setPayoutNote('')
     setPayoutType('money')
@@ -239,7 +268,7 @@ export default function MijozlarPage() {
 
       {/* Detail dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-500" />
@@ -247,105 +276,138 @@ export default function MijozlarPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {detailCustomer && detailCustomer.cashbackPercent > 0 ? (
+          {detailCustomer && (
             <div className="space-y-4">
-              {/* Period selector */}
-              <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">Davr:</Label>
-                <Select value={period} onValueChange={(v: 'month' | 'year') => setPeriod(v)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="month">Bu oy</SelectItem>
-                    <SelectItem value="year">Bu yil</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {cashbackLoading ? (
-                <div className="text-center text-slate-400 py-4">Yuklanmoqda...</div>
-              ) : cashbackData ? (
-                <>
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-50 rounded-lg p-3">
-                      <div className="text-xs text-slate-500">Jami xaridlar</div>
-                      <div className="font-semibold text-slate-800 mt-0.5">{formatPrice(cashbackData.totalSales)}</div>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-3">
-                      <div className="text-xs text-slate-500">Foiz stavkasi</div>
-                      <div className="font-semibold text-slate-800 mt-0.5">{cashbackData.percent}%</div>
-                    </div>
-                    <div className="bg-emerald-50 rounded-lg p-3">
-                      <div className="text-xs text-emerald-600">Hisoblangan foyiz</div>
-                      <div className="font-semibold text-emerald-700 mt-0.5">{formatPrice(cashbackData.calculatedAmount)}</div>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="text-xs text-blue-600">To&apos;langan</div>
-                      <div className="font-semibold text-blue-700 mt-0.5">{formatPrice(cashbackData.alreadyPaid)}</div>
-                    </div>
-                  </div>
-
-                  {cashbackData.remaining > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                      <div className="text-xs text-amber-600">Qoldiq</div>
-                      <div className="font-bold text-amber-700 text-lg">{formatPrice(cashbackData.remaining)}</div>
-                    </div>
-                  )}
-
-                  {/* Payout form */}
-                  {cashbackData.remaining > 0 && (
-                    <div className="border rounded-lg p-3 space-y-2.5">
-                      <div className="text-sm font-medium text-slate-700">Foyiz to&apos;lash</div>
-                      <div className="flex gap-2">
-                        <Input type="number" placeholder="Summa" value={payoutAmount}
-                          onChange={e => setPayoutAmount(e.target.value)} className="flex-1" />
-                        <Select value={payoutType} onValueChange={(v: 'money' | 'gift') => setPayoutType(v)}>
-                          <SelectTrigger className="w-28">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="money"><Banknote className="w-3.5 h-3.5 inline mr-1" />Pul</SelectItem>
-                            <SelectItem value="gift"><Gift className="w-3.5 h-3.5 inline mr-1" />Sovg&apos;a</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Input placeholder="Izoh (ixtiyoriy)" value={payoutNote}
-                        onChange={e => setPayoutNote(e.target.value)} />
-                      <Button size="sm" className="w-full" onClick={handlePayout} disabled={payoutLoading}>
-                        {payoutLoading ? 'Saqlanmoqda...' : 'To\'lash'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Payout history */}
-                  {cashbackData.payouts.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-slate-700">To&apos;lovlar tarixi</div>
-                      {cashbackData.payouts.map(p => (
-                        <div key={p._id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
-                          <div>
-                            <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)}</div>
-                            <div className="text-xs text-slate-500">
-                              {new Date(p.createdAt).toLocaleDateString('uz-UZ')}
-                              {p.note && ` — ${p.note}`}
-                            </div>
+              {/* Customer sales history */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700">Savdo tarixi ({customerSales.length})</div>
+                {salesLoading ? (
+                  <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>
+                ) : customerSales.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {customerSales.map(sale => (
+                      <div key={sale._id} className="bg-slate-50 rounded-lg p-2.5 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700">
+                              {new Date(sale.createdAt).toLocaleDateString('uz-UZ')}
+                            </span>
+                            <span className="text-slate-400">#{sale.receiptNo}</span>
                           </div>
-                          <Badge className={p.type === 'gift' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'}>
-                            {p.type === 'gift' ? 'Sovg\'a' : 'Pul'}
+                          <Badge variant={sale.paymentType === 'full' ? 'default' : sale.paymentType === 'partial' ? 'secondary' : 'destructive'} className="text-[10px] h-4">
+                            {sale.paymentType === 'full' ? 'To\'liq' : sale.paymentType === 'partial' ? 'Qisman' : 'Qarz'}
                           </Badge>
                         </div>
-                      ))}
+                        <div className="text-slate-500 mb-1">
+                          {sale.items.map(i => `${i.productName} x${i.qty}`).join(', ')}
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">{sale.cashier?.name || ''}</span>
+                          <span className="font-bold text-slate-800">{formatPrice(sale.total)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-slate-400 py-4 text-sm">Savdo yo&apos;q</div>
+                )}
+              </div>
+
+              {/* Cashback section */}
+              {detailCustomer.cashbackPercent > 0 && (
+                <>
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Label className="text-sm whitespace-nowrap">Foyiz hisobi — Davr:</Label>
+                      <Select value={period} onValueChange={(v: 'month' | 'year') => setPeriod(v)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="month">Bu oy</SelectItem>
+                          <SelectItem value="year">Bu yil</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+
+                    {cashbackLoading ? (
+                      <div className="text-center text-slate-400 py-4">Yuklanmoqda...</div>
+                    ) : cashbackData ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-slate-50 rounded-lg p-3">
+                            <div className="text-xs text-slate-500">Jami xaridlar</div>
+                            <div className="font-semibold text-slate-800 mt-0.5">{formatPrice(cashbackData.totalSales)}</div>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg p-3">
+                            <div className="text-xs text-slate-500">Foiz stavkasi</div>
+                            <div className="font-semibold text-slate-800 mt-0.5">{cashbackData.percent}%</div>
+                          </div>
+                          <div className="bg-emerald-50 rounded-lg p-3">
+                            <div className="text-xs text-emerald-600">Hisoblangan foyiz</div>
+                            <div className="font-semibold text-emerald-700 mt-0.5">{formatPrice(cashbackData.calculatedAmount)}</div>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-3">
+                            <div className="text-xs text-blue-600">To&apos;langan</div>
+                            <div className="font-semibold text-blue-700 mt-0.5">{formatPrice(cashbackData.alreadyPaid)}</div>
+                          </div>
+                        </div>
+
+                        {cashbackData.remaining > 0 && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                            <div className="text-xs text-amber-600">Qoldiq</div>
+                            <div className="font-bold text-amber-700 text-lg">{formatPrice(cashbackData.remaining)}</div>
+                          </div>
+                        )}
+
+                        {cashbackData.remaining > 0 && (
+                          <div className="border rounded-lg p-3 space-y-2.5 mt-3">
+                            <div className="text-sm font-medium text-slate-700">Foyiz to&apos;lash</div>
+                            <div className="flex gap-2">
+                              <Input type="number" placeholder="Summa" value={payoutAmount}
+                                onChange={e => setPayoutAmount(e.target.value)} className="flex-1" />
+                              <Select value={payoutType} onValueChange={(v: 'money' | 'gift') => setPayoutType(v)}>
+                                <SelectTrigger className="w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="money"><Banknote className="w-3.5 h-3.5 inline mr-1" />Pul</SelectItem>
+                                  <SelectItem value="gift"><Gift className="w-3.5 h-3.5 inline mr-1" />Sovg&apos;a</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Input placeholder="Izoh (ixtiyoriy)" value={payoutNote}
+                              onChange={e => setPayoutNote(e.target.value)} />
+                            <Button size="sm" className="w-full" onClick={handlePayout} disabled={payoutLoading}>
+                              {payoutLoading ? 'Saqlanmoqda...' : 'To\'lash'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {cashbackData.payouts.length > 0 && (
+                          <div className="space-y-2 mt-3">
+                            <div className="text-sm font-medium text-slate-700">To&apos;lovlar tarixi</div>
+                            {cashbackData.payouts.map(p => (
+                              <div key={p._id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                                <div>
+                                  <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)}</div>
+                                  <div className="text-xs text-slate-500">
+                                    {new Date(p.createdAt).toLocaleDateString('uz-UZ')}
+                                    {p.note && ` — ${p.note}`}
+                                  </div>
+                                </div>
+                                <Badge className={p.type === 'gift' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'}>
+                                  {p.type === 'gift' ? 'Sovg\'a' : 'Pul'}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
                 </>
-              ) : null}
-            </div>
-          ) : (
-            <div className="text-center text-slate-400 py-6">
-              <Percent className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              Bu mijozga foyiz belgilanmagan
+              )}
             </div>
           )}
         </DialogContent>

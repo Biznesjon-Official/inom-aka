@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NumberInput } from '@/components/ui/NumberInput'
 
 interface Category { _id: string; name: string }
 
@@ -75,20 +76,20 @@ export function ProductDialog({
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Tannarx *</Label>
-                <Input type="number" value={form.costPrice} onChange={e => onFormChange(f => ({ ...f, costPrice: e.target.value }))} />
+                <NumberInput value={form.costPrice} onChange={v => onFormChange(f => ({ ...f, costPrice: v }))} min={0} />
               </div>
               <div className="space-y-1.5">
                 <Label>Sotuv narxi *</Label>
-                <Input type="number" value={form.salePrice} onChange={e => onFormChange(f => ({ ...f, salePrice: e.target.value }))} />
+                <NumberInput value={form.salePrice} onChange={v => onFormChange(f => ({ ...f, salePrice: v }))} min={0} />
               </div>
               <div className="space-y-1.5">
                 <Label>Qoldiq *</Label>
-                <Input type="number" value={form.stock} onChange={e => onFormChange(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
+                <NumberInput value={form.stock} onChange={v => onFormChange(f => ({ ...f, stock: v }))} placeholder="0" min={0} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>Ulgurji narx</Label>
-              <Input type="number" placeholder="Ixtiyoriy" value={form.wholesalePrice} onChange={e => onFormChange(f => ({ ...f, wholesalePrice: e.target.value }))} />
+              <NumberInput placeholder="Ixtiyoriy" value={form.wholesalePrice} onChange={v => onFormChange(f => ({ ...f, wholesalePrice: v }))} min={0} />
             </div>
             <div className="space-y-1.5">
               <Label>Rasm</Label>

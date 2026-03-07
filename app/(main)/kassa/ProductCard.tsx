@@ -55,11 +55,11 @@ export const ProductCard = React.memo(function ProductCard({ product: p, onClick
           </span>
         )}
 
-        {/* Add button on hover */}
+        {/* Add button */}
         {!outOfStock && (
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
-              <Plus className="w-5 h-5 text-white" />
+          <div className="absolute bottom-2 right-2">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+              <Plus className="w-4 h-4 text-white" />
             </div>
           </div>
         )}
