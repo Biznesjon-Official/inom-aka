@@ -100,13 +100,16 @@ export const PaymentDialog = React.memo(function PaymentDialog({
   clientName, clientPhone, loading, cart,
   onClientNameChange, onClientPhoneChange, onTotalChange, onCheckout,
 }: PaymentDialogProps) {
-  const [payments, setPayments] = useState<SalePayment[]>([])
-  const [currentMethod, setCurrentMethod] = useState<'cash' | 'card' | 'terminal'>('cash')
-  const [currentAmount, setCurrentAmount] = useState('')
+  const [cashAmount, setCashAmount] = useState('')
+  const [cardAmount, setCardAmount] = useState('')
+  const [terminalAmount, setTerminalAmount] = useState('')
   const [editingTotal, setEditingTotal] = useState(false)
   const [editValue, setEditValue] = useState('')
 
-  const paidTotal = payments.reduce((s, p) => s + p.amount, 0)
+  const cashNum = Number(cashAmount) || 0
+  const cardNum = Number(cardAmount) || 0
+  const terminalNum = Number(terminalAmount) || 0
+  const paidTotal = cashNum + cardNum + terminalNum
   const remaining = finalTotal - paidTotal
   const isDebt = remaining > 0
   const costTotal = cart.reduce((s, c) => s + c.costPrice * c.qty, 0)
@@ -115,28 +118,32 @@ export const PaymentDialog = React.memo(function PaymentDialog({
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
-      setPayments([])
-      setCurrentAmount('')
-      setCurrentMethod('cash')
+      setCashAmount('')
+      setCardAmount('')
+      setTerminalAmount('')
       setEditingTotal(false)
     }
   }, [open])
 
-  function addPayment() {
-    const amt = Number(currentAmount)
-    if (!amt || amt <= 0) return
-    setPayments(prev => [...prev, { method: currentMethod, amount: amt }])
-    setCurrentAmount('')
+  function fillFull(method: 'cash' | 'card' | 'terminal') {
+    const currentRemaining = finalTotal - (
+      (method === 'cash' ? 0 : cashNum) +
+      (method === 'card' ? 0 : cardNum) +
+      (method === 'terminal' ? 0 : terminalNum)
+    )
+    if (currentRemaining <= 0) return
+    const val = String(currentRemaining)
+    if (method === 'cash') setCashAmount(val)
+    else if (method === 'card') setCardAmount(val)
+    else setTerminalAmount(val)
   }
 
-  function removePayment(idx: number) {
-    setPayments(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  function payFull(method: 'cash' | 'card' | 'terminal') {
-    if (remaining <= 0) return
-    setPayments(prev => [...prev, { method, amount: remaining }])
-    setCurrentAmount('')
+  function buildPayments(): SalePayment[] {
+    const payments: SalePayment[] = []
+    if (cashNum > 0) payments.push({ method: 'cash', amount: cashNum })
+    if (cardNum > 0) payments.push({ method: 'card', amount: cardNum })
+    if (terminalNum > 0) payments.push({ method: 'terminal', amount: terminalNum })
+    return payments
   }
 
   function startEditTotal() {
@@ -153,6 +160,12 @@ export const PaymentDialog = React.memo(function PaymentDialog({
     }
     setEditingTotal(false)
   }
+
+  const paymentInputs: { key: 'cash' | 'card' | 'terminal'; label: string; emoji: string; value: string; setter: (v: string) => void }[] = [
+    { key: 'cash', label: 'Naqd', emoji: '\uD83D\uDCB5', value: cashAmount, setter: setCashAmount },
+    { key: 'card', label: 'Karta', emoji: '\uD83D\uDCB3', value: cardAmount, setter: setCardAmount },
+    { key: 'terminal', label: 'Terminal', emoji: '\uD83D\uDCF1', value: terminalAmount, setter: setTerminalAmount },
+  ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,70 +206,34 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             </div>
           </div>
 
-          {/* Quick pay buttons */}
-          {remaining > 0 && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-slate-500">To&apos;liq to&apos;lash:</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button size="sm" variant="outline" onClick={() => payFull('cash')} className="text-xs">
-                  💵 Naqd
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => payFull('card')} className="text-xs">
-                  💳 Karta
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => payFull('terminal')} className="text-xs">
-                  📱 Terminal
+          {/* 3 payment inputs */}
+          <div className="space-y-2.5">
+            {paymentInputs.map(({ key, label, emoji, value, setter }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="text-sm w-20 text-slate-600 flex items-center gap-1.5">
+                  <span>{emoji}</span> {label}
+                </span>
+                <div className="flex-1">
+                  <NumberInput value={value} onChange={setter} placeholder="0" min={0} />
+                </div>
+                <Button size="sm" variant="outline" className="text-xs px-3 shrink-0"
+                  onClick={() => fillFull(key)}>
+                  To&apos;liq
                 </Button>
               </div>
-            </div>
-          )}
-
-          {/* Split payment input */}
-          <div className="space-y-1.5">
-            <Label className="text-xs text-slate-500">Qo&apos;shimcha to&apos;lov:</Label>
-            <div className="flex gap-2">
-              <select className="border rounded-lg px-2 py-1.5 text-sm bg-white"
-                value={currentMethod} onChange={e => setCurrentMethod(e.target.value as 'cash' | 'card' | 'terminal')}>
-                <option value="cash">Naqd</option>
-                <option value="card">Karta</option>
-                <option value="terminal">Terminal</option>
-              </select>
-              <div className="flex-1" onKeyDown={e => e.key === 'Enter' && addPayment()}>
-                <NumberInput value={currentAmount} onChange={setCurrentAmount} placeholder="Summa" min={0} />
-              </div>
-              <Button size="sm" onClick={addPayment}>+</Button>
-            </div>
+            ))}
           </div>
 
-          {/* Payments list */}
-          {payments.length > 0 && (
-            <div className="space-y-1">
-              {payments.map((p, i) => (
-                <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-1.5 text-sm">
-                  <span className="text-slate-600">{METHOD_LABELS[p.method]}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-800">{formatPrice(p.amount)}</span>
-                    <button className="text-red-400 hover:text-red-600" onClick={() => removePayment(i)}>✕</button>
-                  </div>
-                </div>
-              ))}
-              <div className="flex justify-between text-sm font-medium pt-1">
-                <span className="text-slate-500">To&apos;langan:</span>
-                <span className="text-slate-800">{formatPrice(paidTotal)}</span>
-              </div>
-            </div>
-          )}
-
           {/* Status */}
-          {payments.length > 0 && (
+          {paidTotal > 0 && (
             <div className={`rounded-lg p-3 text-sm font-medium text-center ${
               remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'
             }`}>
               {remaining <= 0
                 ? paidTotal > finalTotal
-                  ? `✓ To'liq. Qaytim: ${formatPrice(paidTotal - finalTotal)}`
-                  : `✓ To'liq to'landi`
-                : `⚠ Qarz: ${formatPrice(remaining)}`
+                  ? `To'liq. Qaytim: ${formatPrice(paidTotal - finalTotal)}`
+                  : `To'liq to'landi`
+                : `Qarz: ${formatPrice(remaining)}`
               }
             </div>
           )}
@@ -276,7 +253,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             </div>
           </div>
 
-          <Button className="w-full" onClick={() => onCheckout(payments)} disabled={loading || payments.length === 0}>
+          <Button className="w-full" onClick={() => onCheckout(buildPayments())} disabled={loading || paidTotal <= 0}>
             {loading ? 'Saqlanmoqda...' : 'Tasdiqlash'}
           </Button>
         </div>
