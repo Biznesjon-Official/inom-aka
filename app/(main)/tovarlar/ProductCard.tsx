@@ -8,7 +8,7 @@ import { printLabel } from '@/lib/print'
 interface Category { _id: string; name: string }
 interface Product {
   _id: string; name: string; unit: string; costPrice: number; salePrice: number
-  discountPrice?: number; discountThreshold?: number; description?: string
+  wholesalePrice?: number
   image?: string; isActive: boolean; category?: Category; stock: number
 }
 
@@ -35,7 +35,7 @@ export const TovarProductCard = React.memo(function TovarProductCard({ product: 
             <div className="font-medium text-slate-800 text-sm line-clamp-1">{p.name}</div>
             <div className="flex gap-1 flex-shrink-0">
               <button className="p-1 hover:bg-blue-50 rounded" title="Label chiqarish" onClick={() => {
-                printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, unit: p.unit, category: p.category?.name, discountPrice: p.discountPrice, discountThreshold: p.discountThreshold })
+                printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name })
               }}>
                 <Printer className="w-3.5 h-3.5 text-blue-400" />
               </button>
@@ -51,8 +51,8 @@ export const TovarProductCard = React.memo(function TovarProductCard({ product: 
           <div className="mt-2 space-y-0.5">
             <div className="text-xs text-slate-500">Tannarx: <span className="font-medium">{formatPrice(p.costPrice)}</span></div>
             <div className="text-xs text-blue-600 font-bold">{formatPrice(p.salePrice)} / {p.unit}</div>
-            {p.discountPrice && p.discountThreshold && (
-              <div className="text-xs text-green-600">{p.discountThreshold}+ dona: {formatPrice(p.discountPrice)}</div>
+            {p.wholesalePrice && (
+              <div className="text-xs text-green-600">Ulgurji: {formatPrice(p.wholesalePrice)}</div>
             )}
             <div className={`text-xs font-medium mt-1 ${(p.stock ?? 0) <= 0 ? 'text-red-500' : (p.stock ?? 0) <= 5 ? 'text-orange-500' : 'text-slate-500'}`}>
               Qoldiq: {p.stock ?? 0} {p.unit}

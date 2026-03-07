@@ -21,8 +21,7 @@ interface Product {
   unit: string
   salePrice: number
   costPrice: number
-  discountPrice?: number
-  discountThreshold?: number
+  wholesalePrice?: number
   category?: { name: string }
   stock: number
   image?: string
@@ -65,8 +64,7 @@ export default function KassaPage() {
   const { data: fetchedProducts, loading: productsLoading } = useFetchWithCache<Product[]>(productsUrl)
   const products = fetchedProducts || []
 
-  function getItemPrice(p: Product, qty: number) {
-    if (p.discountPrice && p.discountThreshold && qty >= p.discountThreshold) return p.discountPrice
+  function getItemPrice(p: Product) {
     return p.salePrice
   }
 
@@ -78,9 +76,9 @@ export default function KassaPage() {
       if (existing) {
         const newQty = existing.qty + 1
         if (newQty > product.stock) return (toast.error(`${product.name}: stokda ${product.stock} ta`), prev)
-        return prev.map(c => c._id === product._id ? { ...c, qty: newQty, price: getItemPrice(product, newQty) } : c)
+        return prev.map(c => c._id === product._id ? { ...c, qty: newQty, price: getItemPrice(product) } : c)
       }
-      return [...prev, { ...product, qty: 1, price: getItemPrice(product, 1) }]
+      return [...prev, { ...product, qty: 1, price: getItemPrice(product) }]
     })
   }, [])
 
@@ -132,7 +130,7 @@ export default function KassaPage() {
     for (const item of sc.items) {
       if (!item.product) continue
       const p = item.product
-      newCart.push({ ...p, qty: item.qty, price: getItemPrice(p, item.qty) })
+      newCart.push({ ...p, qty: item.qty, price: getItemPrice(p) })
     }
     setCart(newCart)
     setCustomTotal(null)
@@ -155,7 +153,7 @@ export default function KassaPage() {
   const updateQty = useCallback((id: string, qty: number) => {
     setCustomTotal(null)
     if (qty <= 0) { setCart(prev => prev.filter(c => c._id !== id)); return }
-    setCart(prev => prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c, qty) } : c))
+    setCart(prev => prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c) } : c))
   }, [])
 
   const total = useMemo(() => cart.reduce((s, c) => s + c.price * c.qty, 0), [cart])

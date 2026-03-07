@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 
 interface Category { _id: string; name: string }
 
 export interface ProductForm {
   name: string; categoryId: string; unit: string; costPrice: string; salePrice: string
-  discountPrice: string; discountThreshold: string; description: string; image: string; stock: string
+  wholesalePrice: string; image: string; stock: string
 }
 
 const UNITS = ['dona', 'kg', 'm', 'l']
@@ -87,19 +86,9 @@ export function ProductDialog({
                 <Input type="number" value={form.stock} onChange={e => onFormChange(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Ulgurji narx</Label>
-                <Input type="number" placeholder="Ko'p olsangiz" value={form.discountPrice} onChange={e => onFormChange(f => ({ ...f, discountPrice: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Minimal miqdor</Label>
-                <Input type="number" placeholder="Nechta dan" value={form.discountThreshold} onChange={e => onFormChange(f => ({ ...f, discountThreshold: e.target.value }))} />
-              </div>
-            </div>
             <div className="space-y-1.5">
-              <Label>Izoh</Label>
-              <Textarea rows={2} value={form.description} onChange={e => onFormChange(f => ({ ...f, description: e.target.value }))} />
+              <Label>Ulgurji narx</Label>
+              <Input type="number" placeholder="Ixtiyoriy" value={form.wholesalePrice} onChange={e => onFormChange(f => ({ ...f, wholesalePrice: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Rasm</Label>

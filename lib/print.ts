@@ -24,10 +24,9 @@ export function printLabel(product: {
   _id: string
   name: string
   salePrice: number
+  wholesalePrice?: number
   unit: string
   category?: string
-  discountPrice?: number
-  discountThreshold?: number
 }) {
   const barcodeUrl = generateBarcode(product._id)
 
@@ -52,7 +51,7 @@ export function printLabel(product: {
   .cat { font-size: 10px; color: #555; margin-bottom: 2mm; text-align: center; }
   .price { font-size: 18px; font-weight: bold; text-align: center; border: 1px solid #000; padding: 1mm 2mm; margin: 2mm 0; }
   .unit { font-size: 10px; text-align: center; color: #555; }
-  .discount { font-size: 10px; border-top: 1px dashed #000; margin-top: 2mm; padding-top: 1mm; }
+  .wholesale { font-size: 10px; text-align: center; color: #555; margin-top: 1mm; }
   .barcode { text-align: center; margin-top: 3mm; }
   .barcode img { width: 48mm; height: auto; }
 </style>
@@ -63,8 +62,8 @@ export function printLabel(product: {
   ${product.category ? `<div class="cat">${product.category}</div>` : ''}
   <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>
   <div class="unit">1 ${product.unit}</div>
-  ${product.discountPrice && product.discountThreshold
-    ? `<div class="discount">${product.discountThreshold}+ ${product.unit}: ${Number(product.discountPrice).toLocaleString('uz-UZ')} so'm</div>`
+  ${product.wholesalePrice
+    ? `<div class="wholesale">Ulgurji: ${Number(product.wholesalePrice).toLocaleString('uz-UZ')} so'm</div>`
     : ''}
   <div class="barcode"><img src="${barcodeUrl}" alt="barcode" /></div>
 </body>

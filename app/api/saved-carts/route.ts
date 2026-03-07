@@ -7,7 +7,7 @@ export async function GET() {
   try {
     await connectDB()
     const carts = await SavedCart.find()
-      .populate('items.product', 'name unit salePrice costPrice discountPrice discountThreshold stock image')
+      .populate('items.product', 'name unit salePrice costPrice wholesalePrice stock image')
       .populate('createdBy', 'name')
       .sort({ createdAt: -1 })
       .lean()

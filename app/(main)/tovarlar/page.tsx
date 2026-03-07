@@ -13,13 +13,13 @@ import { ProductDialog, type ProductForm } from './ProductDialog'
 interface Category { _id: string; name: string }
 interface Product {
   _id: string; name: string; unit: string; costPrice: number; salePrice: number
-  discountPrice?: number; discountThreshold?: number; description?: string
+  wholesalePrice?: number
   image?: string; isActive: boolean; category?: Category; stock: number
 }
 
 const emptyForm: ProductForm = {
   name: '', categoryId: '', unit: 'dona', costPrice: '', salePrice: '',
-  discountPrice: '', discountThreshold: '', description: '', image: '', stock: ''
+  wholesalePrice: '', image: '', stock: ''
 }
 
 export default function TovarlarPage() {
@@ -62,9 +62,7 @@ export default function TovarlarPage() {
       unit: full.unit,
       costPrice: full.costPrice.toString(),
       salePrice: full.salePrice.toString(),
-      discountPrice: full.discountPrice?.toString() || '',
-      discountThreshold: full.discountThreshold?.toString() || '',
-      description: full.description || '',
+      wholesalePrice: full.wholesalePrice?.toString() || '',
       image: full.image || '',
       stock: full.stock?.toString() || '0',
     })
@@ -82,9 +80,7 @@ export default function TovarlarPage() {
       unit: form.unit,
       costPrice: Number(form.costPrice),
       salePrice: Number(form.salePrice),
-      discountPrice: form.discountPrice ? Number(form.discountPrice) : undefined,
-      discountThreshold: form.discountThreshold ? Number(form.discountThreshold) : undefined,
-      description: form.description || undefined,
+      wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : undefined,
       image: form.image || undefined,
       stock: form.stock !== '' ? Number(form.stock) : 0,
     }

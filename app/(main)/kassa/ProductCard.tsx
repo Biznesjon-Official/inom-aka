@@ -8,8 +8,7 @@ interface Product {
   unit: string
   salePrice: number
   costPrice: number
-  discountPrice?: number
-  discountThreshold?: number
+  wholesalePrice?: number
   category?: { name: string }
   stock: number
   image?: string
@@ -42,8 +41,8 @@ export const ProductCard = React.memo(function ProductCard({ product: p, onClick
             {p.stock ?? 0} {p.unit}
           </span>
         </div>
-        {p.discountPrice && p.discountThreshold && (
-          <div className="text-xs text-green-600 mt-0.5">{p.discountThreshold}+: {formatPrice(p.discountPrice)}</div>
+        {p.wholesalePrice && (
+          <div className="text-xs text-green-600 mt-0.5">Ulgurji: {formatPrice(p.wholesalePrice)}</div>
         )}
       </div>
     </button>
