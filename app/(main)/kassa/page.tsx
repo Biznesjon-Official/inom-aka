@@ -100,7 +100,8 @@ export default function KassaPage() {
   // Saved carts functions
   const fetchSavedCarts = useCallback(async () => {
     const res = await fetch('/api/saved-carts')
-    if (res.ok) setSavedCarts(await res.json())
+    if (!res.ok) return toast.error('Saqlangan ro\'yxatlarni yuklashda xato')
+    setSavedCarts(await res.json())
   }, [])
 
   const handleSaveCart = useCallback(() => {

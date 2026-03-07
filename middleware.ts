@@ -8,7 +8,7 @@ export default withAuth(
 
     // API routes — role-based access
     if (path.startsWith('/api/')) {
-      const adminOnlyAPIs = ['/api/workers', '/api/expenses', '/api/expense-sources', '/api/dashboard', '/api/categories', '/api/customers']
+      const adminOnlyAPIs = ['/api/workers', '/api/expenses', '/api/expense-sources', '/api/dashboard', '/api/categories', '/api/customers', '/api/stock-intakes', '/api/reports', '/api/settings']
       const isAdminOnly = adminOnlyAPIs.some(r => path.startsWith(r))
       // Products: GET allowed for worker (kassa needs it), POST/PUT/DELETE admin only
       const isProductWrite = path.startsWith('/api/products') && req.method !== 'GET'
@@ -25,7 +25,7 @@ export default withAuth(
     }
 
     // Admin-only routes
-    const adminRoutes = ['/dashboard', '/tovarlar', '/xarajatlar', '/mijozlar', '/ishchilar']
+    const adminRoutes = ['/dashboard', '/tovarlar', '/xarajatlar', '/mijozlar', '/ishchilar', '/ombor', '/hisobot', '/sozlamalar']
     if (adminRoutes.some(r => path.startsWith(r)) && token?.role !== 'admin') {
       return NextResponse.redirect(new URL('/kassa', req.url))
     }
@@ -40,5 +40,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/qarzlar/:path*', '/xarajatlar/:path*', '/mijozlar/:path*', '/ishchilar/:path*', '/sozlamalar/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*', '/api/settings/:path*'],
+  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/qarzlar/:path*', '/xarajatlar/:path*', '/mijozlar/:path*', '/ishchilar/:path*', '/sozlamalar/:path*', '/ombor/:path*', '/hisobot/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*', '/api/settings/:path*', '/api/stock-intakes/:path*', '/api/reports/:path*', '/api/saved-carts/:path*'],
 }

@@ -62,7 +62,8 @@ export default function MijozlarPage() {
     const from = range.from.toISOString()
     const to = range.to.toISOString()
     const res = await fetch(`/api/customers/${detailCustomer._id}/cashback?from=${from}&to=${to}`)
-    if (res.ok) setCashbackData(await res.json())
+    if (!res.ok) { setCashbackLoading(false); return toast.error('Cashback ma\'lumotlarini yuklashda xato') }
+    setCashbackData(await res.json())
     setCashbackLoading(false)
   }, [detailCustomer, period])
 
