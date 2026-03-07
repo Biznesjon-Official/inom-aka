@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
+import { errorResponse } from '@/lib/api-utils'
 import Product from '@/models/Product'
 import { escapeRegex } from '@/lib/utils'
 
@@ -22,15 +23,18 @@ export async function GET(req: Request) {
       .limit(200)
       .lean()
     return NextResponse.json(products)
-  } catch (err) {
-    console.error('Products GET error:', err)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
-  }
+  } catch (err) { return errorResponse(err) }
 }
 
 export async function POST(req: Request) {
-  await connectDB()
-  const body = await req.json()
-  const product = await Product.create(body)
-  return NextResponse.json(product, { status: 201 })
+  try {
+    await connectDB()
+    const body = await req.json()
+    const { name, costPrice, salePrice } = body
+    if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+    if (typeof costPrice !== 'number' || costPrice < 0) return NextResponse.json({ error: 'Invalid costPrice' }, { status: 400 })
+    if (typeof salePrice !== 'number' || salePrice <= 0) return NextResponse.json({ error: 'Invalid salePrice' }, { status: 400 })
+    const product = await Product.create(body)
+    return NextResponse.json(product, { status: 201 })
+  } catch (err) { return errorResponse(err) }
 }

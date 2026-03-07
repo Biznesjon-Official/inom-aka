@@ -58,26 +58,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Cashier required' }, { status: 400 })
     }
 
-    // Check stock availability
+    // Validate items
     for (const item of body.items) {
       if (!item.product || !item.qty || item.qty <= 0) {
         return NextResponse.json({ error: 'Invalid item data' }, { status: 400 })
       }
-      const product = await Product.findById(item.product)
-      if (!product) {
-        return NextResponse.json({ error: `Product not found: ${item.productName}` }, { status: 400 })
-      }
-      if (product.stock < item.qty) {
-        return NextResponse.json({ error: `${product.name}: stokda ${product.stock} ta, lekin ${item.qty} ta so'ralmoqda` }, { status: 400 })
+    }
+
+    // Atomic stock decrease — prevents race condition (overselling)
+    for (const item of body.items) {
+      const result = await Product.findOneAndUpdate(
+        { _id: item.product, stock: { $gte: item.qty } },
+        { $inc: { stock: -item.qty } },
+        { new: true }
+      )
+      if (!result) {
+        // Rollback already decremented stocks
+        for (const prev of body.items) {
+          if (prev.product === item.product) break
+          await Product.findByIdAndUpdate(prev.product, { $inc: { stock: prev.qty } })
+        }
+        const p = await Product.findById(item.product).select('name stock').lean()
+        const name = p?.name || item.productName
+        const stock = p?.stock ?? 0
+        return NextResponse.json({ error: `${name}: stokda ${stock} ta, lekin ${item.qty} ta so'ralmoqda` }, { status: 400 })
       }
     }
 
     const sale = await Sale.create(body)
-
-    // Decrease stock for each sold item
-    for (const item of body.items) {
-      await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.qty } })
-    }
 
     // Create debt if partial or full debt
     if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.customer) {

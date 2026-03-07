@@ -18,10 +18,10 @@ export const authOptions: NextAuthOptions = {
 
           await connectDB()
           const user = await User.findOne({ username: credentials.username, isActive: true }).lean()
-          if (!user) { console.log('[auth] user not found:', credentials.username); return null }
+          if (!user) return null
 
           const isValid = await bcrypt.compare(credentials.password, user.password as string)
-          if (!isValid) { console.log('[auth] wrong password'); return null }
+          if (!isValid) return null
 
           return {
             id: (user._id as { toString(): string }).toString(),

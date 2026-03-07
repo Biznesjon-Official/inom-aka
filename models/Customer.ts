@@ -10,5 +10,6 @@ const CustomerSchema = new Schema({
 }, { timestamps: true })
 
 CustomerSchema.index({ name: 1 })
+CustomerSchema.index({ phone: 1 })
 
 export default models.Customer || model('Customer', CustomerSchema)

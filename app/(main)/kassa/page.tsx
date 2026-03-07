@@ -288,9 +288,9 @@ export default function KassaPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto pr-1">
           {productsLoading && products.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-xl border border-slate-200 overflow-hidden animate-pulse">
-                  <div className="w-full h-24 bg-slate-200" />
-                  <div className="p-2 space-y-2">
+                <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-slate-200" />
+                  <div className="p-2.5 space-y-2">
                     <div className="h-4 bg-slate-200 rounded w-3/4" />
                     <div className="h-3 bg-slate-200 rounded w-1/2" />
                   </div>

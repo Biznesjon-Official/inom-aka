@@ -24,7 +24,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await connectDB()
     const { id } = await params
     const body = await req.json()
-    const customer = await Customer.findByIdAndUpdate(id, body, { new: true })
+    const { name, phone, address, note, cashbackPercent } = body
+    const update: Record<string, unknown> = {}
+    if (name !== undefined) update.name = name
+    if (phone !== undefined) update.phone = phone
+    if (address !== undefined) update.address = address
+    if (note !== undefined) update.note = note
+    if (cashbackPercent !== undefined) update.cashbackPercent = cashbackPercent
+    const customer = await Customer.findByIdAndUpdate(id, update, { new: true })
     if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(customer)
   } catch (err) { return errorResponse(err) }

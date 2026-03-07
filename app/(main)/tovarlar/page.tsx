@@ -96,7 +96,8 @@ export default function TovarlarPage() {
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('O\'chirishni tasdiqlaysizmi?')) return
-    await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
     toast.success('O\'chirildi')
     fetchProducts()
   }, [fetchProducts])
@@ -136,14 +137,14 @@ export default function TovarlarPage() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
         {productsLoading && products.length === 0
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm p-4 flex gap-3 animate-pulse">
-                <div className="w-16 h-16 bg-slate-200 rounded-lg flex-shrink-0" />
-                <div className="flex-1 space-y-2">
+          ? Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-slate-200" />
+                <div className="p-3 space-y-2">
                   <div className="h-4 bg-slate-200 rounded w-3/4" />
-                  <div className="h-3 bg-slate-200 rounded w-1/2" />
+                  <div className="h-4 bg-slate-200 rounded w-1/2" />
                   <div className="h-3 bg-slate-200 rounded w-1/3" />
                 </div>
               </div>

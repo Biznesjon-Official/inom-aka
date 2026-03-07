@@ -12,6 +12,7 @@ const ProductSchema = new Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
 
+ProductSchema.index({ name: 'text' })
 ProductSchema.index({ category: 1, isActive: 1 })
 ProductSchema.index({ isActive: 1, createdAt: -1 })
 
