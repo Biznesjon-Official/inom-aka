@@ -153,6 +153,7 @@ export default function KassaPage() {
 
   const updateQty = useCallback((id: string, qty: number) => {
     setCustomTotal(null)
+    if (isNaN(qty)) { setCart(prev => prev.map(c => c._id === id ? { ...c, qty: 0, price: getItemPrice(c) } : c)); return }
     if (qty <= 0) { setCart(prev => prev.filter(c => c._id !== id)); return }
     setCart(prev => prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c) } : c))
   }, [])

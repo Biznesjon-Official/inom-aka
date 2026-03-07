@@ -82,7 +82,7 @@ export const CartPanel = React.memo(function CartPanel({
                   <Minus className="w-4 h-4" />
                 </button>
                 <input className="w-16 text-center text-base border rounded px-1 py-1"
-                  value={item.qty} type="number" step="any" min={0}
+                  value={item.qty || ''} type="number" step="any" min={0}
                   onChange={e => onUpdateQty(item._id, Number(e.target.value))} />
                 <button className="w-8 h-8 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
                   onClick={() => onUpdateQty(item._id, item.qty + 1)}>
@@ -139,7 +139,7 @@ export const CartPanel = React.memo(function CartPanel({
               <Button variant="outline" size="sm" className="flex-1" onClick={onClear}>
                 <X className="w-3 h-3 mr-1" /> Tozalash
               </Button>
-              <Button size="sm" className="flex-1" onClick={onPay}>To&apos;lash</Button>
+              <Button size="sm" className="flex-1" onClick={onPay} disabled={cart.some(c => !c.qty || c.qty <= 0)}>To&apos;lash</Button>
             </div>
           </>
         )}
