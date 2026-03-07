@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -145,7 +145,8 @@ export default function HisobotPage() {
   }
 
   // Load initial data
-  useState(() => { fetchReport(from, to) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchReport(from, to) }, [])
 
   const stats = data ? [
     { label: 'Sotuv soni', value: data.salesCount + ' ta', icon: ShoppingCart, color: 'text-blue-500', bg: 'bg-blue-50' },
