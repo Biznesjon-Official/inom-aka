@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   ShoppingCart, TrendingUp, TrendingDown, Wallet, DollarSign,
-  Download, Calendar, Loader2
+  Download, Calendar, Loader2, Banknote, CreditCard, Smartphone,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -25,6 +25,7 @@ interface ReportData {
   daily: { date: string; revenue: number; profit: number; expense: number; sales: number }[]
   topProducts: { name: string; qty: number; revenue: number }[]
   cashierStats: { name: string; salesCount: number; totalAmount: number }[]
+  paymentMethods: { method: string; total: number; count: number }[]
 }
 
 type PresetKey = 'today' | 'week' | 'month' | 'year' | 'custom'
@@ -226,6 +227,31 @@ export default function HisobotPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          {/* Payment methods */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { method: 'cash', label: 'Naqd', icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+              { method: 'card', label: 'Karta', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
+              { method: 'terminal', label: 'Terminal', icon: Smartphone, color: 'text-violet-600', bg: 'bg-violet-50' },
+            ].map(({ method, label, icon: Icon, color, bg }) => {
+              const pm = data.paymentMethods.find(p => p.method === method)
+              return (
+                <Card key={method} className="border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-slate-500 font-medium">{label}</span>
+                      <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center`}>
+                        <Icon className={`w-4 h-4 ${color}`} />
+                      </div>
+                    </div>
+                    <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{formatPrice(pm?.total || 0)}</div>
+                    <div className="text-xs text-slate-400 mt-1">{pm?.count || 0} ta to&apos;lov</div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
 
           {/* Debt info */}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   TrendingUp, TrendingDown, ShoppingCart, BookOpen, DollarSign,
   Package, AlertTriangle, ArrowUpRight, ArrowDownRight,
+  Banknote, CreditCard, Smartphone,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
@@ -21,6 +22,8 @@ interface DashboardData {
   chart: { date: string; revenue: number; profit: number; expense: number }[]
   topProducts: { name: string; qty: number; revenue: number }[]
   lowStock: { _id: string; name: string; stock: number; unit: string; salePrice: number }[]
+  paymentMethods: { method: string; total: number; count: number }[]
+  monthPaymentMethods: { method: string; total: number; count: number }[]
 }
 
 function pctChange(current: number, previous: number): number | null {
@@ -101,6 +104,31 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Today payment methods */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { method: 'cash', label: 'Naqd', icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+          { method: 'card', label: 'Karta', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { method: 'terminal', label: 'Terminal', icon: Smartphone, color: 'text-violet-600', bg: 'bg-violet-50' },
+        ].map(({ method, label, icon: Icon, color, bg }) => {
+          const pm = data.paymentMethods.find(p => p.method === method)
+          return (
+            <Card key={method} className="border-0 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] text-slate-500 font-medium">{label}</span>
+                  <div className={`w-7 h-7 ${bg} rounded-lg flex items-center justify-center`}>
+                    <Icon className={`w-3.5 h-3.5 ${color}`} />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-slate-800">{formatPrice(pm?.total || 0)}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{pm?.count || 0} ta to&apos;lov</div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
       {/* Month stats with comparison */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {monthStats.map(({ label, value, prev, curr }) => (
@@ -115,6 +143,31 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Month payment methods */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { method: 'cash', label: 'Naqd (oy)', icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+          { method: 'card', label: 'Karta (oy)', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { method: 'terminal', label: 'Terminal (oy)', icon: Smartphone, color: 'text-violet-600', bg: 'bg-violet-50' },
+        ].map(({ method, label, icon: Icon, color, bg }) => {
+          const pm = data.monthPaymentMethods.find(p => p.method === method)
+          return (
+            <Card key={method} className="border-0 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] text-slate-500 font-medium">{label}</span>
+                  <div className={`w-7 h-7 ${bg} rounded-lg flex items-center justify-center`}>
+                    <Icon className={`w-3.5 h-3.5 ${color}`} />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-slate-800">{formatPrice(pm?.total || 0)}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{pm?.count || 0} ta to&apos;lov</div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Chart: 30 days */}

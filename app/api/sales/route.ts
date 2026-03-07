@@ -80,10 +80,11 @@ export async function POST(req: Request) {
           if (prev.product === item.product) break
           await Product.findByIdAndUpdate(prev.product, { $inc: { stock: prev.qty } })
         }
-        const p = await Product.findById(item.product).select('name stock').lean()
+        const p = await Product.findById(item.product).select('name stock unit').lean() as { name?: string; stock?: number; unit?: string } | null
         const name = p?.name || item.productName
         const stock = p?.stock ?? 0
-        return NextResponse.json({ error: `${name}: stokda ${stock} ta, lekin ${item.qty} ta so'ralmoqda` }, { status: 400 })
+        const unit = p?.unit || item.unit || 'ta'
+        return NextResponse.json({ error: `${name}: stokda ${stock} ${unit}, lekin ${item.qty} ${unit} so'ralmoqda` }, { status: 400 })
       }
     }
 

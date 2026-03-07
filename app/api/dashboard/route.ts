@@ -33,6 +33,8 @@ export async function GET() {
       chartSalesAgg, chartExpenseAgg,
       topProductsAgg,
       lowStockProducts,
+      paymentMethodsAgg,
+      monthPaymentMethodsAgg,
       productStatsAgg,
     ] = await Promise.all([
       // Today sales
@@ -139,6 +141,20 @@ export async function GET() {
         .sort({ stock: 1 })
         .limit(10)
         .lean(),
+      // Today payment methods
+      Sale.aggregate([
+        { $match: { createdAt: { $gte: todayStart } } },
+        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+      ]),
+      // Month payment methods
+      Sale.aggregate([
+        { $match: { createdAt: { $gte: monthStart } } },
+        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+      ]),
       // Product stats for dashboard
       Product.aggregate([
         { $match: { isActive: true } },
@@ -210,6 +226,8 @@ export async function GET() {
       chart,
       topProducts: topProductsAgg,
       lowStock: lowStockProducts,
+      paymentMethods: paymentMethodsAgg,
+      monthPaymentMethods: monthPaymentMethodsAgg,
     })
   } catch (err) { return errorResponse(err) }
 }

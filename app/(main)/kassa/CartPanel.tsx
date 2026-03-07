@@ -77,18 +77,18 @@ export const CartPanel = React.memo(function CartPanel({
                 <div className="text-xs text-slate-500">{formatPrice(item.price)}/{item.unit}</div>
               </div>
               <div className="flex items-center gap-1">
-                <button className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
+                <button className="w-8 h-8 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
                   onClick={() => onUpdateQty(item._id, item.qty - 1)}>
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-4 h-4" />
                 </button>
-                <input className="w-12 text-center text-sm border rounded px-1 py-0.5"
-                  value={item.qty} type="number" min={0}
+                <input className="w-16 text-center text-base border rounded px-1 py-1"
+                  value={item.qty} type="number" step="any" min={0}
                   onChange={e => onUpdateQty(item._id, Number(e.target.value))} />
-                <button className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
+                <button className="w-8 h-8 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
                   onClick={() => onUpdateQty(item._id, item.qty + 1)}>
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-4 h-4" />
                 </button>
-                <button className="w-6 h-6 rounded bg-red-100 flex items-center justify-center hover:bg-red-200 ml-1"
+                <button className="w-8 h-8 rounded bg-red-100 flex items-center justify-center hover:bg-red-200 ml-1"
                   onClick={() => onUpdateQty(item._id, 0)}>
                   <Trash2 className="w-3 h-3 text-red-500" />
                 </button>
