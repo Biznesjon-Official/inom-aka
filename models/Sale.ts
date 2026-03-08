@@ -1,4 +1,5 @@
-import { Schema, model, models, Types, Model } from 'mongoose'
+import { Schema, model, models, Types } from 'mongoose'
+import Counter from './Counter'
 
 const SaleItemSchema = new Schema({
   product: { type: Types.ObjectId, ref: 'Product', required: true },
@@ -39,12 +40,15 @@ const SaleSchema = new Schema({
 SaleSchema.index({ cashier: 1, createdAt: -1 })
 SaleSchema.index({ customer: 1, createdAt: -1 })
 
-// Auto-increment receiptNo before save
+// Atomic auto-increment receiptNo
 SaleSchema.pre('save', async function () {
   if (!this.receiptNo) {
-    const SaleModel = this.constructor as Model<unknown>
-    const last = await SaleModel.findOne({}, { receiptNo: 1 }).sort({ receiptNo: -1 }).lean() as { receiptNo?: number } | null
-    this.receiptNo = (last?.receiptNo || 10000) + 1
+    const counter = await Counter.findByIdAndUpdate(
+      'receiptNo',
+      { $inc: { seq: 1 } },
+      { upsert: true, new: true }
+    )
+    this.receiptNo = counter.seq
   }
 })
 

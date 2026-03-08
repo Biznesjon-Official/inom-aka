@@ -304,7 +304,8 @@ export default function TovarlarPage() {
                 <div key={c._id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
                   <span className="text-sm">{c.name}</span>
                   <button onClick={async () => {
-                    await fetch(`/api/categories/${c._id}`, { method: 'DELETE' })
+                    const res = await fetch(`/api/categories/${c._id}`, { method: 'DELETE' })
+                    if (!res.ok) { const err = await res.json(); toast.error(err.error || 'O\'chirishda xato'); return }
                     setCategories(prev => prev.filter(x => x._id !== c._id))
                   }}>
                     <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />

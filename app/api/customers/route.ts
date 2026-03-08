@@ -26,7 +26,8 @@ export async function POST(req: Request) {
   try {
     await connectDB()
     const body = await req.json()
-    const customer = await Customer.create(body)
+    if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+    const customer = await Customer.create({ name: body.name.trim(), phone: body.phone, address: body.address, note: body.note })
     return NextResponse.json(customer, { status: 201 })
   } catch (err) { return errorResponse(err) }
 }

@@ -136,7 +136,7 @@ export async function GET() {
         { $project: { _id: 0, name: '$_id', qty: 1, revenue: 1 } },
       ]),
       // Low stock products (stock <= 5, only active ones)
-      Product.find({ stock: { $lte: 5 } })
+      Product.find({ stock: { $lte: 5 }, isActive: true })
         .select('name stock unit salePrice')
         .sort({ stock: 1 })
         .limit(10)

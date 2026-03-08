@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import Sale from '@/models/Sale'
 import Product from '@/models/Product'
 import Debt from '@/models/Debt'
@@ -9,6 +11,7 @@ import Customer from '@/models/Customer'
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const session = await getServerSession(authOptions)
     const { id } = await params
     const { items } = await req.json() as { items: { product: string; qty: number }[] }
 
@@ -19,6 +22,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const sale = await Sale.findById(id)
     if (!sale) {
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+    }
+
+    // Worker can only return own sales
+    if (session?.user?.role === 'worker' && sale.cashier.toString() !== session.user.id) {
+      return NextResponse.json({ error: 'Faqat o\'z sotuvlaringizni qaytara olasiz' }, { status: 403 })
     }
 
     let returnTotal = 0
@@ -70,9 +78,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (debt) {
         const reduce = Math.min(returnTotal, debt.remainingAmount)
         if (reduce > 0) {
-          debt.remainingAmount -= reduce
-          debt.totalAmount -= returnTotal
-          if (debt.remainingAmount <= 0) {
+          debt.remainingAmount = Math.round((debt.remainingAmount - reduce) * 100) / 100
+          debt.totalAmount = Math.round((debt.totalAmount - reduce) * 100) / 100
+          if (debt.remainingAmount <= 0.01) {
             debt.status = 'paid'
             debt.remainingAmount = 0
           }

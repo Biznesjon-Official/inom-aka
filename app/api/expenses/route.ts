@@ -33,7 +33,9 @@ export async function POST(req: Request) {
   try {
     await connectDB()
     const body = await req.json()
-    const expense = await Expense.create(body)
+    if (!body.source) return NextResponse.json({ error: 'Source required' }, { status: 400 })
+    if (typeof body.amount !== 'number' || body.amount <= 0) return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
+    const expense = await Expense.create({ source: body.source, amount: body.amount, description: body.description, date: body.date })
     const populated = await expense.populate('source', 'name')
     return NextResponse.json(populated, { status: 201 })
   } catch (err) { return errorResponse(err) }

@@ -14,7 +14,8 @@ export async function GET(req: Request) {
     const filter: Record<string, unknown> = {}
     if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' }
     if (category) filter.category = category
-    if (active !== 'all') filter.isActive = true
+    if (active === 'false') filter.isActive = false
+    else if (active !== 'all') filter.isActive = true
 
     const products = await Product.find(filter)
       .populate('category')

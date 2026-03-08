@@ -25,9 +25,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const payment = { amount, date: new Date(), note }
     debt.payments.push(payment)
-    debt.paidAmount += amount
-    debt.remainingAmount -= amount
-    if (debt.remainingAmount <= 0) {
+    debt.paidAmount = Math.round((debt.paidAmount + amount) * 100) / 100
+    debt.remainingAmount = Math.round((debt.remainingAmount - amount) * 100) / 100
+    if (debt.remainingAmount <= 0.01) {
       debt.remainingAmount = 0
       debt.status = 'paid'
     }

@@ -18,7 +18,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await connectDB()
     const { id } = await params
     const body = await req.json()
-    const product = await Product.findByIdAndUpdate(id, { $set: body }, { new: true }).populate('category')
+    const { name, costPrice, salePrice, wholesalePrice, category, unit, stock, image, description } = body
+    const update: Record<string, unknown> = {}
+    if (name !== undefined) update.name = name
+    if (costPrice !== undefined) update.costPrice = costPrice
+    if (salePrice !== undefined) update.salePrice = salePrice
+    if (wholesalePrice !== undefined) update.wholesalePrice = wholesalePrice
+    if (category !== undefined) update.category = category
+    if (unit !== undefined) update.unit = unit
+    if (stock !== undefined) update.stock = stock
+    if (image !== undefined) update.image = image
+    if (description !== undefined) update.description = description
+    const product = await Product.findByIdAndUpdate(id, { $set: update }, { new: true }).populate('category')
     if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(product)
   } catch (err) { return errorResponse(err) }

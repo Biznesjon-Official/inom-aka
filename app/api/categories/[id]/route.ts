@@ -21,8 +21,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     await connectDB()
     const { id } = await params
-    const body = await req.json()
-    const category = await Category.findByIdAndUpdate(id, body, { new: true })
+    const { name } = await req.json()
+    if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+    const category = await Category.findByIdAndUpdate(id, { name: name.trim() }, { new: true })
     return NextResponse.json(category)
   } catch (err) { return errorResponse(err) }
 }

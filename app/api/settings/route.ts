@@ -21,8 +21,9 @@ export async function PUT(req: Request) {
   try {
     await connectDB()
     const { key, value } = await req.json()
-    if (!key) {
-      return NextResponse.json({ error: 'Key is required' }, { status: 400 })
+    const allowedKeys = ['shopName', 'shopPhone', 'shopAddress', 'receiptHeader', 'receiptFooter', 'currency', 'lowStockThreshold']
+    if (!key || !allowedKeys.includes(key)) {
+      return NextResponse.json({ error: `Invalid key. Allowed: ${allowedKeys.join(', ')}` }, { status: 400 })
     }
     await Settings.findOneAndUpdate(
       { key },
