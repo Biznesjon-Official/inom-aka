@@ -16,9 +16,9 @@ module.exports = {
     {
       name: 'bot',
       script: 'bot/index.ts',
-      interpreter: 'node_modules/.bin/tsx',
+      interpreter: './node_modules/.bin/tsx',
       cwd: '/var/www/inomaka-crm',
-      instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       env: {
