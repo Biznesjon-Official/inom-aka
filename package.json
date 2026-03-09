@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
-    "seed:clean": "tsx scripts/seed.ts --clean"
+    "seed:clean": "tsx scripts/seed.ts --clean",
+    "bot": "tsx bot/index.ts",
+    "bot:test": "tsx bot/index.ts --test"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -24,6 +26,8 @@
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
+    "node-cron": "^4.2.1",
+    "node-telegram-bot-api": "^0.67.0",
     "qrcode": "^1.5.4",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
@@ -35,6 +39,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
+    "@types/node-telegram-bot-api": "^0.64.14",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",

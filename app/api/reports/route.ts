@@ -121,6 +121,20 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, name: '$_id', qty: '$totalQty', revenue: '$totalRevenue' } },
     ]).allowDiskUse(true)
 
+    // Payment methods stats
+    const paymentMethodStats = await Sale.aggregate([
+      { $match: { createdAt: dateFilter } },
+      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+      {
+        $group: {
+          _id: '$payments.method',
+          total: { $sum: '$payments.amount' },
+          count: { $sum: 1 },
+        },
+      },
+      { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+    ]).allowDiskUse(true)
+
     // Cashier stats
     const cashierStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
@@ -162,6 +176,7 @@ export async function GET(req: NextRequest) {
       daily,
       topProducts,
       cashierStats,
+      paymentMethods: paymentMethodStats,
     })
   } catch (err) {
     return errorResponse(err)
