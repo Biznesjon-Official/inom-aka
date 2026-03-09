@@ -1,15 +1,47 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import archiver from 'archiver'
+import { PassThrough } from 'stream'
 import Product from '../../models/Product'
 import '../../models/Category'
-import { sendDocumentToAll, sendPhotoToAll, sendDocumentTo, sendPhotoTo } from '../utils/send'
+import { sendDocumentToAll, sendDocumentTo } from '../utils/send'
 import { formatDate } from '../utils/format'
+
+async function createImagesZip(products: any[]): Promise<Buffer | null> {
+  const withImages = products.filter((p: any) => p.image && p.image.startsWith('data:'))
+  if (withImages.length === 0) return null
+
+  return new Promise((resolve, reject) => {
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    const chunks: Buffer[] = []
+    const stream = new PassThrough()
+
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks)))
+    archive.on('error', reject)
+
+    archive.pipe(stream)
+
+    for (const product of withImages) {
+      const matches = product.image.match(/^data:image\/(\w+);base64,(.+)$/)
+      if (!matches) continue
+      const imageBuffer = Buffer.from(matches[2], 'base64')
+      const ext = matches[1]
+      const safeName = product.name.replace(/[/\\?%*:|"<>]/g, '_')
+      archive.append(imageBuffer, { name: `${safeName}.${ext}` })
+    }
+
+    archive.finalize()
+  })
+}
 
 export async function sendDbDump(bot: any, chatId?: string | number): Promise<void> {
   const products = await Product.find({ isActive: true })
     .populate('category', 'name')
     .lean()
 
-  // JSON dump without images
+  const dateStr = formatDate(new Date())
+
+  // JSON dump
   const jsonData = products.map((p: any) => ({
     name: p.name,
     category: p.category?.name || null,
@@ -20,36 +52,27 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
     stock: p.stock,
   }))
 
-  const dateStr = formatDate(new Date())
   const jsonBuffer = Buffer.from(JSON.stringify(jsonData, null, 2), 'utf-8')
-  const caption = `Mahsulotlar (${products.length} ta)`
-  const filename = `products_${dateStr}.json`
+  const jsonCaption = `Mahsulotlar (${products.length} ta)`
+  const jsonFilename = `products_${dateStr}.json`
 
   if (chatId) {
-    await sendDocumentTo(bot, chatId, jsonBuffer, filename, caption)
+    await sendDocumentTo(bot, chatId, jsonBuffer, jsonFilename, jsonCaption)
   } else {
-    await sendDocumentToAll(bot, jsonBuffer, filename, caption)
+    await sendDocumentToAll(bot, jsonBuffer, jsonFilename, jsonCaption)
   }
 
-  // Send product images
-  const productsWithImages = products.filter((p: any) => p.image && p.image.startsWith('data:'))
-  for (const product of productsWithImages as any[]) {
-    try {
-      const matches = product.image.match(/^data:image\/(\w+);base64,(.+)$/)
-      if (!matches) continue
+  // Images ZIP
+  const zipBuffer = await createImagesZip(products)
+  if (zipBuffer) {
+    const withImages = products.filter((p: any) => p.image && p.image.startsWith('data:'))
+    const zipFilename = `images_${dateStr}.zip`
+    const zipCaption = `Rasmlar (${withImages.length} ta)`
 
-      const imageBuffer = Buffer.from(matches[2], 'base64')
-      const imgFilename = `${product.name}.${matches[1]}`
-
-      if (chatId) {
-        await sendPhotoTo(bot, chatId, imageBuffer, imgFilename, product.name)
-      } else {
-        await sendPhotoToAll(bot, imageBuffer, imgFilename, product.name)
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    } catch (err) {
-      console.error(`Failed to send image for ${product.name}:`, err)
+    if (chatId) {
+      await sendDocumentTo(bot, chatId, zipBuffer, zipFilename, zipCaption)
+    } else {
+      await sendDocumentToAll(bot, zipBuffer, zipFilename, zipCaption)
     }
   }
 }

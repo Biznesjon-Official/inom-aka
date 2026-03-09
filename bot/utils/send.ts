@@ -28,23 +28,10 @@ export async function sendDocumentTo(
   caption?: string
 ): Promise<void> {
   try {
-    await bot.sendDocument(chatId, buffer, { caption }, { filename, contentType: 'application/json' })
+    const contentType = filename.endsWith('.zip') ? 'application/zip' : 'application/json'
+    await bot.sendDocument(chatId, buffer, { caption }, { filename, contentType })
   } catch (err) {
     console.error(`Failed to send document to ${chatId}:`, err)
-  }
-}
-
-export async function sendPhotoTo(
-  bot: any,
-  chatId: string | number,
-  buffer: Buffer,
-  filename: string,
-  caption?: string
-): Promise<void> {
-  try {
-    await bot.sendPhoto(chatId, buffer, { caption })
-  } catch (err) {
-    console.error(`Failed to send photo to ${chatId}:`, err)
   }
 }
 
@@ -63,17 +50,6 @@ export async function sendDocumentToAll(
 ): Promise<void> {
   for (const chatId of CHAT_IDS) {
     await sendDocumentTo(bot, chatId, buffer, filename, caption)
-  }
-}
-
-export async function sendPhotoToAll(
-  bot: any,
-  buffer: Buffer,
-  filename: string,
-  caption?: string
-): Promise<void> {
-  for (const chatId of CHAT_IDS) {
-    await sendPhotoTo(bot, chatId, buffer, filename, caption)
   }
 }
 
