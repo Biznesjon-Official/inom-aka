@@ -7,8 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed.ts",
-    "seed:clean": "tsx scripts/seed.ts --clean",
     "bot": "tsx bot/index.ts",
     "bot:test": "tsx bot/index.ts --test"
   },
