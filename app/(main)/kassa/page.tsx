@@ -187,7 +187,7 @@ export default function KassaPage() {
     const paid = payments.reduce((s, p) => s + p.amount, 0)
     const isDebt = paid < finalTotal
     if (cart.length === 0) return toast.error('Savat bo\'sh')
-    if (payments.length === 0) return toast.error('To\'lov usulini tanlang')
+    if (payments.length === 0 && !isDebt) return toast.error('To\'lov usulini tanlang')
     if (isDebt && !clientName.trim()) return toast.error('Qarz bo\'lganda mijoz ismi majburiy')
     if (isDebt && !clientPhone.trim()) return toast.error('Qarz bo\'lganda telefon raqam majburiy')
 

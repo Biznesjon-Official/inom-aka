@@ -225,18 +225,16 @@ export const PaymentDialog = React.memo(function PaymentDialog({
           </div>
 
           {/* Status */}
-          {paidTotal > 0 && (
-            <div className={`rounded-lg p-3 text-sm font-medium text-center ${
-              remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'
-            }`}>
-              {remaining <= 0
-                ? paidTotal > finalTotal
-                  ? `To'liq. Qaytim: ${formatPrice(paidTotal - finalTotal)}`
-                  : `To'liq to'landi`
-                : `Qarz: ${formatPrice(remaining)}`
-              }
-            </div>
-          )}
+          <div className={`rounded-lg p-3 text-sm font-medium text-center ${
+            remaining <= 0 ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'
+          }`}>
+            {remaining <= 0
+              ? paidTotal > finalTotal
+                ? `To'liq. Qaytim: ${formatPrice(paidTotal - finalTotal)}`
+                : paidTotal > 0 ? `To'liq to'landi` : `To'lov kiritilmagan`
+              : `Qarz: ${formatPrice(remaining)}`
+            }
+          </div>
 
           <div className="space-y-2">
             <CustomerAutocomplete
@@ -253,8 +251,9 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             </div>
           </div>
 
-          <Button className="w-full" onClick={() => onCheckout(buildPayments())} disabled={loading || paidTotal <= 0}>
-            {loading ? 'Saqlanmoqda...' : 'Tasdiqlash'}
+          <Button className="w-full" onClick={() => onCheckout(buildPayments())}
+            disabled={loading || (paidTotal <= 0 && (!clientName.trim() || !clientPhone.trim()))}>
+            {loading ? 'Saqlanmoqda...' : paidTotal <= 0 ? 'Qarzga berish' : isDebt ? 'Qisman to\'lov' : 'Tasdiqlash'}
           </Button>
         </div>
       </DialogContent>
