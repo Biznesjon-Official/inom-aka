@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { Plus, Search, Trash2, LayoutGrid, List, Package, AlertTriangle, Pencil, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -49,7 +49,27 @@ export default function TovarlarPage() {
     return `/api/products?${params}`
   })()
   const { data: fetchedProducts, loading: productsLoading, refresh: fetchProducts } = useFetchWithCache<Product[]>(productsUrl)
-  const products = fetchedProducts || []
+  const allProducts = fetchedProducts || []
+
+  // Infinite scroll: show products in batches
+  const BATCH = 20
+  const [visibleCount, setVisibleCount] = useState(BATCH)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Reset visible count when products change (search/filter)
+  useEffect(() => { setVisibleCount(BATCH) }, [productsUrl])
+
+  useEffect(() => {
+    const el = loadMoreRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setVisibleCount(prev => prev + BATCH)
+    }, { rootMargin: '200px' })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [allProducts.length])
+
+  const products = allProducts.slice(0, visibleCount)
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(setCategories)
   }, [])
@@ -274,6 +294,9 @@ export default function TovarlarPage() {
           </table>
         </div>
       )}
+
+      {/* Load more sentinel */}
+      {visibleCount < allProducts.length && <div ref={loadMoreRef} className="h-1" />}
 
       {/* Product dialog */}
       <ProductDialog
