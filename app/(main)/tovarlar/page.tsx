@@ -110,7 +110,7 @@ export default function TovarlarPage() {
       costPrice: Number(form.costPrice),
       salePrice: Number(form.salePrice),
       wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : undefined,
-      image: form.image || undefined,
+      image: form.image && !form.image.startsWith('blob:') ? form.image : undefined,
       stock: form.stock !== '' ? Number(form.stock) : 0,
     }
     const url = editing ? `/api/products/${editing._id}` : '/api/products'

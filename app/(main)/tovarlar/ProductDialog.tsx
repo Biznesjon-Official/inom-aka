@@ -37,21 +37,29 @@ export function ProductDialog({
 
   async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    // Reset input so same file can be re-selected
+    e.target.value = ''
     if (!file) return
 
-    // Show local preview immediately
-    onFormChange(f => ({ ...f, image: URL.createObjectURL(file) }))
+    // Save previous image in case upload fails
+    let prevImage = ''
+    onFormChange(f => { prevImage = f.image; return { ...f, image: URL.createObjectURL(file) } })
 
     setUploading(true)
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      if (!res.ok) { toast.error('Rasm yuklanmadi'); return }
+      if (!res.ok) {
+        toast.error('Rasm yuklanmadi')
+        onFormChange(f => ({ ...f, image: prevImage }))
+        return
+      }
       const { url } = await res.json()
       onFormChange(f => ({ ...f, image: url }))
     } catch {
       toast.error('Rasm yuklanmadi')
+      onFormChange(f => ({ ...f, image: prevImage }))
     } finally {
       setUploading(false)
     }
