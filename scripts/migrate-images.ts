@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { resolve, join } from 'path'
+import sharp from 'sharp'
 
 // Load .env.local manually
 try {
@@ -41,9 +42,12 @@ async function main() {
       const match = p.image.match(/^data:image\/(\w+);base64,(.+)$/)
       if (!match) { console.log(`Skip: ${name} — noto'g'ri format`); skipped++; continue }
 
-      const ext = match[1] === 'jpeg' ? 'jpg' : match[1]
-      const buffer = Buffer.from(match[2], 'base64')
-      const filename = `${Date.now()}-${_id.toString().slice(-8)}.${ext}`
+      const raw = Buffer.from(match[2], 'base64')
+      const buffer = await sharp(raw)
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer()
+      const filename = `${Date.now()}-${_id.toString().slice(-8)}.webp`
 
       writeFileSync(join(dir, filename), buffer)
       await Product.updateOne({ _id }, { $set: { image: `/uploads/${filename}` } })
