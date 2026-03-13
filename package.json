@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "bot": "tsx bot/index.ts",
-    "bot:test": "tsx bot/index.ts --test"
+    "bot:test": "tsx bot/index.ts --test",
+    "migrate:images": "tsx scripts/migrate-images.ts"
   },
   "dependencies": {
     "@types/archiver": "^7.0.0",
@@ -33,6 +34,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
+    "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0"
   },

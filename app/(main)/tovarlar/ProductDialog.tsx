@@ -1,5 +1,6 @@
-import React, { useRef } from 'react'
-import { Camera, Image } from 'lucide-react'
+import React, { useRef, useState } from 'react'
+import { Camera, Image, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,13 +33,28 @@ export function ProductDialog({
 }: ProductDialogProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
 
-  function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => onFormChange(f => ({ ...f, image: reader.result as string }))
-    reader.readAsDataURL(file)
+
+    // Show local preview immediately
+    onFormChange(f => ({ ...f, image: URL.createObjectURL(file) }))
+
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: fd })
+      if (!res.ok) { toast.error('Rasm yuklanmadi'); return }
+      const { url } = await res.json()
+      onFormChange(f => ({ ...f, image: url }))
+    } catch {
+      toast.error('Rasm yuklanmadi')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -106,8 +122,8 @@ export function ProductDialog({
                 <img src={form.image} alt="preview" className="w-20 h-20 object-cover rounded-lg" />
               )}
             </div>
-            <Button className="w-full" onClick={onSave} disabled={loading}>
-              {loading ? 'Saqlanmoqda...' : 'Saqlash'}
+            <Button className="w-full" onClick={onSave} disabled={loading || uploading}>
+              {uploading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Rasm yuklanmoqda...</> : loading ? 'Saqlanmoqda...' : 'Saqlash'}
             </Button>
           </div>
         </DialogContent>
