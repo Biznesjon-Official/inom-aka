@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       .toBuffer()
     await writeFile(path.join(dir, filename), buffer)
 
-    return NextResponse.json({ url: `/uploads/${filename}` })
+    return NextResponse.json({ url: `/api/uploads/${filename}` })
   } catch {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
