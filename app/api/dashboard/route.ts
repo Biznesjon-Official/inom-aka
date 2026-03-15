@@ -85,10 +85,13 @@ export async function GET() {
         { $match: { date: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-      // Total active debt
+      // Active debt grouped by type
       Debt.aggregate([
         { $match: { status: 'active' } },
-        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
+        { $group: {
+          _id: { $ifNull: ['$type', 'customer'] },
+          total: { $sum: '$remainingAmount' },
+        } },
       ]),
       // 30-day chart: sales grouped by date
       Sale.aggregate([
@@ -220,7 +223,8 @@ export async function GET() {
         expenses: lastMonthExpenses,
         netProfit: lastMonthProfit - lastMonthExpenses,
       },
-      totalDebt: debtAgg[0]?.total || 0,
+      customerDebt: debtAgg.find((d: { _id: string; total: number }) => d._id === 'customer')?.total || 0,
+      personalDebt: debtAgg.find((d: { _id: string; total: number }) => d._id === 'personal')?.total || 0,
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
       warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
       chart,

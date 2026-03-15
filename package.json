@@ -9,7 +9,8 @@
     "lint": "eslint",
     "bot": "tsx bot/index.ts",
     "bot:test": "tsx bot/index.ts --test",
-    "migrate:images": "tsx scripts/migrate-images.ts"
+    "migrate:images": "tsx scripts/migrate-images.ts",
+    "clean:db": "tsx scripts/clean-db.ts"
   },
   "dependencies": {
     "@types/archiver": "^7.0.0",

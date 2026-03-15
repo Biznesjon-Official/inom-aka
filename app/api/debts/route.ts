@@ -17,7 +17,11 @@ export async function GET(req: Request) {
     const filter: Record<string, unknown> = {}
     if (status) filter.status = status
     if (customer) filter.customer = customer
-    if (type) filter.type = type
+    if (type === 'customer') {
+      filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+    } else if (type) {
+      filter.type = type
+    }
 
     const debts = await Debt.find(filter)
       .populate('customer', 'name phone')
