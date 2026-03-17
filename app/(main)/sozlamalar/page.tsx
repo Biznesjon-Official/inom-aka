@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Settings, Save, Loader2, Lock } from 'lucide-react'
+import { Settings, Save, Loader2, Lock, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,6 +23,29 @@ export default function SozlamalarPage() {
   // Password change
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [pwSaving, setPwSaving] = useState(false)
+
+  // Backup
+  const [backupLoading, setBackupLoading] = useState(false)
+
+  const handleBackup = async () => {
+    setBackupLoading(true)
+    try {
+      const res = await fetch('/api/backup')
+      if (!res.ok) throw new Error('Backup xato')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `inomaka_backup_${new Date().toISOString().slice(0, 10)}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Backup yuklandi')
+    } catch {
+      toast.error('Backup yaratishda xato')
+    } finally {
+      setBackupLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/settings')
@@ -101,6 +124,19 @@ export default function SozlamalarPage() {
         <Settings className="w-6 h-6" />
         <h1 className="text-2xl font-bold">Sozlamalar</h1>
       </div>
+
+      <Card className="max-w-3xl">
+        <CardContent className="flex items-center justify-between pt-6">
+          <div>
+            <h3 className="font-semibold">Ma&apos;lumotlar zaxirasi</h3>
+            <p className="text-sm text-muted-foreground">Barcha ma&apos;lumotlar va rasmlar ZIP formatda yuklanadi</p>
+          </div>
+          <Button onClick={handleBackup} disabled={backupLoading} variant="outline">
+            {backupLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {backupLoading ? 'Tayyorlanmoqda...' : 'Backup yuklash'}
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-3xl">
         <Card>
