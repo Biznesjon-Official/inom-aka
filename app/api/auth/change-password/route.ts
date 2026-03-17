@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Yangi parol kamida 6 ta belgidan iborat bo\'lishi kerak' }, { status: 400 })
     }
 
-    const user = await User.findById(session.user.id)
+    const user = await User.findById(session.user.id).select('+password')
     if (!user) {
       return NextResponse.json({ error: 'Foydalanuvchi topilmadi' }, { status: 404 })
     }

@@ -17,7 +17,7 @@ export const authOptions: NextAuthOptions = {
           if (!credentials?.username || !credentials?.password) return null
 
           await connectDB()
-          const user = await User.findOne({ username: credentials.username, isActive: true }).lean()
+          const user = await User.findOne({ username: credentials.username, isActive: true }).select('+password').lean()
           if (!user) return null
 
           const isValid = await bcrypt.compare(credentials.password, user.password as string)

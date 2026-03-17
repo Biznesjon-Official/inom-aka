@@ -37,6 +37,7 @@ export async function GET() {
       paymentMethodsAgg,
       monthPaymentMethodsAgg,
       productStatsAgg,
+      personalDebtAgg,
     ] = await Promise.all([
       // Today sales
       Sale.aggregate([
@@ -167,6 +168,11 @@ export async function GET() {
           },
         },
       ]),
+      // Personal debts
+      PersonalDebt.aggregate([
+        { $match: { status: 'active' } },
+        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
+      ]),
     ])
 
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
@@ -222,10 +228,7 @@ export async function GET() {
         netProfit: lastMonthProfit - lastMonthExpenses,
       },
       customerDebt: debtAgg[0]?.total || 0,
-      personalDebt: await PersonalDebt.aggregate([
-        { $match: { status: 'active' } },
-        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
-      ]).then(r => r[0]?.total || 0),
+      personalDebt: personalDebtAgg[0]?.total || 0,
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
       warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
       chart,

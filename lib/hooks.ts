@@ -9,8 +9,21 @@ export function useDebounce<T>(value: T, delay = 300): T {
   return debounced
 }
 
-// Simple stale-while-revalidate cache
+// Simple stale-while-revalidate cache with auto-cleanup
 const fetchCache = new Map<string, { data: unknown; ts: number }>()
+const CACHE_MAX_AGE = 5 * 60 * 1000 // 5 min — remove completely stale entries
+
+function cleanupCache() {
+  const now = Date.now()
+  for (const [key, entry] of fetchCache) {
+    if (now - entry.ts > CACHE_MAX_AGE) fetchCache.delete(key)
+  }
+}
+
+// Run cleanup every 2 minutes
+if (typeof window !== 'undefined') {
+  setInterval(cleanupCache, 2 * 60 * 1000)
+}
 
 export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
   data: T | null
