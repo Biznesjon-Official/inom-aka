@@ -323,7 +323,7 @@ export default function KassaPage() {
         )}
 
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 overflow-y-auto pr-1 content-start">
             {productsLoading && products.length === 0
               ? Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
