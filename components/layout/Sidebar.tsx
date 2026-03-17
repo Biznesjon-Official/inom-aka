@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import {
-  LayoutDashboard, ShoppingCart, Package, BookOpen,
+  LayoutDashboard, ShoppingCart, Package, BookOpen, Wallet,
   TrendingDown, Users, UserCog, Settings, LogOut, Store, FileBarChart, Receipt
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -16,6 +16,7 @@ const adminNav = [
   { href: '/tovarlar', label: 'Tovarlar', icon: Package },
   { href: '/sotuvlar', label: 'Sotuvlar', icon: Receipt },
 { href: '/qarzlar', label: 'Qarz daftarcha', icon: BookOpen },
+  { href: '/shaxsiy-qarzlar', label: 'Shaxsiy qarzlar', icon: Wallet },
   { href: '/xarajatlar', label: 'Xarajatlar', icon: TrendingDown },
   { href: '/mijozlar', label: 'Mijozlar', icon: Users },
   { href: '/ishchilar', label: 'Ishchilar', icon: UserCog },

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { BookOpen, Search, CreditCard, Plus, LayoutGrid, List } from 'lucide-react'
+import { Wallet, Search, CreditCard, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatPrice } from '@/lib/utils'
 import { NumberInput } from '@/components/ui/NumberInput'
 
-interface Debt {
+interface PersonalDebt {
   _id: string
-  customer: { _id: string; name: string; phone?: string }
+  name: string
+  phone?: string
+  direction: 'receivable' | 'payable'
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -24,55 +26,52 @@ interface Debt {
   payments: { amount: number; date: string; note?: string }[]
 }
 
-export default function QarzlarPage() {
-  const [debts, setDebts] = useState<Debt[]>([])
+export default function ShaxsiyQarzlarPage() {
+  const [debts, setDebts] = useState<PersonalDebt[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('active')
   const [payDialog, setPayDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
-  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
+  const [selectedDebt, setSelectedDebt] = useState<PersonalDebt | null>(null)
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '' })
+  const [addForm, setAddForm] = useState({ name: '', phone: '', amount: '', note: '', direction: 'receivable' as 'receivable' | 'payable' })
 
   const fetchDebts = useCallback(async () => {
-    const res = await fetch(`/api/debts?status=${status}`)
-    if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
-    const data = await res.json()
-    setDebts(Array.isArray(data) ? data : [])
-  }, [status])
+    const params = new URLSearchParams({ status })
+    if (search) params.set('search', search)
+    const res = await fetch(`/api/personal-debts?${params}`)
+    if (!res.ok) return toast.error('Yuklashda xato')
+    setDebts(await res.json())
+  }, [status, search])
 
   useEffect(() => { fetchDebts() }, [fetchDebts])
 
-  const filtered = debts.filter(d =>
-    d.customer?.name.toLowerCase().includes(search.toLowerCase()) ||
-    (d.customer?.phone || '').includes(search)
-  )
-
-  const totalDebt = filtered.filter(d => d.status === 'active').reduce((s, d) => s + d.remainingAmount, 0)
+  const receivableTotal = debts.filter(d => d.status === 'active' && d.direction === 'receivable').reduce((s, d) => s + d.remainingAmount, 0)
+  const payableTotal = debts.filter(d => d.status === 'active' && d.direction === 'payable').reduce((s, d) => s + d.remainingAmount, 0)
 
   async function handleAdd() {
-    if (!addForm.customerName.trim() || !addForm.amount) return toast.error('Ism va summa majburiy')
+    if (!addForm.name.trim() || !addForm.amount) return toast.error('Ism va summa majburiy')
     const num = Number(addForm.amount)
     if (!num || num <= 0) return toast.error('Summa noto\'g\'ri')
     setLoading(true)
-    const res = await fetch('/api/debts', {
+    const res = await fetch('/api/personal-debts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customerName: addForm.customerName.trim(),
-        customerPhone: addForm.customerPhone.trim() || undefined,
+        name: addForm.name.trim(),
+        phone: addForm.phone.trim() || undefined,
         amount: num,
         note: addForm.note || undefined,
+        direction: addForm.direction,
       }),
     })
     setLoading(false)
     if (!res.ok) return toast.error('Xato yuz berdi')
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
-    setAddForm({ customerName: '', customerPhone: '', amount: '', note: '' })
+    setAddForm({ name: '', phone: '', amount: '', note: '', direction: 'receivable' })
     fetchDebts()
   }
 
@@ -83,13 +82,12 @@ export default function QarzlarPage() {
     if (num > selectedDebt.remainingAmount) return toast.error('Qarz miqdoridan ko\'p')
 
     setLoading(true)
-    const res = await fetch(`/api/debts/${selectedDebt._id}/pay`, {
+    const res = await fetch(`/api/personal-debts/${selectedDebt._id}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount: num, note }),
     })
     setLoading(false)
-
     if (!res.ok) return toast.error('Xato yuz berdi')
     toast.success('To\'lov qabul qilindi')
     setPayDialog(false)
@@ -98,39 +96,41 @@ export default function QarzlarPage() {
     fetchDebts()
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Qarzni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/personal-debts/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
+    toast.success('O\'chirildi')
+    fetchDebts()
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Qarz daftarcha</h1>
-          {status === 'active' && filtered.length > 0 && (
-            <p className="text-sm text-slate-500">Umumiy qarz: <span className="font-bold text-orange-600">{formatPrice(totalDebt)}</span></p>
+          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <Wallet className="w-5 h-5" />
+            Shaxsiy qarzlar
+          </h1>
+          {status === 'active' && (
+            <div className="flex gap-4 text-sm text-slate-500 mt-1">
+              {receivableTotal > 0 && <span>Menga qarzdor: <span className="font-bold text-blue-600">{formatPrice(receivableTotal)}</span></span>}
+              {payableTotal > 0 && <span>Men qarzdorman: <span className="font-bold text-red-600">{formatPrice(payableTotal)}</span></span>}
+            </div>
           )}
         </div>
-        <div className="flex gap-2">
-          <div className="flex border rounded-lg overflow-hidden">
-            <button className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('list')}>
-              <List className="w-4 h-4 text-slate-600" />
-            </button>
-            <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
-              <LayoutGrid className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-          <Button size="sm" onClick={() => setAddDialog(true)}>
-            <Plus className="w-4 h-4 mr-1" />Qarz qo&apos;shish
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setAddDialog(true)}>
+          <Plus className="w-4 h-4 mr-1" />Qarz qo&apos;shish
+        </Button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Mijoz qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="active">Faol qarzlar</SelectItem>
             <SelectItem value="paid">To&apos;langan</SelectItem>
@@ -138,20 +138,23 @@ export default function QarzlarPage() {
         </Select>
       </div>
 
-      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'space-y-3'}>
-        {filtered.map(d => (
+      <div className="space-y-3">
+        {debts.map(d => (
           <Card key={d._id} className="border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-orange-500" />
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${d.direction === 'receivable' ? 'bg-blue-100' : 'bg-red-100'}`}>
+                    <Wallet className={`w-4 h-4 ${d.direction === 'receivable' ? 'text-blue-500' : 'text-red-500'}`} />
                   </div>
                   <div>
-                    <div className="font-medium text-slate-800">{d.customer?.name}</div>
-                    {d.customer?.phone && <div className="text-xs text-slate-400">{d.customer.phone}</div>}
+                    <div className="font-medium text-slate-800">{d.name}</div>
+                    {d.phone && <div className="text-xs text-slate-400">{d.phone}</div>}
                     <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
                     {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
+                    <span className={`text-[10px] font-medium ${d.direction === 'payable' ? 'text-red-500' : 'text-blue-500'}`}>
+                      {d.direction === 'payable' ? 'Men qarzdorman' : 'Menga qarzdor'}
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -167,21 +170,23 @@ export default function QarzlarPage() {
               </div>
 
               {d.status === 'active' && (
-                <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(d._id)}>
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />O&apos;chirish
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                    To&apos;lov qabul qilish
+                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />To&apos;lov
                   </Button>
                 </div>
               )}
 
-              {d.payments.length > 0 && viewMode === 'list' && (
+              {d.payments.length > 0 && (
                 <div className="mt-3 border-t pt-3">
                   <div className="text-xs text-slate-400 mb-1.5">To&apos;lov tarixi:</div>
                   <div className="space-y-1">
                     {d.payments.map((p, i) => (
                       <div key={i} className="flex justify-between text-xs">
-                        <span className="text-slate-500">{new Date(p.date).toLocaleDateString('uz-UZ')}</span>
+                        <span className="text-slate-500">{new Date(p.date).toLocaleDateString('uz-UZ')}{p.note && ` — ${p.note}`}</span>
                         <span className="font-medium text-green-600">{formatPrice(p.amount)}</span>
                       </div>
                     ))}
@@ -191,24 +196,33 @@ export default function QarzlarPage() {
             </CardContent>
           </Card>
         ))}
-        {filtered.length === 0 && (
-          <div className={`text-center text-slate-400 py-12 ${viewMode === 'grid' ? 'col-span-full' : ''}`}>Qarz topilmadi</div>
+        {debts.length === 0 && (
+          <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>
         )}
       </div>
 
+      {/* Add dialog */}
       <Dialog open={addDialog} onOpenChange={setAddDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Yangi qarz</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Yangi shaxsiy qarz</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Mijoz ismi *</Label>
-              <Input value={addForm.customerName} onChange={e => setAddForm(f => ({ ...f, customerName: e.target.value }))} placeholder="Ism familiya" />
+              <Label>Yo&apos;nalish *</Label>
+              <Select value={addForm.direction} onValueChange={v => setAddForm(f => ({ ...f, direction: v as 'receivable' | 'payable' }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="receivable">Menga qarzdor (olaman)</SelectItem>
+                  <SelectItem value="payable">Men qarzdorman (beraman)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ism *</Label>
+              <Input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} placeholder="Ism familiya" />
             </div>
             <div className="space-y-1.5">
               <Label>Telefon</Label>
-              <Input value={addForm.customerPhone} onChange={e => setAddForm(f => ({ ...f, customerPhone: e.target.value }))} placeholder="+998 XX XXX XX XX" />
+              <Input value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} placeholder="+998 XX XXX XX XX" />
             </div>
             <div className="space-y-1.5">
               <Label>Qarz summasi *</Label>
@@ -225,23 +239,19 @@ export default function QarzlarPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Pay dialog */}
       <Dialog open={payDialog} onOpenChange={setPayDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Qarz to&apos;lovi</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Qarz to&apos;lovi</DialogTitle></DialogHeader>
           {selectedDebt && (
             <div className="space-y-4">
               <div className="bg-orange-50 rounded-lg p-3 text-sm">
-                <div className="font-medium">{selectedDebt.customer?.name}</div>
-                <div className="text-orange-700 font-bold mt-1">
-                  Qolgan qarz: {formatPrice(selectedDebt.remainingAmount)}
-                </div>
+                <div className="font-medium">{selectedDebt.name}</div>
+                <div className="text-orange-700 font-bold mt-1">Qolgan qarz: {formatPrice(selectedDebt.remainingAmount)}</div>
               </div>
               <div className="space-y-1.5">
                 <Label>To&apos;lov summasi</Label>
-                <NumberInput value={amount} onChange={setAmount}
-                  placeholder={`Maks: ${selectedDebt.remainingAmount}`} min={0} max={selectedDebt.remainingAmount} />
+                <NumberInput value={amount} onChange={setAmount} placeholder={`Maks: ${selectedDebt.remainingAmount}`} min={0} max={selectedDebt.remainingAmount} />
               </div>
               <div className="space-y-1.5">
                 <Label>Izoh (ixtiyoriy)</Label>

@@ -4,6 +4,7 @@ import { errorResponse } from '@/lib/api-utils'
 import Sale from '@/models/Sale'
 import Expense from '@/models/Expense'
 import Debt from '@/models/Debt'
+import PersonalDebt from '@/models/PersonalDebt'
 import Product from '@/models/Product'
 
 export async function GET() {
@@ -85,13 +86,10 @@ export async function GET() {
         { $match: { date: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-      // Active debt grouped by type
+      // Active customer debts
       Debt.aggregate([
-        { $match: { status: 'active' } },
-        { $group: {
-          _id: { $ifNull: ['$type', 'customer'] },
-          total: { $sum: '$remainingAmount' },
-        } },
+        { $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
+        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
       ]),
       // 30-day chart: sales grouped by date
       Sale.aggregate([
@@ -223,8 +221,11 @@ export async function GET() {
         expenses: lastMonthExpenses,
         netProfit: lastMonthProfit - lastMonthExpenses,
       },
-      customerDebt: debtAgg.find((d: { _id: string; total: number }) => d._id === 'customer')?.total || 0,
-      personalDebt: debtAgg.find((d: { _id: string; total: number }) => d._id === 'personal')?.total || 0,
+      customerDebt: debtAgg[0]?.total || 0,
+      personalDebt: await PersonalDebt.aggregate([
+        { $match: { status: 'active' } },
+        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
+      ]).then(r => r[0]?.total || 0),
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
       warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
       chart,

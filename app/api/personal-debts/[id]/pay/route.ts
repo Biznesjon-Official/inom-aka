@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
-import Debt from '@/models/Debt'
-import Customer from '@/models/Customer'
+import PersonalDebt from '@/models/PersonalDebt'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,15 +13,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Amount must be positive' }, { status: 400 })
     }
 
-    const debt = await Debt.findById(id)
+    const debt = await PersonalDebt.findById(id)
     if (!debt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     if (amount > debt.remainingAmount) {
       return NextResponse.json({ error: 'Amount exceeds remaining debt' }, { status: 400 })
     }
 
-    const payment = { amount, date: new Date(), note }
-    debt.payments.push(payment)
+    debt.payments.push({ amount, date: new Date(), note })
     debt.paidAmount = Math.round((debt.paidAmount + amount) * 100) / 100
     debt.remainingAmount = Math.round((debt.remainingAmount - amount) * 100) / 100
     if (debt.remainingAmount <= 0.01) {
@@ -30,11 +28,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       debt.status = 'paid'
     }
     await debt.save()
-
-    // Update customer total debt
-    await Customer.findByIdAndUpdate(debt.customer, {
-      $inc: { totalDebt: -amount },
-    })
 
     return NextResponse.json(debt)
   } catch (err) { return errorResponse(err) }
