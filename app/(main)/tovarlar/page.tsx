@@ -1,13 +1,13 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Plus, Search, Trash2, LayoutGrid, List, Package, AlertTriangle, Pencil, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDebounce, useFetchWithCache } from '@/lib/hooks'
+import CategoryCarousel from '@/components/CategoryCarousel'
 import { formatPrice } from '@/lib/utils'
 import { printLabel } from '@/lib/print'
 import { TovarProductCard } from './ProductCard'
@@ -49,7 +49,14 @@ export default function TovarlarPage() {
     return `/api/products?${params}`
   })()
   const { data: fetchedProducts, loading: productsLoading, refresh: fetchProducts } = useFetchWithCache<Product[]>(productsUrl)
-  const allProducts = fetchedProducts || []
+  const allProducts = useMemo(() => {
+    const list = fetchedProducts || []
+    return [...list].sort((a, b) => {
+      const aIn = (a.stock ?? 0) > 0 ? 0 : 1
+      const bIn = (b.stock ?? 0) > 0 ? 0 : 1
+      return aIn - bIn
+    })
+  }, [fetchedProducts])
 
   // Infinite scroll: show products in batches
   const BATCH = 20
@@ -208,21 +215,18 @@ export default function TovarlarPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={catFilter} onValueChange={setCatFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Kategoriya" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Barchasi</SelectItem>
-            {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {categories.length > 0 && (
+        <CategoryCarousel
+          categories={categories}
+          selected={catFilter}
+          onSelect={setCatFilter}
+        />
+      )}
 
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
