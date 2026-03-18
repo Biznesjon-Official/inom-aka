@@ -42,13 +42,14 @@ export async function GET() {
       // Today sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$paid' }, total: { $sum: '$total' } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } }, total: { $sum: '$total' } } },
       ]),
-      // Today profit
+      // Today profit (gross profit minus returned profit)
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
         { $unwind: '$items' },
-        { $group: { _id: null, profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } } } },
+        { $group: { _id: '$_id', gross: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
+        { $group: { _id: null, profit: { $sum: { $subtract: ['$gross', { $subtract: ['$returnedTotal', '$returnedCostTotal'] }] } } } },
       ]),
       // Today expenses
       Expense.aggregate([
@@ -58,13 +59,14 @@ export async function GET() {
       // This month sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: monthStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$paid' }, total: { $sum: '$total' } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } }, total: { $sum: '$total' } } },
       ]),
       // This month profit
       Sale.aggregate([
         { $match: { createdAt: { $gte: monthStart } } },
         { $unwind: '$items' },
-        { $group: { _id: null, profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } } } },
+        { $group: { _id: '$_id', gross: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
+        { $group: { _id: null, profit: { $sum: { $subtract: ['$gross', { $subtract: ['$returnedTotal', '$returnedCostTotal'] }] } } } },
       ]),
       // This month expenses
       Expense.aggregate([
@@ -74,13 +76,14 @@ export async function GET() {
       // Last month sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$paid' } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } } } },
       ]),
       // Last month profit
       Sale.aggregate([
         { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
         { $unwind: '$items' },
-        { $group: { _id: null, profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } } } },
+        { $group: { _id: '$_id', gross: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
+        { $group: { _id: null, profit: { $sum: { $subtract: ['$gross', { $subtract: ['$returnedTotal', '$returnedCostTotal'] }] } } } },
       ]),
       // Last month expenses
       Expense.aggregate([
@@ -100,14 +103,16 @@ export async function GET() {
           $group: {
             _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
             paid: { $first: '$paid' },
-            profit: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } },
+            returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
+            returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
+            gross: { $sum: { $multiply: [{ $subtract: ['$items.salePrice', '$items.costPrice'] }, '$items.qty'] } },
           },
         },
         {
           $group: {
             _id: '$_id.date',
-            revenue: { $sum: '$paid' },
-            profit: { $sum: '$profit' },
+            revenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
+            profit: { $sum: { $subtract: ['$gross', { $subtract: ['$returnedTotal', '$returnedCostTotal'] }] } },
           },
         },
         { $sort: { _id: 1 } },

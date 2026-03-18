@@ -30,11 +30,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     let returnTotal = 0
-    const returnedItems: { product: string; productName: string; qty: number; salePrice: number }[] = []
+    let returnCostTotal = 0
+    const returnedItems: { product: string; productName: string; qty: number; salePrice: number; costPrice: number }[] = []
 
     for (const returnItem of items) {
       const saleItem = sale.items.find(
-        (si: { product: { toString: () => string }; qty: number; productName: string; salePrice: number }) =>
+        (si: { product: { toString: () => string }; qty: number; productName: string; salePrice: number; costPrice: number }) =>
           si.product.toString() === returnItem.product
       )
       if (!saleItem) continue
@@ -50,12 +51,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       const amount = qty * saleItem.salePrice
       returnTotal += amount
+      returnCostTotal += qty * (saleItem.costPrice || 0)
 
       returnedItems.push({
         product: returnItem.product,
         productName: saleItem.productName,
         qty,
         salePrice: saleItem.salePrice,
+        costPrice: saleItem.costPrice || 0,
       })
 
       // Restore stock
@@ -69,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Update sale
     await Sale.findByIdAndUpdate(id, {
       $push: { returnedItems: { $each: returnedItems } },
-      $inc: { returnedTotal: returnTotal },
+      $inc: { returnedTotal: returnTotal, returnedCostTotal: returnCostTotal },
     })
 
     // If sale had debt, reduce it

@@ -15,6 +15,7 @@ const ReturnItemSchema = new Schema({
   productName: { type: String, required: true },
   qty: { type: Number, required: true },
   salePrice: { type: Number, required: true },
+  costPrice: { type: Number, default: 0 },
   returnedAt: { type: Date, default: Date.now },
 }, { _id: false })
 
@@ -35,6 +36,7 @@ const SaleSchema = new Schema({
   note: { type: String },
   returnedItems: [ReturnItemSchema],
   returnedTotal: { type: Number, default: 0 },
+  returnedCostTotal: { type: Number, default: 0 },
 }, { timestamps: true })
 
 SaleSchema.index({ cashier: 1, createdAt: -1 })
