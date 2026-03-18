@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDebounce, useFetchWithCache } from '@/lib/hooks'
-import CategoryCarousel from '@/components/CategoryCarousel'
 import { formatPrice } from '@/lib/utils'
 import { printLabel } from '@/lib/print'
 import { TovarProductCard } from './ProductCard'
@@ -28,7 +27,6 @@ const emptyForm: ProductForm = {
 export default function TovarlarPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
-  const [catFilter, setCatFilter] = useState('all')
   const [dialog, setDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
@@ -43,11 +41,7 @@ export default function TovarlarPage() {
   }>('/api/product-stats')
 
   const debouncedSearch = useDebounce(search)
-  const productsUrl = (() => {
-    const params = new URLSearchParams({ search: debouncedSearch })
-    if (catFilter !== 'all') params.set('category', catFilter)
-    return `/api/products?${params}`
-  })()
+  const productsUrl = `/api/products?search=${debouncedSearch}`
   const { data: fetchedProducts, loading: productsLoading, refresh: fetchProducts } = useFetchWithCache<Product[]>(productsUrl)
   const allProducts = useMemo(() => {
     const list = fetchedProducts || []
@@ -220,13 +214,6 @@ export default function TovarlarPage() {
         <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      {categories.length > 0 && (
-        <CategoryCarousel
-          categories={categories}
-          selected={catFilter}
-          onSelect={setCatFilter}
-        />
-      )}
 
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
