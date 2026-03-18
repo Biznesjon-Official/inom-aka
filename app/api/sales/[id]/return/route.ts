@@ -69,17 +69,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Nothing to return' }, { status: 400 })
     }
 
+    // Apply discount ratio: returnedTotal stored at effective (discounted) price
+    const originalItemsTotal = sale.items.reduce(
+      (s: number, i: { qty: number; salePrice: number }) => s + i.qty * i.salePrice, 0
+    )
+    const discountRatio = originalItemsTotal > 0 ? sale.total / originalItemsTotal : 1
+    const effectiveReturnTotal = Math.round(returnTotal * discountRatio)
+    const effectiveCostTotal = Math.round(returnCostTotal * discountRatio)
+
     // Update sale
     await Sale.findByIdAndUpdate(id, {
       $push: { returnedItems: { $each: returnedItems } },
-      $inc: { returnedTotal: returnTotal, returnedCostTotal: returnCostTotal },
+      $inc: { returnedTotal: effectiveReturnTotal, returnedCostTotal: effectiveCostTotal },
     })
 
-    // If sale had debt, reduce it
+    // If sale had debt, reduce it proportionally
     if (sale.customer && (sale.paymentType === 'partial' || sale.paymentType === 'debt')) {
       const debt = await Debt.findOne({ sale: sale._id, status: 'active' })
       if (debt) {
-        const reduce = Math.min(returnTotal, debt.remainingAmount)
+        const reduce = Math.min(effectiveReturnTotal, debt.remainingAmount)
         if (reduce > 0) {
           debt.remainingAmount = Math.round((debt.remainingAmount - reduce) * 100) / 100
           debt.totalAmount = Math.round((debt.totalAmount - reduce) * 100) / 100
@@ -95,6 +103,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    return NextResponse.json({ returnedItems, returnTotal }, { status: 200 })
+    return NextResponse.json({ returnedItems, returnTotal: effectiveReturnTotal }, { status: 200 })
   } catch (err) { return errorResponse(err) }
 }
