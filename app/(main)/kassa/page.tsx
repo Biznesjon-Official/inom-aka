@@ -162,7 +162,14 @@ export default function KassaPage() {
     setCustomTotal(null)
     if (isNaN(qty)) { setCart(prev => prev.map(c => c._id === id ? { ...c, qty: 0, price: getItemPrice(c) } : c)); return }
     if (qty <= 0) { setCart(prev => prev.filter(c => c._id !== id)); return }
-    setCart(prev => prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c) } : c))
+    setCart(prev => {
+      const item = prev.find(c => c._id === id)
+      if (item && qty > item.stock) {
+        toast.error(`${item.name}: stokda ${item.stock} ta`)
+        return prev.map(c => c._id === id ? { ...c, qty: item.stock, price: getItemPrice(c) } : c)
+      }
+      return prev.map(c => c._id === id ? { ...c, qty, price: getItemPrice(c) } : c)
+    })
   }, [])
 
   const total = useMemo(() => cart.reduce((s, c) => s + c.price * c.qty, 0), [cart])
