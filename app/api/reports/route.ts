@@ -23,16 +23,25 @@ export async function GET(req: NextRequest) {
 
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
-    // Sales aggregation
+    // Sales aggregation (accounting for returns)
     const [salesAgg] = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
         $group: {
+          _id: '$_id',
+          grossRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
+          grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
+          returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
+          returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
+        },
+      },
+      {
+        $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
-          totalCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
+          totalRevenue: { $sum: { $subtract: ['$grossRevenue', '$returnedTotal'] } },
+          totalCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
         },
       },
       {
@@ -62,16 +71,25 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Daily breakdown for chart
+    // Daily breakdown for chart (accounting for returns)
     const dailyBreakdown = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
           revenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
           cost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
-          sales: { $addToSet: '$_id' },
+          returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
+          returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          revenue: { $sum: { $subtract: ['$revenue', '$returnedTotal'] } },
+          cost: { $sum: { $subtract: ['$cost', '$returnedCostTotal'] } },
+          sales: { $addToSet: '$_id.saleId' },
         },
       },
       {
@@ -142,7 +160,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: '$cashier',
           salesCount: { $sum: 1 },
-          totalAmount: { $sum: '$total' },
+          totalAmount: { $sum: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] } },
         },
       },
       {
