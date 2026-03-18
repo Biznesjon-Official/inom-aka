@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Search, Trash2, LayoutGrid, List } from 'lucide-react'
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/utils'
 import { useDebounce, useFetchWithCache, useBarcodeScan } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
-import CategoryCarousel from '@/components/CategoryCarousel'
 import { ProductCard } from './ProductCard'
 import { CartPanel } from './CartPanel'
 import { PaymentDialog, type SalePayment } from './PaymentDialog'
@@ -50,8 +49,6 @@ export default function KassaPage() {
   const [clientPhone, setClientPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([])
   const [customTotal, setCustomTotal] = useState<number | null>(null)
   const [editingTotal, setEditingTotal] = useState(false)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -62,16 +59,8 @@ export default function KassaPage() {
   const [saveNameDialog, setSaveNameDialog] = useState(false)
   const [saveName, setSaveName] = useState('')
 
-  useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(setCategories)
-  }, [])
-
   const debouncedSearch = useDebounce(search)
-  const productsUrl = useMemo(() => {
-    const p = new URLSearchParams({ search: debouncedSearch })
-    if (selectedCategory !== 'all') p.set('category', selectedCategory)
-    return `/api/products?${p}`
-  }, [debouncedSearch, selectedCategory])
+  const productsUrl = useMemo(() => `/api/products?search=${debouncedSearch}`, [debouncedSearch])
   const { data: fetchedProducts, loading: productsLoading } = useFetchWithCache<Product[]>(productsUrl)
   const products = useMemo(() => {
     const list = fetchedProducts || []
@@ -290,9 +279,9 @@ export default function KassaPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+    <div className="flex flex-col lg:flex-row gap-4">
       {/* Products panel */}
-      <div className="flex-1 flex flex-col min-h-0 gap-4">
+      <div className="flex-1 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800">Kassa</h1>
           <div className="flex items-center gap-2">
@@ -314,16 +303,8 @@ export default function KassaPage() {
             onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {categories.length > 0 && (
-          <CategoryCarousel
-            categories={categories}
-            selected={selectedCategory}
-            onSelect={setSelectedCategory}
-          />
-        )}
-
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 overflow-y-auto pr-1 content-start">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {productsLoading && products.length === 0
               ? Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
@@ -343,7 +324,7 @@ export default function KassaPage() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-xl overflow-x-auto shadow-sm flex-1 overflow-y-auto">
+          <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b text-left text-slate-500">
@@ -385,7 +366,7 @@ export default function KassaPage() {
       </div>
 
       {/* Cart panel */}
-      <div className="lg:w-80 xl:w-96 lg:overflow-y-auto">
+      <div className="lg:w-80 xl:w-96 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
         <CartPanel
           cart={cart}
           total={total}
