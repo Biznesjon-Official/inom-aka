@@ -385,7 +385,7 @@ export default function KassaPage() {
       </div>
 
       {/* Cart panel */}
-      <div className="lg:w-80 xl:w-96">
+      <div className="lg:w-80 xl:w-96 lg:overflow-y-auto">
         <CartPanel
           cart={cart}
           total={total}

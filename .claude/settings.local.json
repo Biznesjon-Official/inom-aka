@@ -8,7 +8,18 @@
       "Bash(node:*)",
       "Bash(cat:*)",
       "Bash(npm install:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(grep -r \"upload\\\\|FormData\\\\|multipart\\\\|Buffer\" /c/Users/User/Desktop/inomaka-crm/app/api --include=\"*.ts\" 2>/dev/null | head -20)",
+      "Bash(grep -r \"image\" \"/c/Users/User/Desktop/inomaka-crm/lib\" --include=\"*.ts\" --include=\"*.tsx\" 2>/dev/null | head -20)",
+      "Bash(node_modules/.bin/tsx scripts/migrate-images.ts 2>&1)",
+      "Bash(./node_modules/.bin/tsx scripts/migrate-images.ts 2>&1)",
+      "Bash(ls node_modules/.bin/tsx* 2>&1; npm exec -- tsx scripts/migrate-images.ts 2>&1)",
+      "Bash(ls node_modules/.bin/tsx* 2>&1; ls \"C:/Users/User/Desktop/inomaka-crm/node_modules/.bin/\" | grep tsx 2>&1)",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq tsx*\" 2>/dev/null; taskkill /F /FI \"IMAGENAME eq node.exe\" /FI \"WINDOWTITLE eq *migrate*\" 2>/dev/null; echo \"done\")",
+      "Bash(git add:*)",
+      "Bash(ls \"C:/Users/User/Desktop/inomaka-crm/public/uploads/\"*.webp 2>/dev/null | head -10)",
+      "Bash(grep:*)",
+      "Bash(head:*)"
     ]
   }
 }
