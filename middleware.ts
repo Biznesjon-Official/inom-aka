@@ -8,8 +8,10 @@ export default withAuth(
 
     // API routes — role-based access
     if (path.startsWith('/api/')) {
-      const adminOnlyAPIs = ['/api/workers', '/api/expenses', '/api/expense-sources', '/api/dashboard', '/api/categories', '/api/customers', '/api/reports', '/api/settings', '/api/personal-debts']
-      const isAdminOnly = adminOnlyAPIs.some(r => path.startsWith(r))
+      const adminOnlyAPIs = ['/api/workers', '/api/expenses', '/api/expense-sources', '/api/dashboard', '/api/categories', '/api/reports', '/api/settings', '/api/personal-debts']
+      // Customers: GET and POST allowed for worker (debt sales), PUT/DELETE admin only
+      const isCustomerAdminOnly = path.startsWith('/api/customers') && !['GET', 'POST'].includes(req.method)
+      const isAdminOnly = adminOnlyAPIs.some(r => path.startsWith(r)) || isCustomerAdminOnly
       // Products: GET allowed for worker (kassa needs it), POST/PUT/DELETE admin only
       const isProductWrite = path.startsWith('/api/products') && req.method !== 'GET'
 
