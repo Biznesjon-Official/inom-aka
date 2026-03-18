@@ -133,8 +133,8 @@ export default function SotuvlarPage() {
     fetchSales()
   }
 
-  const totalRevenue = filtered.reduce((s, x) => s + x.paid, 0)
-  const totalSales = filtered.reduce((s, x) => s + x.total, 0)
+  const totalRevenue = filtered.reduce((s, x) => s + x.paid - (x.returnedTotal || 0), 0)
+  const totalSales = filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
 
   return (
     <div className="space-y-4">
