@@ -3,7 +3,6 @@ import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Sale from '@/models/Sale'
 import Debt from '@/models/Debt'
-import Customer from '@/models/Customer'
 import Product from '@/models/Product'
 
 export async function GET(req: Request) {
@@ -91,21 +90,17 @@ export async function POST(req: Request) {
     const sale = await Sale.create(body)
 
     // Create debt if partial or full debt
-    if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.customer) {
+    if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.debtorName) {
       const remaining = body.total - (body.paid || 0)
       const debt = await Debt.create({
-        customer: body.customer,
+        customerName: body.debtorName,
+        customerPhone: body.debtorPhone || undefined,
         sale: sale._id,
         totalAmount: body.total,
         paidAmount: body.paid || 0,
         remainingAmount: remaining,
         payments: body.paid > 0 ? [{ amount: body.paid, date: new Date() }] : [],
       })
-
-      await Customer.findByIdAndUpdate(body.customer, {
-        $inc: { totalDebt: remaining },
-      })
-
       return NextResponse.json({ sale, debt }, { status: 201 })
     }
 

@@ -8,13 +8,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/utils'
 import { NumberInput } from '@/components/ui/NumberInput'
 
 interface Debt {
   _id: string
-  customer: { _id: string; name: string; phone?: string }
+  customer?: { _id: string; name: string; phone?: string }
+  customerName?: string
+  customerPhone?: string
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -34,7 +35,7 @@ export default function QarzlarPage() {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
   const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '' })
 
   const fetchDebts = useCallback(async () => {
@@ -46,9 +47,12 @@ export default function QarzlarPage() {
 
   useEffect(() => { fetchDebts() }, [fetchDebts])
 
+  const debtorName = (d: Debt) => d.customerName || d.customer?.name || ''
+  const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
+
   const filtered = debts.filter(d =>
-    d.customer?.name.toLowerCase().includes(search.toLowerCase()) ||
-    (d.customer?.phone || '').includes(search)
+    debtorName(d).toLowerCase().includes(search.toLowerCase()) ||
+    debtorPhone(d).includes(search)
   )
 
   const totalDebt = filtered.filter(d => d.status === 'active').reduce((s, d) => s + d.remainingAmount, 0)
@@ -109,11 +113,11 @@ export default function QarzlarPage() {
         </div>
         <div className="flex gap-2">
           <div className="flex border rounded-lg overflow-hidden">
-            <button className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('list')}>
-              <List className="w-4 h-4 text-slate-600" />
-            </button>
-            <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
+            <button className={`p-1.5 ${viewMode === 'card' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('card')}>
               <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+              <List className="w-4 h-4 text-slate-600" />
             </button>
           </div>
           <Button size="sm" onClick={() => setAddDialog(true)}>
@@ -122,79 +126,130 @@ export default function QarzlarPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Mijoz qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Faol qarzlar</SelectItem>
-            <SelectItem value="paid">To&apos;langan</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${status === 'active' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setStatus('active')}
+        >
+          Faol qarzlar
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${status === 'paid' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          onClick={() => setStatus('paid')}
+        >
+          Arxiv
+        </button>
       </div>
 
-      <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'space-y-3'}>
-        {filtered.map(d => (
-          <Card key={d._id} className="border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-orange-500" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-slate-800">{d.customer?.name}</div>
-                    {d.customer?.phone && <div className="text-xs text-slate-400">{d.customer.phone}</div>}
-                    <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
-                    {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge variant={d.status === 'active' ? 'destructive' : 'secondary'} className="mb-1">
-                    {d.status === 'active' ? 'Faol' : 'To\'langan'}
-                  </Badge>
-                  <div className="text-xs text-slate-500">Jami: {formatPrice(d.totalAmount)}</div>
-                  <div className="text-xs text-slate-500">To&apos;langan: {formatPrice(d.paidAmount)}</div>
-                  {d.status === 'active' && (
-                    <div className="text-sm font-bold text-red-600">Qoldi: {formatPrice(d.remainingAmount)}</div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {viewMode === 'table' ? (
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="px-4 py-3 font-medium">Qarzdor</th>
+                <th className="px-4 py-3 font-medium">Telefon</th>
+                <th className="px-4 py-3 font-medium">Sana</th>
+                <th className="px-4 py-3 font-medium text-right">Jami</th>
+                <th className="px-4 py-3 font-medium text-right">To&apos;langan</th>
+                <th className="px-4 py-3 font-medium text-right">Qoldi</th>
+                {status === 'active' && <th className="px-4 py-3 font-medium text-right">Amallar</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(d => (
+                <tr key={d._id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">
+                    {debtorName(d)}
+                    {d.note && <div className="text-xs text-slate-400 italic font-normal">{d.note}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{debtorPhone(d) || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{formatPrice(d.totalAmount)}</td>
+                  <td className="px-4 py-3 text-right text-green-600">{formatPrice(d.paidAmount)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-red-600">
+                    {d.status === 'active' ? formatPrice(d.remainingAmount) : <span className="text-slate-400 font-normal">To&apos;langan</span>}
+                  </td>
+                  {status === 'active' && (
+                    <td className="px-4 py-3 text-right">
+                      {d.status === 'active' && (
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
+                          <CreditCard className="w-3.5 h-3.5 mr-1" />To&apos;lov
+                        </Button>
+                      )}
+                    </td>
                   )}
-                </div>
-              </div>
-
-              {d.status === 'active' && (
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                    To&apos;lov qabul qilish
-                  </Button>
-                </div>
-              )}
-
-              {d.payments.length > 0 && viewMode === 'list' && (
-                <div className="mt-3 border-t pt-3">
-                  <div className="text-xs text-slate-400 mb-1.5">To&apos;lov tarixi:</div>
-                  <div className="space-y-1">
-                    {d.payments.map((p, i) => (
-                      <div key={i} className="flex justify-between text-xs">
-                        <span className="text-slate-500">{new Date(p.date).toLocaleDateString('uz-UZ')}</span>
-                        <span className="font-medium text-green-600">{formatPrice(p.amount)}</span>
-                      </div>
-                    ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(d => (
+            <Card key={d._id} className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
+                      <BookOpen className="w-4 h-4 text-orange-500" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-800">{debtorName(d)}</div>
+                      {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
+                      <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
+                      {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={d.status === 'active' ? 'destructive' : 'secondary'} className="mb-1">
+                      {d.status === 'active' ? 'Faol' : 'To\'langan'}
+                    </Badge>
+                    <div className="text-xs text-slate-500">Jami: {formatPrice(d.totalAmount)}</div>
+                    <div className="text-xs text-slate-500">To&apos;langan: {formatPrice(d.paidAmount)}</div>
+                    {d.status === 'active' && (
+                      <div className="text-sm font-bold text-red-600">Qoldi: {formatPrice(d.remainingAmount)}</div>
+                    )}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className={`text-center text-slate-400 py-12 ${viewMode === 'grid' ? 'col-span-full' : ''}`}>Qarz topilmadi</div>
-        )}
-      </div>
+
+                {d.status === 'active' && (
+                  <div className="mt-3 flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
+                      <CreditCard className="w-3.5 h-3.5 mr-1.5" />To&apos;lov qabul qilish
+                    </Button>
+                  </div>
+                )}
+
+                {d.payments.length > 0 && (
+                  <div className="mt-3 border-t pt-3">
+                    <div className="text-xs text-slate-400 mb-1.5">To&apos;lov tarixi:</div>
+                    <div className="space-y-1">
+                      {d.payments.map((p, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-slate-500">{new Date(p.date).toLocaleDateString('uz-UZ')}</span>
+                          <span className="font-medium text-green-600">{formatPrice(p.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>
+          )}
+        </div>
+      )}
 
       <Dialog open={addDialog} onOpenChange={setAddDialog}>
         <DialogContent className="max-w-sm">

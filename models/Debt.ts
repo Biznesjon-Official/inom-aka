@@ -7,7 +7,9 @@ const DebtPaymentSchema = new Schema({
 }, { _id: false })
 
 const DebtSchema = new Schema({
-  customer: { type: Types.ObjectId, ref: 'Customer', required: true },
+  customer: { type: Types.ObjectId, ref: 'Customer' },
+  customerName: { type: String },
+  customerPhone: { type: String },
   sale: { type: Types.ObjectId, ref: 'Sale' },
   totalAmount: { type: Number, required: true },
   paidAmount: { type: Number, default: 0 },

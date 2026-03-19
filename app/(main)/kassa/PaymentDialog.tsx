@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/utils'
-import { useDebounce } from '@/lib/hooks'
 import { NumberInput } from '@/components/ui/NumberInput'
 
 interface CartItem {
@@ -25,70 +25,39 @@ interface PaymentDialogProps {
   total: number
   finalTotal: number
   discount: number
-  clientName: string
-  clientPhone: string
   loading: boolean
   cart: CartItem[]
-  onClientNameChange: (value: string) => void
-  onClientPhoneChange: (value: string) => void
   onTotalChange: (value: number | null) => void
-  onCheckout: (payments: SalePayment[]) => void
+  onCheckout: (payments: SalePayment[], extra: { ustaId?: string; debtorName?: string; debtorPhone?: string }) => void
 }
 
-interface CustomerSuggestion {
+interface Usta {
   _id: string
   name: string
-  phone?: string
+  cashbackPercent: number
 }
 
-function CustomerAutocomplete({ value, phone, onChange, onPhoneChange, required }: {
-  value: string; phone: string; onChange: (v: string) => void; onPhoneChange: (v: string) => void; required: boolean
-}) {
-  const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const debouncedSearch = useDebounce(value, 200)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+function UstaSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [ustalar, setUstalar] = useState<Usta[]>([])
 
   useEffect(() => {
-    if (!debouncedSearch || debouncedSearch.length < 2) { setSuggestions([]); return }
-    fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
-      .then(r => r.ok ? r.json() : [])
-      .then((data: CustomerSuggestion[]) => { setSuggestions(data.slice(0, 5)); setShowSuggestions(true) })
-  }, [debouncedSearch])
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowSuggestions(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    fetch('/api/customers').then(r => r.ok ? r.json() : []).then(setUstalar)
   }, [])
 
-  function selectCustomer(c: CustomerSuggestion) {
-    onChange(c.name)
-    if (c.phone) onPhoneChange(c.phone)
-    setShowSuggestions(false)
-  }
-
   return (
-    <div ref={wrapperRef} className="relative">
-      <div className="space-y-1.5">
-        <Label>Mijoz ismi {required && <span className="text-red-500">*</span>}</Label>
-        <Input placeholder="Ism qidirish..." value={value}
-          onChange={e => { onChange(e.target.value); setShowSuggestions(true) }}
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} />
-      </div>
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto">
-          {suggestions.map(c => (
-            <button key={c._id} type="button" className="w-full text-left px-3 py-2 hover:bg-slate-50 text-sm"
-              onClick={() => selectCustomer(c)}>
-              <div className="font-medium text-slate-800">{c.name}</div>
-              {c.phone && <div className="text-xs text-slate-400">{c.phone}</div>}
-            </button>
+    <div className="space-y-1.5">
+      <Label>Usta (ixtiyoriy)</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder="Usta tanlang..." /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Ustasiz</SelectItem>
+          {ustalar.map(u => (
+            <SelectItem key={u._id} value={u._id}>
+              {u.name} ({u.cashbackPercent}%)
+            </SelectItem>
           ))}
-        </div>
-      )}
+        </SelectContent>
+      </Select>
     </div>
   )
 }
@@ -97,14 +66,17 @@ const METHOD_LABELS: Record<string, string> = { cash: 'Naqd', card: 'Karta', ter
 
 export const PaymentDialog = React.memo(function PaymentDialog({
   open, onOpenChange, total, finalTotal, discount,
-  clientName, clientPhone, loading, cart,
-  onClientNameChange, onClientPhoneChange, onTotalChange, onCheckout,
+  loading, cart,
+  onTotalChange, onCheckout,
 }: PaymentDialogProps) {
   const [cashAmount, setCashAmount] = useState('')
   const [cardAmount, setCardAmount] = useState('')
   const [terminalAmount, setTerminalAmount] = useState('')
   const [editingTotal, setEditingTotal] = useState(false)
   const [editValue, setEditValue] = useState('')
+  const [ustaId, setUstaId] = useState('none')
+  const [debtorName, setDebtorName] = useState('')
+  const [debtorPhone, setDebtorPhone] = useState('')
 
   const cashNum = Number(cashAmount) || 0
   const cardNum = Number(cardAmount) || 0
@@ -122,6 +94,9 @@ export const PaymentDialog = React.memo(function PaymentDialog({
       setCardAmount('')
       setTerminalAmount('')
       setEditingTotal(false)
+      setUstaId('none')
+      setDebtorName('')
+      setDebtorPhone('')
     }
   }, [open])
 
@@ -236,23 +211,28 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             }
           </div>
 
-          <div className="space-y-2">
-            <CustomerAutocomplete
-              value={clientName}
-              phone={clientPhone}
-              onChange={onClientNameChange}
-              onPhoneChange={onClientPhoneChange}
-              required={isDebt}
-            />
-            <div className="space-y-1.5">
-              <Label>Telefon raqam {isDebt && <span className="text-red-500">*</span>}</Label>
-              <Input placeholder="+998 XX XXX XX XX" value={clientPhone}
-                onChange={e => onClientPhoneChange(e.target.value)} />
-            </div>
-          </div>
+          <UstaSelect value={ustaId} onChange={setUstaId} />
 
-          <Button className="w-full" onClick={() => onCheckout(buildPayments())}
-            disabled={loading || (paidTotal <= 0 && (!clientName.trim() || !clientPhone.trim()))}>
+          {isDebt && (
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label>Qarzdor ismi <span className="text-red-500">*</span></Label>
+                <Input placeholder="Ism familiya" value={debtorName} onChange={e => setDebtorName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Telefon raqam <span className="text-red-500">*</span></Label>
+                <Input placeholder="+998 XX XXX XX XX" value={debtorPhone} onChange={e => setDebtorPhone(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          <Button className="w-full"
+            onClick={() => onCheckout(buildPayments(), {
+              ustaId: ustaId !== 'none' ? ustaId : undefined,
+              debtorName: debtorName.trim() || undefined,
+              debtorPhone: debtorPhone.trim() || undefined,
+            })}
+            disabled={loading || (isDebt && (!debtorName.trim() || !debtorPhone.trim()))}>
             {loading ? 'Saqlanmoqda...' : paidTotal <= 0 ? 'Qarzga berish' : isDebt ? 'Qisman to\'lov' : 'Tasdiqlash'}
           </Button>
         </div>

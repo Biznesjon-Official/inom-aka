@@ -31,6 +31,7 @@ const SaleSchema = new Schema({
   paid: { type: Number, required: true },
   cashier: { type: Types.ObjectId, ref: 'User', required: true },
   customer: { type: Types.ObjectId, ref: 'Customer' },
+  usta: { type: Types.ObjectId, ref: 'Customer' },
   paymentType: { type: String, enum: ['full', 'partial', 'debt'], required: true },
   payments: [SalePaymentSchema],
   note: { type: String },

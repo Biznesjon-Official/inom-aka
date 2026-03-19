@@ -45,8 +45,6 @@ export default function KassaPage() {
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
-  const [clientName, setClientName] = useState('')
-  const [clientPhone, setClientPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [customTotal, setCustomTotal] = useState<number | null>(null)
@@ -192,42 +190,18 @@ export default function KassaPage() {
   }, [editTotalValue, total])
 
   function openPayDialog() {
-    setClientName('')
-    setClientPhone('')
     setPayDialog(true)
   }
 
-  async function handleCheckout(payments: SalePayment[]) {
+  async function handleCheckout(payments: SalePayment[], extra: { ustaId?: string; debtorName?: string; debtorPhone?: string }) {
     const paid = payments.reduce((s, p) => s + p.amount, 0)
     const isDebt = paid < finalTotal
     if (cart.length === 0) return toast.error('Savat bo\'sh')
     if (payments.length === 0 && !isDebt) return toast.error('To\'lov usulini tanlang')
-    if (isDebt && !clientName.trim()) return toast.error('Qarz bo\'lganda mijoz ismi majburiy')
-    if (isDebt && !clientPhone.trim()) return toast.error('Qarz bo\'lganda telefon raqam majburiy')
+    if (isDebt && !extra.debtorName?.trim()) return toast.error('Qarz bo\'lganda qarzdor ismi majburiy')
+    if (isDebt && !extra.debtorPhone?.trim()) return toast.error('Qarz bo\'lganda telefon raqam majburiy')
 
     setLoading(true)
-
-    let customerId: string | undefined
-    if (clientName.trim()) {
-      const existing = await fetch(`/api/customers?search=${encodeURIComponent(clientName.trim())}`)
-      if (!existing.ok) { setLoading(false); return toast.error('Mijoz qidirishda xato') }
-      const list = await existing.json()
-      const found = list.find((c: { name: string; phone?: string }) =>
-        c.name.toLowerCase() === clientName.trim().toLowerCase()
-      )
-      if (found) {
-        customerId = found._id
-      } else {
-        const created = await fetch('/api/customers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: clientName.trim(), phone: clientPhone.trim() || undefined }),
-        })
-        if (!created.ok) { setLoading(false); return toast.error('Mijoz yaratishda xato') }
-        const c = await created.json()
-        customerId = c._id
-      }
-    }
 
     const actualPaid = Math.min(paid, finalTotal)
     const paymentType = paid >= finalTotal ? 'full' : paid > 0 ? 'partial' : 'debt'
@@ -247,7 +221,9 @@ export default function KassaPage() {
         total: finalTotal,
         paid: actualPaid,
         cashier: session?.user.id,
-        customer: customerId,
+        usta: extra.ustaId || undefined,
+        debtorName: extra.debtorName || undefined,
+        debtorPhone: extra.debtorPhone || undefined,
         paymentType,
         payments,
       }),
@@ -266,7 +242,7 @@ export default function KassaPage() {
       paid: actualPaid,
       originalTotal: discount > 0 ? total : undefined,
       cashier: session?.user?.name || 'Kassir',
-      customer: clientName.trim() || undefined,
+      customer: extra.debtorName || undefined,
       paymentType,
       createdAt: new Date(),
     })
@@ -404,12 +380,8 @@ export default function KassaPage() {
         total={total}
         finalTotal={finalTotal}
         discount={discount}
-        clientName={clientName}
-        clientPhone={clientPhone}
         loading={loading}
         cart={cart}
-        onClientNameChange={setClientName}
-        onClientPhoneChange={setClientPhone}
         onTotalChange={setCustomTotal}
         onCheckout={handleCheckout}
       />

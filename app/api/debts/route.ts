@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
-import Customer from '@/models/Customer'
-import { escapeRegex } from '@/lib/utils'
 
 export async function GET(req: Request) {
   try {
@@ -18,7 +16,6 @@ export async function GET(req: Request) {
     filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
 
     const debts = await Debt.find(filter)
-      .populate('customer', 'name phone')
       .populate('sale', 'total paid createdAt paymentType')
       .sort({ createdAt: -1 })
       .limit(100)
@@ -37,14 +34,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'customerName and amount required' }, { status: 400 })
     }
 
-    // Find or create customer
-    let customer = await Customer.findOne({ name: { $regex: `^${escapeRegex(customerName)}$`, $options: 'i' } })
-    if (!customer) {
-      customer = await Customer.create({ name: customerName, phone: customerPhone || undefined })
-    }
-
     const debt = await Debt.create({
-      customer: customer._id,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone?.trim() || undefined,
       totalAmount: amount,
       paidAmount: 0,
       remainingAmount: amount,
@@ -52,9 +44,6 @@ export async function POST(req: Request) {
       type: 'customer',
     })
 
-    await Customer.findByIdAndUpdate(customer._id, { $inc: { totalDebt: amount } })
-
-    const populated = await debt.populate('customer', 'name phone')
-    return NextResponse.json(populated, { status: 201 })
+    return NextResponse.json(debt, { status: 201 })
   } catch (err) { return errorResponse(err) }
 }
