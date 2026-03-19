@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Trash2, Settings2 } from 'lucide-react'
+import { Plus, Trash2, Settings2, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,6 +23,7 @@ export default function XarajatlarPage() {
   const [form, setForm] = useState({ sourceId: '', amount: '', description: '', date: new Date().toISOString().slice(0, 10) })
   const [filterSource, setFilterSource] = useState('all')
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
 
   const fetchExpenses = useCallback(async () => {
     const params = new URLSearchParams()
@@ -105,6 +106,14 @@ export default function XarajatlarPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-800">Xarajatlar</h1>
         <div className="flex gap-2">
+          <div className="flex border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('list')}>
+              <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+              <List className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
           <Button variant="outline" size="sm" onClick={() => setSourceDialog(true)}>
             <Settings2 className="w-4 h-4 mr-1" />Manbalar
           </Button>
@@ -144,28 +153,62 @@ export default function XarajatlarPage() {
         </Select>
       </div>
 
-      <div className="space-y-2">
-        {expenses.map(e => (
-          <Card key={e._id} className="border-0 shadow-sm">
-            <CardContent className="p-3 flex items-center gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-800">{e.source?.name}</span>
-                  <span className="text-xs text-slate-400">{new Date(e.date).toLocaleDateString('uz-UZ')}</span>
+      {viewMode === 'table' ? (
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="px-4 py-3 font-medium">Manba</th>
+                <th className="px-4 py-3 font-medium">Sana</th>
+                <th className="px-4 py-3 font-medium">Izoh</th>
+                <th className="px-4 py-3 font-medium text-right">Summa</th>
+                <th className="px-4 py-3 font-medium text-right">Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map(e => (
+                <tr key={e._id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{e.source?.name}</td>
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(e.date).toLocaleDateString('uz-UZ')}</td>
+                  <td className="px-4 py-3 text-slate-500">{e.description || '—'}</td>
+                  <td className="px-4 py-3 text-right font-bold text-red-600">{formatPrice(e.amount)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => deleteExpense(e._id)} className="p-1 hover:bg-red-50 rounded">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {expenses.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Xarajat topilmadi</div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {expenses.map(e => (
+            <Card key={e._id} className="border-0 shadow-sm">
+              <CardContent className="p-3 flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-800">{e.source?.name}</span>
+                    <span className="text-xs text-slate-400">{new Date(e.date).toLocaleDateString('uz-UZ')}</span>
+                  </div>
+                  {e.description && <div className="text-xs text-slate-500 mt-0.5">{e.description}</div>}
                 </div>
-                {e.description && <div className="text-xs text-slate-500 mt-0.5">{e.description}</div>}
-              </div>
-              <div className="text-red-600 font-bold text-sm">{formatPrice(e.amount)}</div>
-              <button onClick={() => deleteExpense(e._id)} className="p-1 hover:bg-red-50 rounded">
-                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-              </button>
-            </CardContent>
-          </Card>
-        ))}
-        {expenses.length === 0 && (
-          <div className="text-center text-slate-400 py-12">Xarajat topilmadi</div>
-        )}
-      </div>
+                <div className="text-red-600 font-bold text-sm">{formatPrice(e.amount)}</div>
+                <button onClick={() => deleteExpense(e._id)} className="p-1 hover:bg-red-50 rounded">
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </button>
+              </CardContent>
+            </Card>
+          ))}
+          {expenses.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Xarajat topilmadi</div>
+          )}
+        </div>
+      )}
 
       {/* Source management dialog */}
       <Dialog open={sourceDialog} onOpenChange={setSourceDialog}>

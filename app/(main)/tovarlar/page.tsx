@@ -33,7 +33,7 @@ export default function TovarlarPage() {
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [newCat, setNewCat] = useState('')
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
 
   // Product stats
   const { data: stats } = useFetchWithCache<{

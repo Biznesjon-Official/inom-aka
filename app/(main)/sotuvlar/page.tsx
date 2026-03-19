@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Search, RefreshCw, Undo2, Printer, Minus, Plus } from 'lucide-react'
+import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,7 @@ export default function SotuvlarPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [expandedSale, setExpandedSale] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
 
   // Return state
   const [returnDialog, setReturnDialog] = useState(false)
@@ -140,10 +141,20 @@ export default function SotuvlarPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-800">Sotuvlar</h1>
-        <Button variant="ghost" size="sm" onClick={fetchSales} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          Yangilash
-        </Button>
+        <div className="flex gap-2">
+          <div className="flex border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('list')}>
+              <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+              <List className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+          <Button variant="ghost" size="sm" onClick={fetchSales} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Yangilash
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -168,107 +179,148 @@ export default function SotuvlarPage() {
       </div>
 
       {/* Sales list */}
-      <div className="space-y-2">
-        {filtered.map(sale => (
-          <Card key={sale._id} className="border-0 shadow-sm">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between gap-2 cursor-pointer"
-                onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="text-sm">
-                    <span className="font-medium text-slate-700">#{sale.receiptNo}</span>
-                    <span className="text-slate-400 ml-2">
-                      {new Date(sale.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+      {viewMode === 'table' ? (
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="px-4 py-3 font-medium">Chek #</th>
+                <th className="px-4 py-3 font-medium">Sana</th>
+                <th className="px-4 py-3 font-medium">Kassir</th>
+                <th className="px-4 py-3 font-medium">Mijoz</th>
+                <th className="px-4 py-3 font-medium">To&apos;lov</th>
+                <th className="px-4 py-3 font-medium text-right">Jami</th>
+                <th className="px-4 py-3 font-medium text-right">Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(sale => (
+                <tr key={sale._id} className="border-b last:border-0 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
+                  <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    {new Date(sale.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">{sale.cashier?.name || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500">{sale.customer?.name || '—'}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant={payBadge[sale.paymentType]?.variant || 'default'} className="text-xs">
+                      {payBadge[sale.paymentType]?.label || sale.paymentType}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="font-bold text-slate-800">{formatPrice(sale.total)}</div>
+                    {(sale.returnedTotal || 0) > 0 && (
+                      <div className="text-xs text-orange-500">-{formatPrice(sale.returnedTotal!)}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                      <button className="p-1 hover:bg-orange-50 rounded" title="Qaytarish" onClick={() => openReturn(sale)}>
+                        <Undo2 className="w-3.5 h-3.5 text-orange-400" />
+                      </button>
+                      <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
+                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt) })}>
+                        <Printer className="w-3.5 h-3.5 text-blue-400" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && filtered.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Sotuv topilmadi</div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(sale => (
+            <Card key={sale._id} className="border-0 shadow-sm">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between gap-2 cursor-pointer"
+                  onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="text-sm">
+                      <span className="font-medium text-slate-700">#{sale.receiptNo}</span>
+                      <span className="text-slate-400 ml-2">
+                        {new Date(sale.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {sale.cashier && (
+                      <span className="text-xs text-slate-500">{sale.cashier.name}</span>
+                    )}
+                    <Badge variant={payBadge[sale.paymentType]?.variant || 'default'} className="text-xs">
+                      {payBadge[sale.paymentType]?.label || sale.paymentType}
+                    </Badge>
+                    <span className="font-bold text-sm text-slate-800">{formatPrice(sale.total)}</span>
+                    <button className="p-1 hover:bg-orange-50 rounded" title="Qaytarish"
+                      onClick={e => { e.stopPropagation(); openReturn(sale) }}>
+                      <Undo2 className="w-3.5 h-3.5 text-orange-400" />
+                    </button>
+                    <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
+                      onClick={e => {
+                        e.stopPropagation()
+                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt) })
+                      }}>
+                      <Printer className="w-3.5 h-3.5 text-blue-400" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {sale.cashier && (
-                    <span className="text-xs text-slate-500">{sale.cashier.name}</span>
-                  )}
-                  <Badge variant={payBadge[sale.paymentType]?.variant || 'default'} className="text-xs">
-                    {payBadge[sale.paymentType]?.label || sale.paymentType}
-                  </Badge>
-                  <span className="font-bold text-sm text-slate-800">{formatPrice(sale.total)}</span>
-                  <button className="p-1 hover:bg-orange-50 rounded" title="Qaytarish"
-                    onClick={e => { e.stopPropagation(); openReturn(sale) }}>
-                    <Undo2 className="w-3.5 h-3.5 text-orange-400" />
-                  </button>
-                  <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
-                    onClick={e => {
-                      e.stopPropagation()
-                      printReceipt({
-                        receiptNo: sale.receiptNo,
-                        items: sale.items,
-                        total: sale.total,
-                        paid: sale.paid,
-                        cashier: sale.cashier?.name || 'Kassir',
-                        customer: sale.customer?.name,
-                        paymentType: sale.paymentType,
-                        createdAt: new Date(sale.createdAt),
-                      })
-                    }}>
-                    <Printer className="w-3.5 h-3.5 text-blue-400" />
-                  </button>
-                </div>
-              </div>
 
-              {/* Customer info */}
-              {sale.customer && (
-                <div className="text-xs text-slate-500 mt-1">
-                  Mijoz: {sale.customer.name} {sale.customer.phone && `(${sale.customer.phone})`}
-                </div>
-              )}
+                {sale.customer && (
+                  <div className="text-xs text-slate-500 mt-1">
+                    Mijoz: {sale.customer.name} {sale.customer.phone && `(${sale.customer.phone})`}
+                  </div>
+                )}
 
-              {/* Return info */}
-              {(sale.returnedTotal || 0) > 0 && (
-                <div className="text-xs text-orange-500 mt-1">
-                  Qaytarilgan: {formatPrice(sale.returnedTotal!)}
-                </div>
-              )}
+                {(sale.returnedTotal || 0) > 0 && (
+                  <div className="text-xs text-orange-500 mt-1">
+                    Qaytarilgan: {formatPrice(sale.returnedTotal!)}
+                  </div>
+                )}
 
-              {/* Payment methods */}
-              {sale.payments && sale.payments.length > 0 && (
-                <div className="flex gap-2 mt-1">
-                  {sale.payments.map((p, i) => (
-                    <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                      {methodLabels[p.method] || p.method}: {formatPrice(p.amount)}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Expanded: items */}
-              {expandedSale === sale._id && (
-                <div className="mt-3 border-t pt-2 space-y-1">
-                  {sale.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-xs">
-                      <span className="text-slate-600">
-                        {item.productName} x{item.qty} {item.unit}
+                {sale.payments && sale.payments.length > 0 && (
+                  <div className="flex gap-2 mt-1">
+                    {sale.payments.map((p, i) => (
+                      <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                        {methodLabels[p.method] || p.method}: {formatPrice(p.amount)}
                       </span>
-                      <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
-                    </div>
-                  ))}
-                  {sale.returnedItems && sale.returnedItems.length > 0 && (
-                    <div className="border-t pt-1 mt-1">
-                      <div className="text-[10px] text-orange-500 font-medium mb-0.5">Qaytarilgan:</div>
-                      {sale.returnedItems.map((ri, i) => (
-                        <div key={i} className="flex justify-between text-xs text-orange-500">
-                          <span>{ri.productName} x{ri.qty}</span>
-                          <span>-{formatPrice(ri.salePrice * ri.qty)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        {!loading && filtered.length === 0 && (
-          <div className="text-center text-slate-400 py-12">Sotuv topilmadi</div>
-        )}
-      </div>
+                    ))}
+                  </div>
+                )}
+
+                {expandedSale === sale._id && (
+                  <div className="mt-3 border-t pt-2 space-y-1">
+                    {sale.items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-xs">
+                        <span className="text-slate-600">{item.productName} x{item.qty} {item.unit}</span>
+                        <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
+                      </div>
+                    ))}
+                    {sale.returnedItems && sale.returnedItems.length > 0 && (
+                      <div className="border-t pt-1 mt-1">
+                        <div className="text-[10px] text-orange-500 font-medium mb-0.5">Qaytarilgan:</div>
+                        {sale.returnedItems.map((ri, i) => (
+                          <div key={i} className="flex justify-between text-xs text-orange-500">
+                            <span>{ri.productName} x{ri.qty}</span>
+                            <span>-{formatPrice(ri.salePrice * ri.qty)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {!loading && filtered.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Sotuv topilmadi</div>
+          )}
+        </div>
+      )}
 
       {/* Return dialog */}
       <Dialog open={returnDialog} onOpenChange={setReturnDialog}>

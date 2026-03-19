@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Pencil, UserCog, TrendingUp } from 'lucide-react'
+import { Plus, Pencil, UserCog, TrendingUp, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,6 +26,7 @@ export default function IshchilarPage() {
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
   const [stats, setStats] = useState<{ today: { count: number; total: number; profit: number }; month: { count: number; total: number; profit: number } } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
 
   const fetchWorkers = useCallback(async () => {
     const res = await fetch('/api/workers')
@@ -88,57 +89,112 @@ export default function IshchilarPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-800">Ishchilar</h1>
-        <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Qo&apos;shish</Button>
+        <div className="flex gap-2">
+          <div className="flex border rounded-lg overflow-hidden">
+            <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
+              <LayoutGrid className="w-4 h-4 text-slate-600" />
+            </button>
+            <button className={`p-1.5 ${viewMode === 'table' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('table')}>
+              <List className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+          <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Qo&apos;shish</Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {workers.map(w => (
-          <Card key={w._id} className="border-0 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                    <UserCog className="w-5 h-5 text-indigo-500" />
+      {viewMode === 'table' ? (
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-500">
+                <th className="px-4 py-3 font-medium">Ism</th>
+                <th className="px-4 py-3 font-medium">Login</th>
+                <th className="px-4 py-3 font-medium">Maosh</th>
+                <th className="px-4 py-3 font-medium">Holat</th>
+                <th className="px-4 py-3 font-medium text-right">Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workers.map(w => (
+                <tr key={w._id} className="border-b last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{w.name}</td>
+                  <td className="px-4 py-3 text-slate-500">@{w.username}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {formatPrice(w.salary.fixed)}
+                    {w.salary.salesPercent > 0 && <span className="text-slate-400 ml-1">+{w.salary.salesPercent}%</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={w.isActive ? 'default' : 'secondary'}>{w.isActive ? 'Faol' : 'Nofaol'}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1">
+                      <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEdit(w)}>
+                        <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                      </button>
+                      <button className="p-1 hover:bg-blue-50 rounded" onClick={() => openStats(w._id)}>
+                        <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                      </button>
+                      <button className="p-1 hover:bg-slate-100 rounded text-xs text-slate-400 hover:text-slate-600 px-2" onClick={() => toggleActive(w)}>
+                        {w.isActive ? 'O\'chirish' : 'Faol'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {workers.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Ishchi topilmadi</div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {workers.map(w => (
+            <Card key={w._id} className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <UserCog className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-800">{w.name}</div>
+                      <div className="text-xs text-slate-400">@{w.username}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-medium text-slate-800">{w.name}</div>
-                    <div className="text-xs text-slate-400">@{w.username}</div>
+                  <div className="flex gap-1">
+                    <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEdit(w)}>
+                      <Pencil className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                    <button className="p-1 hover:bg-blue-50 rounded" onClick={() => openStats(w._id)}>
+                      <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button className="p-1 hover:bg-slate-100 rounded" onClick={() => openEdit(w)}>
-                    <Pencil className="w-3.5 h-3.5 text-slate-500" />
-                  </button>
-                  <button className="p-1 hover:bg-blue-50 rounded" onClick={() => openStats(w._id)}>
-                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                <div className="mt-3 space-y-1">
+                  <div className="text-xs text-slate-500">
+                    Maosh: <span className="font-medium text-slate-700">{formatPrice(w.salary.fixed)}</span>
+                    {w.salary.salesPercent > 0 && (
+                      <span className="ml-1">+ {w.salary.salesPercent}% foyda</span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <Badge variant={w.isActive ? 'default' : 'secondary'}>
+                    {w.isActive ? 'Faol' : 'Nofaol'}
+                  </Badge>
+                  <button className="text-xs text-slate-400 hover:text-slate-600" onClick={() => toggleActive(w)}>
+                    {w.isActive ? 'O\'chirish' : 'Faollashtirish'}
                   </button>
                 </div>
-              </div>
-
-              <div className="mt-3 space-y-1">
-                <div className="text-xs text-slate-500">
-                  Maosh: <span className="font-medium text-slate-700">{formatPrice(w.salary.fixed)}</span>
-                  {w.salary.salesPercent > 0 && (
-                    <span className="ml-1">+ {w.salary.salesPercent}% foyda</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-2 flex items-center justify-between">
-                <Badge variant={w.isActive ? 'default' : 'secondary'}>
-                  {w.isActive ? 'Faol' : 'Nofaol'}
-                </Badge>
-                <button className="text-xs text-slate-400 hover:text-slate-600" onClick={() => toggleActive(w)}>
-                  {w.isActive ? 'O\'chirish' : 'Faollashtirish'}
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {workers.length === 0 && (
-          <div className="col-span-full text-center text-slate-400 py-12">Ishchi topilmadi</div>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+          {workers.length === 0 && (
+            <div className="col-span-full text-center text-slate-400 py-12">Ishchi topilmadi</div>
+          )}
+        </div>
+      )}
 
       {/* Worker form dialog */}
       <Dialog open={dialog} onOpenChange={setDialog}>
