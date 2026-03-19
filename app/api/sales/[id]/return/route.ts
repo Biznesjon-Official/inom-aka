@@ -75,7 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     )
     const discountRatio = originalItemsTotal > 0 ? sale.total / originalItemsTotal : 1
     const effectiveReturnTotal = Math.round(returnTotal * discountRatio)
-    const effectiveCostTotal = Math.round(returnCostTotal * discountRatio)
+    const effectiveCostTotal = returnCostTotal // cost is actual, not discounted
 
     // Update sale
     await Sale.findByIdAndUpdate(id, {

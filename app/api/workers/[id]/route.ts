@@ -54,13 +54,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
     if (!worker) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const calcStats = (sales: { items: { costPrice: number; salePrice: number; qty: number }[]; total: number; paid: number; returnedTotal?: number; returnedCostTotal?: number }[]) => ({
+    const calcStats = (sales: { items: { costPrice: number; qty: number }[]; total: number; paid: number; returnedTotal?: number; returnedCostTotal?: number }[]) => ({
       count: sales.length,
       total: sales.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0),
       profit: sales.reduce((s: number, x) => {
-        const gross = x.items.reduce((a: number, i: { salePrice: number; costPrice: number; qty: number }) =>
-          a + (i.salePrice - i.costPrice) * i.qty, 0)
-        return s + gross - ((x.returnedTotal || 0) - (x.returnedCostTotal || 0))
+        const grossCost = x.items.reduce((a: number, i: { costPrice: number; qty: number }) => a + i.costPrice * i.qty, 0)
+        return s + (x.total - (x.returnedTotal || 0)) - (grossCost - (x.returnedCostTotal || 0))
       }, 0),
     })
 

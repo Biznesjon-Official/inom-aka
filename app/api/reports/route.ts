@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       {
         $group: {
           _id: '$_id',
-          grossRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
+          saleTotal: { $first: '$total' },
           grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
           returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
@@ -40,15 +40,15 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: { $subtract: ['$grossRevenue', '$returnedTotal'] } },
-          totalCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
+          totalRevenue: { $sum: { $subtract: ['$saleTotal', '$returnedTotal'] } },
+          totalNetCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
         },
       },
       {
         $project: {
           salesCount: { $size: '$totalSales' },
           totalRevenue: 1,
-          totalProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
+          totalProfit: { $subtract: ['$totalRevenue', '$totalNetCost'] },
         },
       },
     ]).allowDiskUse(true)
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       {
         $group: {
           _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
-          revenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
+          saleTotal: { $first: '$total' },
           cost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
           returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       {
         $group: {
           _id: '$_id.date',
-          revenue: { $sum: { $subtract: ['$revenue', '$returnedTotal'] } },
+          revenue: { $sum: { $subtract: ['$saleTotal', '$returnedTotal'] } },
           cost: { $sum: { $subtract: ['$cost', '$returnedCostTotal'] } },
           sales: { $addToSet: '$_id.saleId' },
         },
