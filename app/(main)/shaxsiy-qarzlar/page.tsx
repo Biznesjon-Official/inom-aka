@@ -36,7 +36,7 @@ export default function ShaxsiyQarzlarPage() {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', phone: '', amount: '', note: '', direction: 'receivable' as 'receivable' | 'payable' })
+  const [addForm, setAddForm] = useState({ name: '', phone: '', amount: '', note: '' })
 
   const fetchDebts = useCallback(async () => {
     const params = new URLSearchParams({ status })
@@ -64,14 +64,14 @@ export default function ShaxsiyQarzlarPage() {
         phone: addForm.phone.trim() || undefined,
         amount: num,
         note: addForm.note || undefined,
-        direction: addForm.direction,
+        direction: 'payable',
       }),
     })
     setLoading(false)
     if (!res.ok) return toast.error('Xato yuz berdi')
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
-    setAddForm({ name: '', phone: '', amount: '', note: '', direction: 'receivable' })
+    setAddForm({ name: '', phone: '', amount: '', note: '' })
     fetchDebts()
   }
 
@@ -112,10 +112,9 @@ export default function ShaxsiyQarzlarPage() {
             <Wallet className="w-5 h-5" />
             Shaxsiy qarzlar
           </h1>
-          {status === 'active' && (
-            <div className="flex gap-4 text-sm text-slate-500 mt-1">
-              {receivableTotal > 0 && <span>Menga qarzdor: <span className="font-bold text-blue-600">{formatPrice(receivableTotal)}</span></span>}
-              {payableTotal > 0 && <span>Men qarzdorman: <span className="font-bold text-red-600">{formatPrice(payableTotal)}</span></span>}
+          {status === 'active' && payableTotal > 0 && (
+            <div className="text-sm text-slate-500 mt-1">
+              Jami qarz: <span className="font-bold text-red-600">{formatPrice(payableTotal)}</span>
             </div>
           )}
         </div>
@@ -144,17 +143,14 @@ export default function ShaxsiyQarzlarPage() {
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ${d.direction === 'receivable' ? 'bg-blue-100' : 'bg-red-100'}`}>
-                    <Wallet className={`w-4 h-4 ${d.direction === 'receivable' ? 'text-blue-500' : 'text-red-500'}`} />
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center bg-red-100">
+                    <Wallet className="w-4 h-4 text-red-500" />
                   </div>
                   <div>
                     <div className="font-medium text-slate-800">{d.name}</div>
                     {d.phone && <div className="text-xs text-slate-400">{d.phone}</div>}
                     <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
                     {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
-                    <span className={`text-[10px] font-medium ${d.direction === 'payable' ? 'text-red-500' : 'text-blue-500'}`}>
-                      {d.direction === 'payable' ? 'Men qarzdorman' : 'Menga qarzdor'}
-                    </span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -206,16 +202,6 @@ export default function ShaxsiyQarzlarPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Yangi shaxsiy qarz</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Yo&apos;nalish *</Label>
-              <Select value={addForm.direction} onValueChange={v => setAddForm(f => ({ ...f, direction: v as 'receivable' | 'payable' }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="receivable">Menga qarzdor (olaman)</SelectItem>
-                  <SelectItem value="payable">Men qarzdorman (beraman)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1.5">
               <Label>Ism *</Label>
               <Input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} placeholder="Ism familiya" />
