@@ -20,7 +20,6 @@ const adminNav = [
   { href: '/xarajatlar', label: 'Xarajatlar', icon: TrendingDown },
   { href: '/mijozlar', label: 'Mijozlar', icon: Users },
   { href: '/ishchilar', label: 'Ishchilar', icon: UserCog },
-  { href: '/hisobot', label: 'Hisobot', icon: FileBarChart },
   { href: '/sozlamalar', label: 'Sozlamalar', icon: Settings },
 ]
 

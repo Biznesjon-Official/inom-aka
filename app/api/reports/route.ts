@@ -4,6 +4,8 @@ import { errorResponse } from '@/lib/api-utils'
 import Sale from '@/models/Sale'
 import Expense from '@/models/Expense'
 import Debt from '@/models/Debt'
+import PersonalDebt from '@/models/PersonalDebt'
+import Product from '@/models/Product'
 
 export async function GET(req: NextRequest) {
   try {
@@ -70,6 +72,14 @@ export async function GET(req: NextRequest) {
         },
       },
     ]).allowDiskUse(true)
+
+    // Static data (not date-filtered)
+    const [customerDebtAgg, personalDebtAgg, productStatsAgg, lowStockProducts] = await Promise.all([
+      Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]),
+      PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]),
+      Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]),
+      Product.find({ stock: { $lte: 5 }, isActive: true }).select('name stock unit salePrice').sort({ stock: 1 }).limit(10).lean(),
+    ])
 
     // Daily breakdown for chart (accounting for returns)
     const dailyBreakdown = await Sale.aggregate([
@@ -195,6 +205,11 @@ export async function GET(req: NextRequest) {
       topProducts,
       cashierStats,
       paymentMethods: paymentMethodStats,
+      customerDebt: customerDebtAgg[0]?.total || 0,
+      personalDebt: personalDebtAgg[0]?.total || 0,
+      totalProducts: productStatsAgg[0]?.totalProducts || 0,
+      warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
+      lowStock: lowStockProducts,
     })
   } catch (err) {
     return errorResponse(err)
