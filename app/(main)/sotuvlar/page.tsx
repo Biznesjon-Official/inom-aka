@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ const payBadge: Record<string, { label: string; variant: 'default' | 'secondary'
 const methodLabels: Record<string, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal' }
 
 export default function SotuvlarPage() {
+  const router = useRouter()
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -132,6 +134,7 @@ export default function SotuvlarPage() {
     toast.success(`${formatPrice(result.returnTotal)} qaytarildi`)
     setReturnDialog(false)
     fetchSales()
+    router.refresh()
   }
 
   const totalRevenue = filtered.reduce((s, x) => s + x.paid - (x.returnedTotal || 0), 0)
@@ -328,8 +331,17 @@ export default function SotuvlarPage() {
           <DialogHeader>
             <DialogTitle>Tovar qaytarish {returnSale?.receiptNo && `#${returnSale.receiptNo}`}</DialogTitle>
           </DialogHeader>
-          {returnSale && (
+          {returnSale && (() => {
+            const originalTotal = returnSale.items.reduce((s, i) => s + i.qty * i.salePrice, 0)
+            const discountRatio = originalTotal > 0 ? returnSale.total / originalTotal : 1
+            const effectivePrice = (item: SaleItem) => Math.round(item.salePrice * discountRatio)
+            return (
             <div className="space-y-3">
+              {discountRatio < 1 && (
+                <div className="text-xs text-slate-500 bg-slate-50 rounded px-2 py-1">
+                  Chegirma qo&apos;llanilgan ({Math.round((1 - discountRatio) * 100)}%)
+                </div>
+              )}
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {returnSale.items.map(item => {
                   if (!item.product) return null
@@ -340,12 +352,16 @@ export default function SotuvlarPage() {
                     </div>
                   )
                   const qty = returnQtys[item.product] || 0
+                  const effPrice = effectivePrice(item)
                   return (
                     <div key={item.product} className="p-2 bg-slate-50 rounded-lg">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-sm font-medium truncate">{item.productName}</div>
-                          <div className="text-xs text-slate-500">{formatPrice(item.salePrice)} x {item.qty} {item.unit}</div>
+                          <div className="text-xs text-slate-500">
+                            {formatPrice(effPrice)} x {item.qty} {item.unit}
+                            {discountRatio < 1 && <span className="line-through ml-1 text-slate-400">{formatPrice(item.salePrice)}</span>}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <button className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
@@ -361,7 +377,7 @@ export default function SotuvlarPage() {
                       </div>
                       {qty > 0 && (
                         <div className="text-xs text-orange-600 mt-1 text-right">
-                          Qaytariladi: {formatPrice(qty * item.salePrice)}
+                          Qaytariladi: {formatPrice(qty * effPrice)}
                         </div>
                       )}
                     </div>
@@ -375,7 +391,7 @@ export default function SotuvlarPage() {
                     {formatPrice(
                       returnSale.items.reduce((s, item) => {
                         if (!item.product) return s
-                        return s + (returnQtys[item.product] || 0) * item.salePrice
+                        return s + (returnQtys[item.product] || 0) * effectivePrice(item)
                       }, 0)
                     )}
                   </div>
@@ -386,7 +402,8 @@ export default function SotuvlarPage() {
                 {returnLoading ? 'Qaytarilmoqda...' : 'Qaytarish'}
               </Button>
             </div>
-          )}
+            )
+          })()}
         </DialogContent>
       </Dialog>
     </div>
