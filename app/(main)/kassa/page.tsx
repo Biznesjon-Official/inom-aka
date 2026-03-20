@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Search, Trash2, LayoutGrid, List } from 'lucide-react'
@@ -42,6 +42,7 @@ interface SavedCart {
 
 export default function KassaPage() {
   const { data: session } = useSession()
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; receiptFooter?: string }>({})
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
@@ -56,6 +57,10 @@ export default function KassaPage() {
   const [savedCartsDialog, setSavedCartsDialog] = useState(false)
   const [saveNameDialog, setSaveNameDialog] = useState(false)
   const [saveName, setSaveName] = useState('')
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+  }, [])
 
   const debouncedSearch = useDebounce(search)
   const productsUrl = useMemo(() => `/api/products?search=${debouncedSearch}`, [debouncedSearch])
@@ -245,6 +250,8 @@ export default function KassaPage() {
       customer: extra.debtorName || undefined,
       paymentType,
       createdAt: new Date(),
+      shopName: shopSettings.shopName,
+      receiptFooter: shopSettings.receiptFooter,
     })
 
     const debt = finalTotal - paid

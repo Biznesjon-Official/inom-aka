@@ -46,6 +46,7 @@ const methodLabels: Record<string, string> = { cash: 'Naqd', card: 'Karta', term
 
 export default function SotuvlarPage() {
   const router = useRouter()
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -59,6 +60,10 @@ export default function SotuvlarPage() {
   const [returnSale, setReturnSale] = useState<Sale | null>(null)
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({})
   const [returnLoading, setReturnLoading] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+  }, [])
 
   const debouncedSearch = useDebounce(search)
 
@@ -233,7 +238,7 @@ export default function SotuvlarPage() {
                         <Undo2 className="w-3.5 h-3.5 text-orange-400" />
                       </button>
                       <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
-                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt) })}>
+                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, receiptFooter: shopSettings.receiptFooter })}>
                         <Printer className="w-3.5 h-3.5 text-blue-400" />
                       </button>
                     </div>
@@ -276,7 +281,7 @@ export default function SotuvlarPage() {
                     <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
                       onClick={e => {
                         e.stopPropagation()
-                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt) })
+                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, receiptFooter: shopSettings.receiptFooter })
                       }}>
                       <Printer className="w-3.5 h-3.5 text-blue-400" />
                     </button>
