@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDebounce, useFetchWithCache } from '@/lib/hooks'
 import { formatPrice } from '@/lib/utils'
-import { printLabel } from '@/lib/print'
+import { printLabel, printLabels } from '@/lib/print'
 import { TovarProductCard } from './ProductCard'
 import { ProductDialog, type ProductForm } from './ProductDialog'
 
@@ -34,11 +34,20 @@ export default function TovarlarPage() {
   const [newCat, setNewCat] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string }>({})
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }, [])
+
+  const handleBatchPrint = useCallback(() => {
+    const items = allProducts.filter(p => selectedIds.has(p._id)).map(p => ({ _id: p._id, name: p.name, salePrice: p.salePrice }))
+    printLabels(items)
+  }, [allProducts, selectedIds])
 
   // Product stats
   const { data: stats } = useFetchWithCache<{
@@ -200,7 +209,7 @@ export default function TovarlarPage() {
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-800">Tovarlar</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <div className="flex border rounded-lg overflow-hidden">
             <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
               <LayoutGrid className="w-4 h-4 text-slate-600" />
@@ -209,6 +218,17 @@ export default function TovarlarPage() {
               <List className="w-4 h-4 text-slate-600" />
             </button>
           </div>
+          {selectedIds.size > 0 && (
+            <Button size="sm" variant="outline" onClick={handleBatchPrint} className="gap-1.5">
+              <Printer className="w-4 h-4" />
+              Label ({selectedIds.size} ta)
+            </Button>
+          )}
+          {selectedIds.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="text-slate-500">
+              Bekor
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setCatDialog(true)}>Kategoriyalar</Button>
           <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Qo&apos;shish</Button>
         </div>
@@ -234,7 +254,7 @@ export default function TovarlarPage() {
                 </div>
               ))
             : products.map(p => (
-                <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} shopName={shopSettings.shopName} shopPhone={shopSettings.shopPhone} />
+                <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} selected={selectedIds.has(p._id)} onSelect={toggleSelect} />
               ))
           }
           {!productsLoading && products.length === 0 && (
@@ -246,6 +266,14 @@ export default function TovarlarPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-slate-500">
+                <th className="px-3 py-3 w-8">
+                  <input type="checkbox" className="rounded"
+                    checked={products.length > 0 && products.every(p => selectedIds.has(p._id))}
+                    onChange={e => {
+                      if (e.target.checked) setSelectedIds(prev => new Set([...prev, ...products.map(p => p._id)]))
+                      else setSelectedIds(prev => { const n = new Set(prev); products.forEach(p => n.delete(p._id)); return n })
+                    }} />
+                </th>
                 <th className="px-4 py-3 font-medium">Nom</th>
                 <th className="px-4 py-3 font-medium">Kategoriya</th>
                 <th className="px-4 py-3 font-medium text-right">Tannarx</th>
@@ -259,7 +287,10 @@ export default function TovarlarPage() {
                 const outOfStock = (p.stock ?? 0) <= 0
                 const lowStock = (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5
                 return (
-                  <tr key={p._id} className="border-b last:border-0 hover:bg-slate-50">
+                  <tr key={p._id} className={`border-b last:border-0 hover:bg-slate-50 ${selectedIds.has(p._id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-3 py-2.5">
+                      <input type="checkbox" className="rounded" checked={selectedIds.has(p._id)} onChange={() => toggleSelect(p._id)} />
+                    </td>
                     <td className="px-4 py-2.5 font-medium text-slate-800">{p.name}</td>
                     <td className="px-4 py-2.5 text-slate-500">{p.category?.name || '—'}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{formatPrice(p.costPrice)}</td>
@@ -269,7 +300,7 @@ export default function TovarlarPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
-                        <button className="p-1.5 hover:bg-blue-50 rounded" onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name }, shopSettings.shopName, shopSettings.shopPhone)}>
+                        <button className="p-1.5 hover:bg-blue-50 rounded" onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice })}>
                           <Printer className="w-3.5 h-3.5 text-blue-500" />
                         </button>
                         <button className="p-1.5 hover:bg-slate-100 rounded" onClick={() => openEdit(p)}>

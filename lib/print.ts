@@ -15,56 +15,37 @@ function generateBarcode(data: string): string {
   return canvas.toDataURL('image/png')
 }
 
-export function printLabel(product: {
-  _id: string
-  name: string
-  salePrice: number
-  wholesalePrice?: number
-  unit: string
-  category?: string
-}, shopName: string = "Inomaka Do'kon", shopPhone: string = '') {
+function labelHtml(product: { _id: string; name: string; salePrice: number }): string {
   const barcodeUrl = generateBarcode(product._id)
+  return `<div class="label">
+  <div class="name">${product.name}</div>
+  <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>
+  <div class="barcode"><img src="${barcodeUrl}" alt="barcode" /></div>
+</div>`
+}
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
+const LABEL_STYLES = `
   @media print {
-    @page { size: 58mm auto; margin: 2mm; }
+    @page { size: 58mm auto; margin: 0; }
     body { margin: 0; }
   }
-  body {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    width: 54mm;
-    padding: 2mm;
-    box-sizing: border-box;
-  }
-  .shop { text-align: center; font-weight: bold; font-size: 13px; }
-  .shop-phone { text-align: center; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 2mm; margin-bottom: 2mm; }
-  .name { font-weight: bold; font-size: 14px; word-break: break-word; margin-bottom: 2mm; text-align: center; }
-  .cat { font-size: 10px; color: #555; margin-bottom: 2mm; text-align: center; }
-  .price { font-size: 18px; font-weight: bold; text-align: center; border: 1px solid #000; padding: 1mm 2mm; margin: 2mm 0; }
-  .unit { font-size: 10px; text-align: center; color: #555; }
-  .wholesale { font-size: 10px; text-align: center; color: #555; margin-top: 1mm; }
-  .barcode { text-align: center; margin-top: 3mm; }
-  .barcode img { width: 48mm; height: auto; }
-</style>
-</head>
-<body>
-  <div class="shop">${shopName}</div>
-  ${shopPhone ? `<div class="shop-phone">${shopPhone}</div>` : '<div class="shop-phone"></div>'}
-  <div class="name">${product.name}</div>
-  ${product.category ? `<div class="cat">${product.category}</div>` : ''}
-  <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>
-  <div class="unit">1 ${product.unit}</div>
-  ${product.wholesalePrice
-    ? `<div class="wholesale">Ulgurji: ${Number(product.wholesalePrice).toLocaleString('uz-UZ')} so'm</div>`
-    : ''}
-  <div class="barcode"><img src="${barcodeUrl}" alt="barcode" /></div>
-</body>
-</html>`
+  body { font-family: 'Courier New', monospace; width: 58mm; }
+  .label { width: 54mm; padding: 2mm; box-sizing: border-box; }
+  .name { font-weight: bold; font-size: 13px; text-align: center; word-break: break-word; margin-bottom: 2mm; line-height: 1.3; }
+  .price { font-size: 22px; font-weight: bold; text-align: center; margin: 2mm 0; }
+  .barcode { text-align: center; }
+  .barcode img { width: 50mm; height: auto; }
+`
+
+export function printLabel(product: { _id: string; name: string; salePrice: number }) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_STYLES}</style></head><body>${labelHtml(product)}</body></html>`
+  openPrintWindow(html)
+}
+
+export function printLabels(products: { _id: string; name: string; salePrice: number }[]) {
+  if (!products.length) return
+  const body = products.map(labelHtml).join('')
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_STYLES}</style></head><body>${body}</body></html>`
   openPrintWindow(html)
 }
 
