@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
         },
       },
+      // Exclude fully-returned sales from count
+      { $match: { $expr: { $lt: ['$returnedTotal', '$saleTotal'] } } },
       {
         $group: {
           _id: null,
@@ -163,8 +165,16 @@ export async function GET(req: NextRequest) {
     const [saleMethodStats, debtMethodStats] = await Promise.all([
       Sale.aggregate([
         { $match: { createdAt: dateFilter } },
+        // For full-payment sales: scale down by return ratio. Partial/debt returns reduce debt, not cash.
+        { $addFields: {
+          effectiveRatio: { $cond: [
+            { $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] },
+            { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] },
+            1,
+          ]},
+        }},
         { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
       ]).allowDiskUse(true),
       Debt.aggregate([
