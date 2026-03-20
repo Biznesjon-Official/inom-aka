@@ -181,14 +181,15 @@ export async function GET() {
       ]),
     ])
 
-    // Manual debt payments (not linked to sale) — add to revenue/profit + method breakdown
-    const manualDebtFilter = { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] }
+    // Debt payments not already counted in Sale.paid (fromSale=true means initial payment, already in Sale.paid)
+    const debtPayFilter = { $or: [{ type: 'customer' }, { type: { $exists: false } }] }
+    const notFromSale = { 'payments.fromSale': { $ne: true } }
     const [todayManualDebt, monthManualDebt, lastMonthManualDebt, todayDebtMethods, monthDebtMethods] = await Promise.all([
-      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
-      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
+      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: todayStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
+      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: monthStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
     ])
 
     function mergeMethodStats(saleStats: {method: string; total: number; count: number}[], debtStats: {method: string; total: number; count: number}[]) {

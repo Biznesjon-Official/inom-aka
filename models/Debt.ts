@@ -6,6 +6,7 @@ const DebtPaymentSchema = new Schema({
   method: { type: String, enum: ['cash', 'card', 'terminal'], default: 'cash' },
   date: { type: Date, default: Date.now },
   note: { type: String },
+  fromSale: { type: Boolean, default: false }, // initial payment from kassa — already counted in Sale.paid
 }, { _id: false })
 
 const DebtSchema = new Schema({

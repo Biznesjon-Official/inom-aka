@@ -56,11 +56,11 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Manual debt payments (old debts not linked to a sale) as revenue
+    // Debt payments not already counted in Sale.paid (fromSale payments are initial, already in Sale.paid)
     const [manualDebtPayAgg] = await Debt.aggregate([
-      { $match: { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
+      { $match: { $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
       { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter } },
+      { $match: { 'payments.fromSale': { $ne: true }, 'payments.date': dateFilter } },
       { $group: { _id: null, total: { $sum: '$payments.amount' } } },
     ]).allowDiskUse(true)
 
@@ -168,9 +168,9 @@ export async function GET(req: NextRequest) {
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
       ]).allowDiskUse(true),
       Debt.aggregate([
-        { $match: { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
+        { $match: { $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
         { $unwind: '$payments' },
-        { $match: { 'payments.date': dateFilter } },
+        { $match: { 'payments.fromSale': { $ne: true }, 'payments.date': dateFilter } },
         { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
       ]).allowDiskUse(true),
