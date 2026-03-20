@@ -16,9 +16,9 @@ if (!MONGODB_URI) { console.error('MONGODB_URI not found'); process.exit(1) }
 
 // Collections to fully clear
 const COLLECTIONS_TO_CLEAR = [
-  'sales', 'debts', 'expenses', 'customers',
+  'sales', 'debts', 'personaldebts', 'expenses', 'customers',
   'expensesources', 'cashbackpayouts', 'savedcarts',
-  'counters', 'settings',
+  'counters', 'settings', 'debtcategories',
 ]
 
 async function main() {
