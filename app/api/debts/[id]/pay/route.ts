@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
+import Sale from '@/models/Sale'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +30,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       debt.status = 'paid'
     }
     await debt.save()
+
+    // Sync Sale.paid and Sale.payments so sales page and reports reflect actual received cash
+    if (debt.sale) {
+      await Sale.findByIdAndUpdate(debt.sale, {
+        $inc: { paid: amount },
+        $push: { payments: { method: validMethod, amount, date: new Date() } },
+      })
+    }
 
     return NextResponse.json(debt)
   } catch (err) { return errorResponse(err) }

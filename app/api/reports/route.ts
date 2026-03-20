@@ -58,13 +58,7 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Debt payments not already counted in Sale.paid (fromSale payments are initial, already in Sale.paid)
-    const [manualDebtPayAgg] = await Debt.aggregate([
-      { $match: { $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.fromSale': { $ne: true }, 'payments.date': dateFilter } },
-      { $group: { _id: null, total: { $sum: '$payments.amount' } } },
-    ]).allowDiskUse(true)
+    // Sale.paid is updated on every debt payment, so no separate manual debt aggregation needed
 
     // Expenses aggregation
     const [expensesAgg] = await Expense.aggregate([
@@ -162,38 +156,20 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, name: '$_id', qty: '$totalQty', revenue: '$totalRevenue' } },
     ]).allowDiskUse(true)
 
-    // Payment methods stats (sales + manual debt payments)
-    const [saleMethodStats, debtMethodStats] = await Promise.all([
-      Sale.aggregate([
-        { $match: { createdAt: dateFilter } },
-        // For full-payment sales: scale down by return ratio. Partial/debt returns reduce debt, not cash.
-        { $addFields: {
-          effectiveRatio: { $cond: [
-            { $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] },
-            { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] },
-            1,
-          ]},
-        }},
-        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
-        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
-      ]).allowDiskUse(true),
-      Debt.aggregate([
-        { $match: { $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
-        { $unwind: '$payments' },
-        { $match: { 'payments.fromSale': { $ne: true }, 'payments.date': dateFilter } },
-        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
-        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
-      ]).allowDiskUse(true),
-    ])
-    const methodMap: Record<string, { total: number; count: number }> = {}
-    for (const s of [...saleMethodStats, ...debtMethodStats]) {
-      const m = s.method || 'cash'
-      if (!methodMap[m]) methodMap[m] = { total: 0, count: 0 }
-      methodMap[m].total += s.total
-      methodMap[m].count += s.count
-    }
-    const paymentMethodStats = Object.entries(methodMap).map(([method, v]) => ({ method, ...v }))
+    // Payment methods stats — Sale.paid is updated on debt payments, so no separate debt aggregation needed
+    const paymentMethodStats = await Sale.aggregate([
+      { $match: { createdAt: dateFilter } },
+      { $addFields: {
+        effectiveRatio: { $cond: [
+          { $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] },
+          { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] },
+          1,
+        ]},
+      }},
+      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+      { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
+      { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+    ]).allowDiskUse(true)
 
     // Cashier stats
     const cashierStats = await Sale.aggregate([
@@ -227,10 +203,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       salesCount: salesAgg?.salesCount || 0,
-      totalRevenue: (salesAgg?.totalRevenue || 0) + (manualDebtPayAgg?.total || 0),
-      totalProfit: (salesAgg?.totalProfit || 0) + (manualDebtPayAgg?.total || 0),
+      totalRevenue: salesAgg?.totalRevenue || 0,
+      totalProfit: salesAgg?.totalProfit || 0,
       totalExpenses: expensesAgg?.totalExpenses || 0,
-      netProfit: (salesAgg?.totalProfit || 0) + (manualDebtPayAgg?.total || 0) - (expensesAgg?.totalExpenses || 0),
+      netProfit: (salesAgg?.totalProfit || 0) - (expensesAgg?.totalExpenses || 0),
       newDebt: debtsAgg?.newDebt || 0,
       paidDebt: debtsAgg?.paidDebt || 0,
       daily,

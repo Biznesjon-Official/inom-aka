@@ -42,7 +42,7 @@ export async function GET() {
       // Today sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } }, total: { $sum: '$total' } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } }, total: { $sum: '$total' } } },
       ]),
       // Today profit (sale.total - cost, accounting for discount and returns)
       Sale.aggregate([
@@ -59,7 +59,7 @@ export async function GET() {
       // This month sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: monthStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } }, total: { $sum: '$total' } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } }, total: { $sum: '$total' } } },
       ]),
       // This month profit
       Sale.aggregate([
@@ -76,7 +76,7 @@ export async function GET() {
       // Last month sales
       Sale.aggregate([
         { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] } } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } } } },
       ]),
       // Last month profit
       Sale.aggregate([
@@ -112,7 +112,7 @@ export async function GET() {
         {
           $group: {
             _id: '$_id.date',
-            revenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
+            revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] } },
             profit: { $sum: { $subtract: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, { $subtract: ['$grossCost', '$returnedCostTotal'] }] } },
           },
         },
@@ -149,18 +149,20 @@ export async function GET() {
         .sort({ stock: 1 })
         .limit(10)
         .lean(),
-      // Today payment methods
+      // Today payment methods (scaled by return ratio for full-payment sales)
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
+        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
         { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
       ]),
-      // Month payment methods
+      // Month payment methods (scaled by return ratio for full-payment sales)
       Sale.aggregate([
         { $match: { createdAt: { $gte: monthStart } } },
+        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
         { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
       ]),
       // Product stats for dashboard
@@ -181,41 +183,21 @@ export async function GET() {
       ]),
     ])
 
-    // Debt payments not already counted in Sale.paid (fromSale=true means initial payment, already in Sale.paid)
-    const debtPayFilter = { $or: [{ type: 'customer' }, { type: { $exists: false } }] }
-    const notFromSale = { 'payments.fromSale': { $ne: true } }
-    const [todayManualDebt, monthManualDebt, lastMonthManualDebt, todayDebtMethods, monthDebtMethods] = await Promise.all([
-      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
-      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: todayStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
-      Debt.aggregate([{ $match: debtPayFilter }, { $unwind: '$payments' }, { $match: { ...notFromSale, 'payments.date': { $gte: monthStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
-    ])
-
-    function mergeMethodStats(saleStats: {method: string; total: number; count: number}[], debtStats: {method: string; total: number; count: number}[]) {
-      const map: Record<string, { total: number; count: number }> = {}
-      for (const s of [...saleStats, ...debtStats]) {
-        const m = s.method || 'cash'
-        if (!map[m]) map[m] = { total: 0, count: 0 }
-        map[m].total += s.total
-        map[m].count += s.count
-      }
-      return Object.entries(map).map(([method, v]) => ({ method, ...v }))
-    }
+    // Sale.paid is updated on every debt payment, so no separate manualDebt aggregation needed
 
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const todayProfit = (todayProfitAgg[0]?.profit || 0) + (todayManualDebt[0]?.total || 0)
-    const todayRevenue = (todayData.revenue || 0) + (todayManualDebt[0]?.total || 0)
+    const todayProfit = todayProfitAgg[0]?.profit || 0
+    const todayRevenue = todayData.revenue || 0
     const todayExpenses = todayExpenseAgg[0]?.total || 0
 
     const monthData = monthSalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const monthProfit = (monthProfitAgg[0]?.profit || 0) + (monthManualDebt[0]?.total || 0)
-    const monthRevenue = (monthData.revenue || 0) + (monthManualDebt[0]?.total || 0)
+    const monthProfit = monthProfitAgg[0]?.profit || 0
+    const monthRevenue = monthData.revenue || 0
     const monthExpenses = monthExpenseAgg[0]?.total || 0
 
     const lastMonthData = lastMonthSalesAgg[0] || { count: 0, revenue: 0 }
-    const lastMonthProfit = (lastMonthProfitAgg[0]?.profit || 0) + (lastMonthManualDebt[0]?.total || 0)
-    const lastMonthRevenue = (lastMonthData.revenue || 0) + (lastMonthManualDebt[0]?.total || 0)
+    const lastMonthProfit = lastMonthProfitAgg[0]?.profit || 0
+    const lastMonthRevenue = lastMonthData.revenue || 0
     const lastMonthExpenses = lastMonthExpenseAgg[0]?.total || 0
 
     // Build 30-day chart
@@ -265,8 +247,8 @@ export async function GET() {
       chart,
       topProducts: topProductsAgg,
       lowStock: lowStockProducts,
-      paymentMethods: mergeMethodStats(paymentMethodsAgg, todayDebtMethods),
-      monthPaymentMethods: mergeMethodStats(monthPaymentMethodsAgg, monthDebtMethods),
+      paymentMethods: paymentMethodsAgg,
+      monthPaymentMethods: monthPaymentMethodsAgg,
     })
   } catch (err) { return errorResponse(err) }
 }
