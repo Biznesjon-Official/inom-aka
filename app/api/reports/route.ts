@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
+          totalRevenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] } },
           totalNetCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
         },
       },
@@ -106,10 +106,11 @@ export async function GET(req: NextRequest) {
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
         },
       },
+      { $match: { $expr: { $lt: ['$returnedTotal', '$saleTotal'] } } },
       {
         $group: {
           _id: '$_id.date',
-          revenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
+          revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] } },
           cost: { $sum: { $subtract: ['$cost', '$returnedCostTotal'] } },
           sales: { $addToSet: '$_id.saleId' },
         },

@@ -2,9 +2,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Search, Trash2, LayoutGrid, List } from 'lucide-react'
+import { Search, Trash2, LayoutGrid, List, Package, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/utils'
 import { useDebounce, useFetchWithCache, useBarcodeScan } from '@/lib/hooks'
@@ -48,6 +48,8 @@ export default function KassaPage() {
   const [payDialog, setPayDialog] = useState(false)
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null)
+  const [scannedQty, setScannedQty] = useState(1)
   const [customTotal, setCustomTotal] = useState<number | null>(null)
   const [editingTotal, setEditingTotal] = useState(false)
   const [editTotalValue, setEditTotalValue] = useState('')
@@ -92,18 +94,36 @@ export default function KassaPage() {
     })
   }, [])
 
-  // Barcode scanner — fetch product by ID and add to cart
+  // Barcode scanner — fetch product by ID and open modal
   const handleBarcodeScan = useCallback(async (code: string) => {
     try {
       const res = await fetch(`/api/products/${code}`)
       if (!res.ok) return toast.error('Mahsulot topilmadi')
       const product: Product = await res.json()
-      addToCart(product)
-      toast.success(`${product.name} qo'shildi`)
+      setScannedProduct(product)
+      setScannedQty(1)
     } catch {
       toast.error('Skaner xatosi')
     }
-  }, [addToCart])
+  }, [])
+
+  const confirmScannedProduct = useCallback(() => {
+    if (!scannedProduct) return
+    const qty = Math.max(1, scannedQty)
+    if (qty > scannedProduct.stock) return toast.error(`${scannedProduct.name}: stokda ${scannedProduct.stock} ta`)
+    setCustomTotal(null)
+    setCart(prev => {
+      const existing = prev.find(c => c._id === scannedProduct._id)
+      const newQty = (existing?.qty || 0) + qty
+      if (newQty > scannedProduct.stock) {
+        toast.error(`${scannedProduct.name}: stokda ${scannedProduct.stock} ta`)
+        return prev
+      }
+      if (existing) return prev.map(c => c._id === scannedProduct._id ? { ...c, qty: newQty } : c)
+      return [...prev, { ...scannedProduct, qty, price: scannedProduct.salePrice }]
+    })
+    setScannedProduct(null)
+  }, [scannedProduct, scannedQty])
 
   useBarcodeScan(handleBarcodeScan)
 
@@ -380,6 +400,77 @@ export default function KassaPage() {
           <SalesLog cashierId={session?.user.role === 'worker' ? session.user.id : undefined} />
         </div>
       </div>
+
+      {/* Scanned product modal */}
+      <Dialog open={!!scannedProduct} onOpenChange={open => !open && setScannedProduct(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Skanerlangan mahsulot</DialogTitle>
+          </DialogHeader>
+          {scannedProduct && (
+            <div className="space-y-4">
+              {scannedProduct.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={scannedProduct.image} alt={scannedProduct.name} className="w-full h-40 object-cover rounded-lg" />
+              ) : (
+                <div className="w-full h-40 bg-slate-100 rounded-lg flex items-center justify-center">
+                  <Package className="w-12 h-12 text-slate-300" />
+                </div>
+              )}
+              <div>
+                <div className="font-semibold text-slate-800 text-base">{scannedProduct.name}</div>
+                {scannedProduct.category && (
+                  <div className="text-xs text-slate-400 mt-0.5">{scannedProduct.category.name}</div>
+                )}
+              </div>
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3">
+                <div>
+                  <div className="text-xl font-bold text-blue-600">{formatPrice(scannedProduct.salePrice)}</div>
+                  <div className="text-xs text-slate-400">/{scannedProduct.unit}</div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm font-medium ${(scannedProduct.stock ?? 0) <= 0 ? 'text-red-500' : (scannedProduct.stock ?? 0) <= 5 ? 'text-amber-500' : 'text-green-600'}`}>
+                    {scannedProduct.stock} {scannedProduct.unit}
+                  </div>
+                  <div className="text-xs text-slate-400">stokda</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-600 whitespace-nowrap">Miqdor:</span>
+                <div className="flex items-center gap-2 flex-1">
+                  <button
+                    className="w-8 h-8 rounded-full border flex items-center justify-center text-lg hover:bg-slate-100"
+                    onClick={() => setScannedQty(q => Math.max(1, q - 1))}
+                  >−</button>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={scannedProduct.stock}
+                    value={scannedQty}
+                    onChange={e => setScannedQty(Math.max(1, Number(e.target.value)))}
+                    className="text-center w-16 h-8"
+                  />
+                  <button
+                    className="w-8 h-8 rounded-full border flex items-center justify-center text-lg hover:bg-slate-100"
+                    onClick={() => setScannedQty(q => Math.min(scannedProduct.stock, q + 1))}
+                  >+</button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setScannedProduct(null)}>Bekor</Button>
+            <Button
+              onClick={confirmScannedProduct}
+              disabled={(scannedProduct?.stock ?? 0) <= 0}
+              className="flex-1"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Savatga qo&apos;shish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment dialog */}
       <PaymentDialog

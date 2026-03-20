@@ -15,9 +15,11 @@ interface ProductCardProps {
   product: Product
   onEdit: (product: Product) => void
   onDelete: (id: string) => void
+  shopName?: string
+  shopPhone?: string
 }
 
-export const TovarProductCard = React.memo(function TovarProductCard({ product: p, onEdit, onDelete }: ProductCardProps) {
+export const TovarProductCard = React.memo(function TovarProductCard({ product: p, onEdit, onDelete, shopName, shopPhone }: ProductCardProps) {
   const outOfStock = (p.stock ?? 0) <= 0
   const lowStock = (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5
 
@@ -58,7 +60,7 @@ export const TovarProductCard = React.memo(function TovarProductCard({ product: 
           <button
             className="w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow hover:bg-blue-50 transition-colors"
             title="Label chiqarish"
-            onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name })}
+            onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name }, shopName, shopPhone)}
           >
             <Printer className="w-3.5 h-3.5 text-blue-500" />
           </button>

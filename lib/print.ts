@@ -22,7 +22,7 @@ export function printLabel(product: {
   wholesalePrice?: number
   unit: string
   category?: string
-}, shopName: string = "Inomaka Do'kon") {
+}, shopName: string = "Inomaka Do'kon", shopPhone: string = '') {
   const barcodeUrl = generateBarcode(product._id)
 
   const html = `<!DOCTYPE html>
@@ -41,7 +41,8 @@ export function printLabel(product: {
     padding: 2mm;
     box-sizing: border-box;
   }
-  .shop { text-align: center; font-weight: bold; font-size: 13px; border-bottom: 1px dashed #000; padding-bottom: 2mm; margin-bottom: 2mm; }
+  .shop { text-align: center; font-weight: bold; font-size: 13px; }
+  .shop-phone { text-align: center; font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 2mm; margin-bottom: 2mm; }
   .name { font-weight: bold; font-size: 14px; word-break: break-word; margin-bottom: 2mm; text-align: center; }
   .cat { font-size: 10px; color: #555; margin-bottom: 2mm; text-align: center; }
   .price { font-size: 18px; font-weight: bold; text-align: center; border: 1px solid #000; padding: 1mm 2mm; margin: 2mm 0; }
@@ -53,6 +54,7 @@ export function printLabel(product: {
 </head>
 <body>
   <div class="shop">${shopName}</div>
+  ${shopPhone ? `<div class="shop-phone">${shopPhone}</div>` : '<div class="shop-phone"></div>'}
   <div class="name">${product.name}</div>
   ${product.category ? `<div class="cat">${product.category}</div>` : ''}
   <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>

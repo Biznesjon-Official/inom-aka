@@ -34,6 +34,11 @@ export default function TovarlarPage() {
   const [newCat, setNewCat] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string }>({})
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+  }, [])
 
   // Product stats
   const { data: stats } = useFetchWithCache<{
@@ -229,7 +234,7 @@ export default function TovarlarPage() {
                 </div>
               ))
             : products.map(p => (
-                <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} />
+                <TovarProductCard key={p._id} product={p} onEdit={openEdit} onDelete={handleDelete} shopName={shopSettings.shopName} shopPhone={shopSettings.shopPhone} />
               ))
           }
           {!productsLoading && products.length === 0 && (
@@ -264,7 +269,7 @@ export default function TovarlarPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
-                        <button className="p-1.5 hover:bg-blue-50 rounded" onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name })}>
+                        <button className="p-1.5 hover:bg-blue-50 rounded" onClick={() => printLabel({ _id: p._id, name: p.name, salePrice: p.salePrice, wholesalePrice: p.wholesalePrice, unit: p.unit, category: p.category?.name }, shopSettings.shopName, shopSettings.shopPhone)}>
                           <Printer className="w-3.5 h-3.5 text-blue-500" />
                         </button>
                         <button className="p-1.5 hover:bg-slate-100 rounded" onClick={() => openEdit(p)}>
