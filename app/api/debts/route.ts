@@ -6,6 +6,9 @@ import Debt from '@/models/Debt'
 export async function GET(req: Request) {
   try {
     await connectDB()
+    // Migrate: remove old string category values
+    await Debt.updateMany({ category: { $type: 'string' } }, { $unset: { category: 1 } })
+
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     const customer = searchParams.get('customer')
