@@ -19,6 +19,7 @@ export async function GET(req: Request) {
     }
 
     const debts = await PersonalDebt.find(filter)
+      .populate('category', 'name')
       .sort({ createdAt: -1 })
       .limit(200)
       .lean()
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectDB()
-    const { name, phone, direction, amount, note } = await req.json()
+    const { name, phone, direction, amount, note, category } = await req.json()
 
     if (!name?.trim() || !amount || amount <= 0) {
       return NextResponse.json({ error: 'name and amount required' }, { status: 400 })
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       paidAmount: 0,
       remainingAmount: amount,
       note: note || undefined,
+      category: category || undefined,
     })
 
     return NextResponse.json(debt, { status: 201 })

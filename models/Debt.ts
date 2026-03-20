@@ -1,4 +1,5 @@
 import { Schema, model, models, Types } from 'mongoose'
+import './DebtCategory'
 
 const DebtPaymentSchema = new Schema({
   amount: { type: Number, required: true },
@@ -20,7 +21,7 @@ const DebtSchema = new Schema({
   direction: { type: String, enum: ['receivable', 'payable'], default: 'receivable' },
   description: { type: String },
   note: { type: String },
-  category: { type: String },
+  category: { type: Types.ObjectId, ref: 'DebtCategory' },
 }, { timestamps: true })
 
 DebtSchema.index({ customer: 1, status: 1 })

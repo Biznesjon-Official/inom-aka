@@ -10,12 +10,16 @@ export async function GET(req: Request) {
     const status = searchParams.get('status')
     const customer = searchParams.get('customer')
 
+    const category = searchParams.get('category')
+
     const filter: Record<string, unknown> = {}
     if (status) filter.status = status
     if (customer) filter.customer = customer
+    if (category) filter.category = category
     filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
 
     const debts = await Debt.find(filter)
+      .populate('category', 'name')
       .populate('sale', 'total paid createdAt paymentType')
       .sort({ createdAt: -1 })
       .limit(100)
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
       paidAmount: 0,
       remainingAmount: amount,
       note,
-      category: category?.trim() || undefined,
+      category: category || undefined,
       type: 'customer',
     })
 

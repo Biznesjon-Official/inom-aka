@@ -1,4 +1,5 @@
-import { Schema, model, models } from 'mongoose'
+import { Schema, model, models, Types } from 'mongoose'
+import './DebtCategory'
 
 const PaymentSchema = new Schema({
   amount: { type: Number, required: true },
@@ -16,6 +17,7 @@ const PersonalDebtSchema = new Schema({
   payments: [PaymentSchema],
   status: { type: String, enum: ['active', 'paid'], default: 'active' },
   note: { type: String },
+  category: { type: Types.ObjectId, ref: 'DebtCategory' },
 }, { timestamps: true })
 
 PersonalDebtSchema.index({ status: 1, createdAt: -1 })
