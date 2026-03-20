@@ -157,19 +157,30 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, name: '$_id', qty: '$totalQty', revenue: '$totalRevenue' } },
     ]).allowDiskUse(true)
 
-    // Payment methods stats
-    const paymentMethodStats = await Sale.aggregate([
-      { $match: { createdAt: dateFilter } },
-      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-      {
-        $group: {
-          _id: '$payments.method',
-          total: { $sum: '$payments.amount' },
-          count: { $sum: 1 },
-        },
-      },
-      { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
-    ]).allowDiskUse(true)
+    // Payment methods stats (sales + manual debt payments)
+    const [saleMethodStats, debtMethodStats] = await Promise.all([
+      Sale.aggregate([
+        { $match: { createdAt: dateFilter } },
+        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+      ]).allowDiskUse(true),
+      Debt.aggregate([
+        { $match: { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': dateFilter } },
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+      ]).allowDiskUse(true),
+    ])
+    const methodMap: Record<string, { total: number; count: number }> = {}
+    for (const s of [...saleMethodStats, ...debtMethodStats]) {
+      const m = s.method || 'cash'
+      if (!methodMap[m]) methodMap[m] = { total: 0, count: 0 }
+      methodMap[m].total += s.total
+      methodMap[m].count += s.count
+    }
+    const paymentMethodStats = Object.entries(methodMap).map(([method, v]) => ({ method, ...v }))
 
     // Cashier stats
     const cashierStats = await Sale.aggregate([

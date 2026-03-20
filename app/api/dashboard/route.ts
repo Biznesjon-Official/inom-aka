@@ -181,13 +181,26 @@ export async function GET() {
       ]),
     ])
 
-    // Manual debt payments (not linked to sale) — add to revenue/profit
+    // Manual debt payments (not linked to sale) — add to revenue/profit + method breakdown
     const manualDebtFilter = { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] }
-    const [todayManualDebt, monthManualDebt, lastMonthManualDebt] = await Promise.all([
+    const [todayManualDebt, monthManualDebt, lastMonthManualDebt, todayDebtMethods, monthDebtMethods] = await Promise.all([
       Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
       Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
       Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
+      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }, { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }]),
     ])
+
+    function mergeMethodStats(saleStats: {method: string; total: number; count: number}[], debtStats: {method: string; total: number; count: number}[]) {
+      const map: Record<string, { total: number; count: number }> = {}
+      for (const s of [...saleStats, ...debtStats]) {
+        const m = s.method || 'cash'
+        if (!map[m]) map[m] = { total: 0, count: 0 }
+        map[m].total += s.total
+        map[m].count += s.count
+      }
+      return Object.entries(map).map(([method, v]) => ({ method, ...v }))
+    }
 
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
     const todayProfit = (todayProfitAgg[0]?.profit || 0) + (todayManualDebt[0]?.total || 0)
@@ -251,8 +264,8 @@ export async function GET() {
       chart,
       topProducts: topProductsAgg,
       lowStock: lowStockProducts,
-      paymentMethods: paymentMethodsAgg,
-      monthPaymentMethods: monthPaymentMethodsAgg,
+      paymentMethods: mergeMethodStats(paymentMethodsAgg, todayDebtMethods),
+      monthPaymentMethods: mergeMethodStats(monthPaymentMethodsAgg, monthDebtMethods),
     })
   } catch (err) { return errorResponse(err) }
 }

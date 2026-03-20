@@ -39,6 +39,7 @@ export default function QarzlarPage() {
   const [catDialog, setCatDialog] = useState(false)
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
   const [amount, setAmount] = useState('')
+  const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'terminal'>('cash')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
@@ -133,7 +134,7 @@ export default function QarzlarPage() {
     const res = await fetch(`/api/debts/${selectedDebt._id}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: num, note }),
+      body: JSON.stringify({ amount: num, method: payMethod, note }),
     })
     setLoading(false)
     if (!res.ok) return toast.error('Xato yuz berdi')
@@ -141,6 +142,7 @@ export default function QarzlarPage() {
     setPayDialog(false)
     setAmount('')
     setNote('')
+    setPayMethod('cash')
     fetchDebts()
   }
 
@@ -388,6 +390,18 @@ export default function QarzlarPage() {
               <div className="bg-orange-50 rounded-lg p-3 text-sm">
                 <div className="font-medium">{debtorName(selectedDebt)}</div>
                 <div className="text-orange-700 font-bold mt-1">Qolgan qarz: {formatPrice(selectedDebt.remainingAmount)}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>To&apos;lov usuli</Label>
+                <div className="flex gap-2">
+                  {([['cash', '💵 Naqd'], ['card', '💳 Karta'], ['terminal', '📱 Terminal']] as const).map(([m, label]) => (
+                    <button key={m} type="button"
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${payMethod === m ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      onClick={() => setPayMethod(m)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>To&apos;lov summasi</Label>

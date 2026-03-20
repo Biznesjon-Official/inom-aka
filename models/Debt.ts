@@ -3,6 +3,7 @@ import './DebtCategory'
 
 const DebtPaymentSchema = new Schema({
   amount: { type: Number, required: true },
+  method: { type: String, enum: ['cash', 'card', 'terminal'], default: 'cash' },
   date: { type: Date, default: Date.now },
   note: { type: String },
 }, { _id: false })
