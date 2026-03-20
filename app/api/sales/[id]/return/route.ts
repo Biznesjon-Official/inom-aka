@@ -6,7 +6,6 @@ import { authOptions } from '@/lib/auth'
 import Sale from '@/models/Sale'
 import Product from '@/models/Product'
 import Debt from '@/models/Debt'
-import Customer from '@/models/Customer'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -83,8 +82,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       $inc: { returnedTotal: effectiveReturnTotal, returnedCostTotal: effectiveCostTotal },
     })
 
-    // If sale had debt, reduce it proportionally
-    if (sale.customer && (sale.paymentType === 'partial' || sale.paymentType === 'debt')) {
+    // If sale had debt, reduce remaining debt by the returned amount
+    if (sale.paymentType === 'partial' || sale.paymentType === 'debt') {
       const debt = await Debt.findOne({ sale: sale._id, status: 'active' })
       if (debt) {
         const reduce = Math.min(effectiveReturnTotal, debt.remainingAmount)
@@ -96,9 +95,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             debt.remainingAmount = 0
           }
           await debt.save()
-
-          // Update customer totalDebt
-          await Customer.findByIdAndUpdate(sale.customer, { $inc: { totalDebt: -reduce } })
         }
       }
     }
