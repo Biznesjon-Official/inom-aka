@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const fetchReport = useCallback(async (f: string, t: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/reports?from=${f}&to=${t}`)
+      const res = await fetch(`/api/reports?from=${f}&to=${t}`, { cache: 'no-store' })
       if (!res.ok) throw new Error()
       setData(await res.json())
     } catch {
@@ -88,8 +88,7 @@ export default function DashboardPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchReport(from, to) }, [])
+  useEffect(() => { fetchReport(from, to) }, [from, to, fetchReport])
 
   const exportCSV = () => {
     if (!data) return
@@ -123,11 +122,17 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
-        {data && (
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download className="w-4 h-4 mr-1.5" />CSV
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => fetchReport(from, to)} disabled={loading}>
+            <Loader2 className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : 'hidden'}`} />
+            Yangilash
           </Button>
-        )}
+          {data && (
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="w-4 h-4 mr-1.5" />CSV
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Date filter */}

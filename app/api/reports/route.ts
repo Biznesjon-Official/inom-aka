@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
       { $match: { createdAt: dateFilter } },
       { $addFields: {
         effectiveRatio: { $cond: [
-          { $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] },
+          { $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] },
           { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] },
           1,
         ]},

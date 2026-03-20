@@ -152,7 +152,7 @@ export async function GET() {
       // Today payment methods (scaled by return ratio for full-payment sales)
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
-        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
+        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
         { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
         { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
@@ -160,7 +160,7 @@ export async function GET() {
       // Month payment methods (scaled by return ratio for full-payment sales)
       Sale.aggregate([
         { $match: { createdAt: { $gte: monthStart } } },
-        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $eq: ['$paymentType', 'full'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
+        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
         { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
         { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
         { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
