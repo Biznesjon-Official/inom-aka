@@ -44,11 +44,6 @@ export default function TovarlarPage() {
     })
   }, [])
 
-  const handleBatchPrint = useCallback(() => {
-    const items = allProducts.filter(p => selectedIds.has(p._id)).map(p => ({ _id: p._id, name: p.name, salePrice: p.salePrice }))
-    printLabels(items)
-  }, [allProducts, selectedIds])
-
   // Product stats
   const { data: stats } = useFetchWithCache<{
     totalProducts: number; totalCostValue: number; totalSaleValue: number; lowStockCount: number
@@ -65,6 +60,11 @@ export default function TovarlarPage() {
       return aIn - bIn
     })
   }, [fetchedProducts])
+
+  const handleBatchPrint = useCallback(() => {
+    const items = allProducts.filter(p => selectedIds.has(p._id)).map(p => ({ _id: p._id, name: p.name, salePrice: p.salePrice }))
+    printLabels(items)
+  }, [allProducts, selectedIds])
 
   // Infinite scroll: show products in batches
   const BATCH = 20
