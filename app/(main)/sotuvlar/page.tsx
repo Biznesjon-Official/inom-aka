@@ -137,7 +137,17 @@ export default function SotuvlarPage() {
     router.refresh()
   }
 
-  const totalRevenue = filtered.reduce((s, x) => s + x.paid - (x.returnedTotal || 0), 0)
+  // Return reduces debt first, then cash. Kirim = paid - cash_refund, Qarz = max(0, debt - return)
+  const totalRevenue = filtered.reduce((s, x) => {
+    const debt = x.total - x.paid
+    const ret = x.returnedTotal || 0
+    return s + x.paid - Math.max(0, ret - debt)
+  }, 0)
+  const totalDebt = filtered.reduce((s, x) => {
+    const debt = x.total - x.paid
+    const ret = x.returnedTotal || 0
+    return s + Math.max(0, debt - ret)
+  }, 0)
   const totalSales = filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
 
   return (
@@ -176,8 +186,8 @@ export default function SotuvlarPage() {
         <span>{filtered.length} ta sotuv</span>
         <span>Jami: <span className="font-bold text-slate-800">{formatPrice(totalSales)}</span></span>
         <span>Kirim: <span className="font-bold text-green-700">{formatPrice(totalRevenue)}</span></span>
-        {totalSales > totalRevenue && (
-          <span>Qarz: <span className="font-bold text-orange-600">{formatPrice(totalSales - totalRevenue)}</span></span>
+        {totalDebt > 0 && (
+          <span>Qarz: <span className="font-bold text-orange-600">{formatPrice(totalDebt)}</span></span>
         )}
       </div>
 
