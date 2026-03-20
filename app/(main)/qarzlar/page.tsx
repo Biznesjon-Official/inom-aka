@@ -19,6 +19,7 @@ interface Debt {
   customerName?: string
   customerPhone?: string
   category?: DebtCategory
+  sale?: string
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -250,7 +251,11 @@ export default function QarzlarPage() {
                     {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
                   </td>
                   <td className="px-4 py-3">
-                    {d.category ? <Badge variant="secondary" className="text-xs">{d.category.name}</Badge> : <span className="text-slate-300">—</span>}
+                    <div className="flex flex-wrap gap-1">
+                      {d.sale && <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200">Kassadan</Badge>}
+                      {d.category ? <Badge variant="secondary" className="text-xs">{d.category.name}</Badge> : null}
+                      {!d.sale && !d.category && <span className="text-slate-300">—</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{formatPrice(d.totalAmount)}</td>
@@ -286,7 +291,10 @@ export default function QarzlarPage() {
                     <div className="font-medium text-slate-800">{debtorName(d)}</div>
                     {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
                     <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
-                    {d.category && <Badge variant="secondary" className="text-xs mt-1">{d.category.name}</Badge>}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {d.sale && <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200">Kassadan</Badge>}
+                      {d.category && <Badge variant="secondary" className="text-xs">{d.category.name}</Badge>}
+                    </div>
                     {d.note && <div className="text-xs text-slate-400 italic mt-0.5">{d.note}</div>}
                   </div>
                   <div className="text-right shrink-0">
@@ -359,9 +367,10 @@ export default function QarzlarPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Kategoriya</Label>
-              <Select value={addForm.categoryId} onValueChange={v => setAddForm(f => ({ ...f, categoryId: v }))}>
+              <Select value={addForm.categoryId || 'none'} onValueChange={v => setAddForm(f => ({ ...f, categoryId: v === 'none' ? '' : v }))}>
                 <SelectTrigger><SelectValue placeholder="Tanlang (ixtiyoriy)" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">Kategoriyasiz</SelectItem>
                   {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -382,7 +391,7 @@ export default function QarzlarPage() {
       </Dialog>
 
       {/* Pay dialog */}
-      <Dialog open={payDialog} onOpenChange={setPayDialog}>
+      <Dialog open={payDialog} onOpenChange={v => { setPayDialog(v); if (!v) { setAmount(''); setNote(''); setPayMethod('cash'); setSelectedDebt(null) } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Qarz to&apos;lovi</DialogTitle></DialogHeader>
           {selectedDebt && (

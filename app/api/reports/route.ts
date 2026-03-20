@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: '$_id',
           saleTotal: { $first: '$total' },
+          paid: { $first: '$paid' },
           grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
           returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: { $subtract: ['$saleTotal', '$returnedTotal'] } },
+          totalRevenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
           totalNetCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
         },
       },
@@ -97,6 +98,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
           saleTotal: { $first: '$total' },
+          paid: { $first: '$paid' },
           cost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
           returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
@@ -105,7 +107,7 @@ export async function GET(req: NextRequest) {
       {
         $group: {
           _id: '$_id.date',
-          revenue: { $sum: { $subtract: ['$saleTotal', '$returnedTotal'] } },
+          revenue: { $sum: { $subtract: ['$paid', '$returnedTotal'] } },
           cost: { $sum: { $subtract: ['$cost', '$returnedCostTotal'] } },
           sales: { $addToSet: '$_id.saleId' },
         },

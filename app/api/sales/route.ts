@@ -99,7 +99,9 @@ export async function POST(req: Request) {
         totalAmount: body.total,
         paidAmount: body.paid || 0,
         remainingAmount: remaining,
-        payments: body.paid > 0 ? [{ amount: body.paid, date: new Date() }] : [],
+        payments: body.paid > 0 && Array.isArray(body.payments) && body.payments.length > 0
+          ? body.payments.map((p: { method: string; amount: number }) => ({ amount: p.amount, method: p.method, date: new Date() }))
+          : body.paid > 0 ? [{ amount: body.paid, date: new Date() }] : [],
       })
       return NextResponse.json({ sale, debt }, { status: 201 })
     }
