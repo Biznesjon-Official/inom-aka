@@ -1,11 +1,6 @@
 // Thermal printer via browser window.print()
 // XPrinter: set paper width to 80mm in printer settings (or 58mm)
-import QRCode from 'qrcode'
 import JsBarcode from 'jsbarcode'
-
-async function generateQR(text: string): Promise<string> {
-  return QRCode.toDataURL(text, { width: 100, margin: 1, color: { dark: '#000', light: '#fff' } })
-}
 
 function generateBarcode(data: string): string {
   const canvas = document.createElement('canvas')
@@ -78,7 +73,7 @@ export interface ReceiptItem {
   salePrice: number
 }
 
-export async function printReceipt(data: {
+export function printReceipt(data: {
   receiptNo: number
   items: ReceiptItem[]
   total: number
@@ -89,18 +84,17 @@ export async function printReceipt(data: {
   createdAt?: Date
   originalTotal?: number
   shopName?: string
+  shopPhone?: string
   receiptFooter?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
+  const shopPhone = data.shopPhone || ''
   const receiptFooter = data.receiptFooter || 'Rahmat! Yana tashrif buyuring.'
   const date = data.createdAt || new Date()
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
   const change = data.paid - data.total
   const debt = data.total - data.paid
   const receiptNo = data.receiptNo.toString()
-
-  const qrData = `Inomaka | Chek #${receiptNo} | ${dateStr} | ${data.total.toLocaleString('uz-UZ')} so'm`
-  const qrUrl = await generateQR(qrData)
 
   const itemsHtml = data.items.map(i => {
     const lineTotal = i.salePrice * i.qty
@@ -140,12 +134,11 @@ export async function printReceipt(data: {
   .info { display: flex; justify-content: space-between; margin: 1mm 0; font-size: 10px; }
   .debt-line { background: #f5f5f5; padding: 1mm 2mm; text-align: center; font-weight: bold; margin: 2mm 0; }
   .footer { text-align: center; font-size: 10px; margin-top: 3mm; }
-  .qr { text-align: center; margin: 3mm 0 1mm; }
-  .qr img { width: 28mm; height: 28mm; }
 </style>
 </head>
 <body>
   <div class="shop-name">${shopName}</div>
+  ${shopPhone ? `<div class="center" style="font-size:10px">${shopPhone}</div>` : ''}
   <div class="center" style="font-size:10px">Chek #${receiptNo}</div>
   <div class="divider"></div>
   <div class="info"><span>Sana:</span><span>${dateStr}</span></div>
@@ -186,7 +179,6 @@ export async function printReceipt(data: {
   <div class="info"><span>To'landi:</span><span class="bold">${data.paid.toLocaleString('uz-UZ')} so'm</span></div>
   ${change > 0 ? `<div class="info"><span>Qaytim:</span><span class="bold">${change.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
   ${debt > 0 ? `<div class="debt-line">⚠ QARZ: ${debt.toLocaleString('uz-UZ')} so'm</div>` : ''}
-  <div class="qr"><img src="${qrUrl}" alt="qr" /></div>
   <div class="footer">${receiptFooter}<br>${shopName}</div>
 </body>
 </html>`

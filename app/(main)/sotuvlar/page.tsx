@@ -46,7 +46,7 @@ const methodLabels: Record<string, string> = { cash: 'Naqd', card: 'Karta', term
 
 export default function SotuvlarPage() {
   const router = useRouter()
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; receiptFooter?: string }>({})
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -238,7 +238,7 @@ export default function SotuvlarPage() {
                         <Undo2 className="w-3.5 h-3.5 text-orange-400" />
                       </button>
                       <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
-                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, receiptFooter: shopSettings.receiptFooter })}>
+                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter })}>
                         <Printer className="w-3.5 h-3.5 text-blue-400" />
                       </button>
                     </div>
@@ -281,7 +281,7 @@ export default function SotuvlarPage() {
                     <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
                       onClick={e => {
                         e.stopPropagation()
-                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, receiptFooter: shopSettings.receiptFooter })
+                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter })
                       }}>
                       <Printer className="w-3.5 h-3.5 text-blue-400" />
                     </button>

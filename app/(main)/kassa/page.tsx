@@ -42,7 +42,7 @@ interface SavedCart {
 
 export default function KassaPage() {
   const { data: session } = useSession()
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; receiptFooter?: string }>({})
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
@@ -251,6 +251,7 @@ export default function KassaPage() {
       paymentType,
       createdAt: new Date(),
       shopName: shopSettings.shopName,
+      shopPhone: shopSettings.shopPhone,
       receiptFooter: shopSettings.receiptFooter,
     })
 
