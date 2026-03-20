@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectDB()
-    const { customerName, customerPhone, amount, note } = await req.json()
+    const { customerName, customerPhone, amount, note, category } = await req.json()
 
     if (!customerName || !amount) {
       return NextResponse.json({ error: 'customerName and amount required' }, { status: 400 })
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       paidAmount: 0,
       remainingAmount: amount,
       note,
+      category: category?.trim() || undefined,
       type: 'customer',
     })
 

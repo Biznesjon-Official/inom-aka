@@ -55,6 +55,14 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
+    // Manual debt payments (old debts not linked to a sale) as revenue
+    const [manualDebtPayAgg] = await Debt.aggregate([
+      { $match: { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter } },
+      { $group: { _id: null, total: { $sum: '$payments.amount' } } },
+    ]).allowDiskUse(true)
+
     // Expenses aggregation
     const [expensesAgg] = await Expense.aggregate([
       { $match: { date: dateFilter } },
@@ -195,10 +203,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       salesCount: salesAgg?.salesCount || 0,
-      totalRevenue: salesAgg?.totalRevenue || 0,
-      totalProfit: salesAgg?.totalProfit || 0,
+      totalRevenue: (salesAgg?.totalRevenue || 0) + (manualDebtPayAgg?.total || 0),
+      totalProfit: (salesAgg?.totalProfit || 0) + (manualDebtPayAgg?.total || 0),
       totalExpenses: expensesAgg?.totalExpenses || 0,
-      netProfit: (salesAgg?.totalProfit || 0) - (expensesAgg?.totalExpenses || 0),
+      netProfit: (salesAgg?.totalProfit || 0) + (manualDebtPayAgg?.total || 0) - (expensesAgg?.totalExpenses || 0),
       newDebt: debtsAgg?.newDebt || 0,
       paidDebt: debtsAgg?.paidDebt || 0,
       daily,

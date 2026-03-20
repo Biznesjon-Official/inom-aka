@@ -20,6 +20,7 @@ const DebtSchema = new Schema({
   direction: { type: String, enum: ['receivable', 'payable'], default: 'receivable' },
   description: { type: String },
   note: { type: String },
+  category: { type: String },
 }, { timestamps: true })
 
 DebtSchema.index({ customer: 1, status: 1 })

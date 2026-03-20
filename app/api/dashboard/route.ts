@@ -181,16 +181,27 @@ export async function GET() {
       ]),
     ])
 
+    // Manual debt payments (not linked to sale) — add to revenue/profit
+    const manualDebtFilter = { sale: null, $or: [{ type: 'customer' }, { type: { $exists: false } }] }
+    const [todayManualDebt, monthManualDebt, lastMonthManualDebt] = await Promise.all([
+      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: manualDebtFilter }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, total: { $sum: '$payments.amount' } } }]),
+    ])
+
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const todayProfit = todayProfitAgg[0]?.profit || 0
+    const todayProfit = (todayProfitAgg[0]?.profit || 0) + (todayManualDebt[0]?.total || 0)
+    const todayRevenue = (todayData.revenue || 0) + (todayManualDebt[0]?.total || 0)
     const todayExpenses = todayExpenseAgg[0]?.total || 0
 
     const monthData = monthSalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const monthProfit = monthProfitAgg[0]?.profit || 0
+    const monthProfit = (monthProfitAgg[0]?.profit || 0) + (monthManualDebt[0]?.total || 0)
+    const monthRevenue = (monthData.revenue || 0) + (monthManualDebt[0]?.total || 0)
     const monthExpenses = monthExpenseAgg[0]?.total || 0
 
     const lastMonthData = lastMonthSalesAgg[0] || { count: 0, revenue: 0 }
-    const lastMonthProfit = lastMonthProfitAgg[0]?.profit || 0
+    const lastMonthProfit = (lastMonthProfitAgg[0]?.profit || 0) + (lastMonthManualDebt[0]?.total || 0)
+    const lastMonthRevenue = (lastMonthData.revenue || 0) + (lastMonthManualDebt[0]?.total || 0)
     const lastMonthExpenses = lastMonthExpenseAgg[0]?.total || 0
 
     // Build 30-day chart
@@ -214,21 +225,21 @@ export async function GET() {
     return NextResponse.json({
       today: {
         sales: todayData.count,
-        revenue: todayData.revenue,
+        revenue: todayRevenue,
         profit: todayProfit,
         expenses: todayExpenses,
         netProfit: todayProfit - todayExpenses,
       },
       month: {
         sales: monthData.count,
-        revenue: monthData.revenue,
+        revenue: monthRevenue,
         profit: monthProfit,
         expenses: monthExpenses,
         netProfit: monthProfit - monthExpenses,
       },
       lastMonth: {
         sales: lastMonthData.count,
-        revenue: lastMonthData.revenue,
+        revenue: lastMonthRevenue,
         profit: lastMonthProfit,
         expenses: lastMonthExpenses,
         netProfit: lastMonthProfit - lastMonthExpenses,

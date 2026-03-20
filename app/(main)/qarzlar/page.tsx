@@ -16,6 +16,7 @@ interface Debt {
   customer?: { _id: string; name: string; phone?: string }
   customerName?: string
   customerPhone?: string
+  category?: string
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -36,7 +37,7 @@ export default function QarzlarPage() {
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
-  const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '' })
+  const [addForm, setAddForm] = useState({ customerName: '', customerPhone: '', amount: '', note: '', category: '' })
 
   const fetchDebts = useCallback(async () => {
     const res = await fetch(`/api/debts?status=${status}`)
@@ -70,13 +71,14 @@ export default function QarzlarPage() {
         customerPhone: addForm.customerPhone.trim() || undefined,
         amount: num,
         note: addForm.note || undefined,
+        category: addForm.category.trim() || undefined,
       }),
     })
     setLoading(false)
     if (!res.ok) return toast.error('Xato yuz berdi')
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
-    setAddForm({ customerName: '', customerPhone: '', amount: '', note: '' })
+    setAddForm({ customerName: '', customerPhone: '', amount: '', note: '', category: '' })
     fetchDebts()
   }
 
@@ -174,6 +176,7 @@ export default function QarzlarPage() {
                 <tr key={d._id} className="border-b last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-3 font-medium text-slate-800">
                     {debtorName(d)}
+                    {d.category && <div className="text-xs text-blue-500 font-normal">{d.category}</div>}
                     {d.note && <div className="text-xs text-slate-400 italic font-normal">{d.note}</div>}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{debtorPhone(d) || '—'}</td>
@@ -217,6 +220,7 @@ export default function QarzlarPage() {
                       <div className="font-medium text-slate-800">{debtorName(d)}</div>
                       {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
                       <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
+                      {d.category && <div className="text-xs text-blue-500">{d.category}</div>}
                       {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
                     </div>
                   </div>
@@ -282,6 +286,10 @@ export default function QarzlarPage() {
             <div className="space-y-1.5">
               <Label>Qarz summasi *</Label>
               <NumberInput value={addForm.amount} onChange={v => setAddForm(f => ({ ...f, amount: v }))} placeholder="Summa" min={0} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kategoriya</Label>
+              <Input value={addForm.category} onChange={e => setAddForm(f => ({ ...f, category: e.target.value }))} placeholder="Masalan: Eski qarz, Do'kon..." />
             </div>
             <div className="space-y-1.5">
               <Label>Izoh</Label>
