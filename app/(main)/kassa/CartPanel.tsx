@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Plus, Minus, Trash2, ShoppingCart, X, Save, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +40,8 @@ export const CartPanel = React.memo(function CartPanel({
   onUpdateQty, onClear, onPay, onStartEditTotal, onCommitEditTotal, onEditTotalChange,
   onSaveCart, onLoadCart, savedCartsCount,
 }: CartPanelProps) {
+  const [editingQty, setEditingQty] = useState<Map<string, string>>(new Map())
+
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-3">
@@ -82,8 +84,14 @@ export const CartPanel = React.memo(function CartPanel({
                   <Minus className="w-4 h-4" />
                 </button>
                 <input className="w-16 text-center text-base border rounded px-1 py-1"
-                  value={item.qty || ''} type="number" step="any" min={0}
-                  onChange={e => onUpdateQty(item._id, Number(e.target.value))} />
+                  value={editingQty.get(item._id) ?? item.qty}
+                  type="number" step="any" min={0}
+                  onChange={e => setEditingQty(prev => new Map(prev).set(item._id, e.target.value))}
+                  onBlur={e => {
+                    const val = parseFloat(e.target.value)
+                    onUpdateQty(item._id, isNaN(val) ? 0 : val)
+                    setEditingQty(prev => { const m = new Map(prev); m.delete(item._id); return m })
+                  }} />
                 <button className="w-8 h-8 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
                   onClick={() => onUpdateQty(item._id, item.qty + 1)}>
                   <Plus className="w-4 h-4" />

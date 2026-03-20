@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { BookOpen, Search, CreditCard, Plus, LayoutGrid, List } from 'lucide-react'
+import { BookOpen, Search, CreditCard, Plus, LayoutGrid, List, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -77,6 +77,14 @@ export default function QarzlarPage() {
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
     setAddForm({ customerName: '', customerPhone: '', amount: '', note: '' })
+    fetchDebts()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Qarzni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/debts/${id}`, { method: 'DELETE' })
+    if (!res.ok) return toast.error('O\'chirishda xato')
+    toast.success('O\'chirildi')
     fetchDebts()
   }
 
@@ -158,7 +166,7 @@ export default function QarzlarPage() {
                 <th className="px-4 py-3 font-medium text-right">Jami</th>
                 <th className="px-4 py-3 font-medium text-right">To&apos;langan</th>
                 <th className="px-4 py-3 font-medium text-right">Qoldi</th>
-                {status === 'active' && <th className="px-4 py-3 font-medium text-right">Amallar</th>}
+                <th className="px-4 py-3 font-medium text-right">Amallar</th>
               </tr>
             </thead>
             <tbody>
@@ -175,15 +183,18 @@ export default function QarzlarPage() {
                   <td className="px-4 py-3 text-right font-bold text-red-600">
                     {d.status === 'active' ? formatPrice(d.remainingAmount) : <span className="text-slate-400 font-normal">To&apos;langan</span>}
                   </td>
-                  {status === 'active' && (
-                    <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex gap-1.5 justify-end">
                       {d.status === 'active' && (
                         <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
                           <CreditCard className="w-3.5 h-3.5 mr-1" />To&apos;lov
                         </Button>
                       )}
-                    </td>
-                  )}
+                      <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(d._id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -221,13 +232,16 @@ export default function QarzlarPage() {
                   </div>
                 </div>
 
-                {d.status === 'active' && (
-                  <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(d._id)}>
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />O&apos;chirish
+                  </Button>
+                  {d.status === 'active' && (
                     <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
                       <CreditCard className="w-3.5 h-3.5 mr-1.5" />To&apos;lov qabul qilish
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {d.payments.length > 0 && (
                   <div className="mt-3 border-t pt-3">
