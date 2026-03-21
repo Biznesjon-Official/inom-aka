@@ -116,9 +116,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const alreadyPaid = payoutsAgg[0]?.totalPaid || 0
 
     const payouts = await CashbackPayout.find({
-      customer: customerId,
-      type: 'archive'
-    }).sort({ periodTo: -1 }).lean()
+      customer: customerId
+    }).sort({ createdAt: -1 }).lean()
 
     const percent = customer.cashbackPercent || 0
     const calculatedAmount = Math.round(totalSales * percent / 100)

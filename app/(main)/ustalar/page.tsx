@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice, getMonthRange, getYearRange } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks'
+import { NumberInput } from '@/components/ui/NumberInput'
 
 interface Usta {
   _id: string; seqNo?: number; name: string; phone?: string; address?: string; note?: string; totalDebt: number; cashbackPercent: number
@@ -21,7 +22,7 @@ interface Usta {
 interface CashbackData {
   totalSales: number; percent: number; calculatedAmount: number; alreadyPaid: number; remaining: number
   periodFrom: string; periodTo: string;
-  payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string; periodFrom: string; periodTo: string; percent: number }[]
+  payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string; periodFrom: string; periodTo: string; percent: number; totalSales: number }[]
 }
 
 interface UstaSale {
@@ -57,7 +58,9 @@ export default function UstalarPage() {
   const [salesLoading, setSalesLoading] = useState(false)
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
-
+  const [editPayoutDialog, setEditPayoutDialog] = useState(false)
+  const [selectedPayout, setSelectedPayout] = useState<any>(null)
+  const [payoutEditForm, setPayoutEditForm] = useState({ amount: '', totalSales: '', percent: '', note: '' })
   const debouncedSearch = useDebounce(search)
   const fetchUstalar = useCallback(async () => {
     const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
@@ -140,6 +143,34 @@ export default function UstalarPage() {
     fetchUstalar()
   }
 
+  async function handlePayoutUpdate() {
+    if (!selectedPayout) return
+    const res = await fetch(`/api/cashback-payouts/${selectedPayout._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: Number(payoutEditForm.amount),
+        totalSales: Number(payoutEditForm.totalSales),
+        percent: Number(payoutEditForm.percent),
+        note: payoutEditForm.note
+      })
+    })
+
+    if (!res.ok) return toast.error('Yangilashda xato')
+    toast.success('Ma\'lumotlar tahrirlandi')
+    setEditPayoutDialog(false)
+    if (detailUsta) fetchCashback()
+  }
+
+  async function handlePayoutDelete(id: string) {
+    if (!confirm('Ushbu arxivni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/cashback-payouts/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('O\'chirildi')
+      setEditPayoutDialog(false)
+      if (detailUsta) fetchCashback()
+    }
+  }
 
 
   return (
@@ -391,17 +422,31 @@ export default function UstalarPage() {
 
                         {cashbackData.payouts.length > 0 && (
                           <div className="space-y-2 mt-4">
-                            <div className="text-sm font-medium text-slate-700">Arxivlangan davrlar</div>
+                            <div className="text-sm font-medium text-slate-700">Tarix</div>
                             {cashbackData.payouts.map(p => (
-                              <div key={p._id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                              <div
+                                key={p._id}
+                                className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors"
+                                onDoubleClick={() => {
+                                  setSelectedPayout(p)
+                                  setPayoutEditForm({
+                                    amount: String(p.amount),
+                                    totalSales: String(p.totalSales || 0),
+                                    percent: String(p.percent || 0),
+                                    note: p.note || ''
+                                  })
+                                  setEditPayoutDialog(true)
+                                }}
+                                title="Tahrirlash uchun ikki marta bosing"
+                              >
                                 <div>
-                                  <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)} <span className="text-xs font-normal text-slate-500">({p.percent}%)</span></div>
+                                  <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)} <span className="text-xs font-normal text-slate-500">{p.type === 'archive' ? `(${p.percent}%)` : ''}</span></div>
                                   <div className="text-xs text-slate-500">
-                                    Davr: {new Date(p.periodFrom).toLocaleDateString()} — {new Date(p.periodTo).toLocaleDateString()}
+                                    {p.type === 'archive' ? `Davr: ${new Date(p.periodFrom).toLocaleDateString()} — ${new Date(p.periodTo).toLocaleDateString()}` : `Sana: ${new Date(p.createdAt).toLocaleDateString()}`}
                                   </div>
                                 </div>
-                                <Badge className={p.type === 'archive' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100' : 'bg-slate-200 text-slate-700 hover:bg-slate-200'}>
-                                  Arxiv
+                                <Badge className={p.type === 'archive' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'}>
+                                  {p.type === 'archive' ? 'Arxiv' : 'To\'lov'}
                                 </Badge>
                               </div>
                             ))}
@@ -412,6 +457,41 @@ export default function UstalarPage() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payout Dialog */}
+      <Dialog open={editPayoutDialog} onOpenChange={setEditPayoutDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{selectedPayout?.type === 'archive' ? 'Arxivni tahrirlash' : 'To\'lovni tahrirlash'}</DialogTitle></DialogHeader>
+          {selectedPayout && (
+            <div className="space-y-3">
+              {selectedPayout.type === 'archive' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Jami savdo (shu davrda)</Label>
+                    <NumberInput value={payoutEditForm.totalSales} onChange={(v: string) => setPayoutEditForm(f => ({ ...f, totalSales: v }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Foiz (%)</Label>
+                    <NumberInput value={payoutEditForm.percent} onChange={(v: string) => setPayoutEditForm(f => ({ ...f, percent: v }))} />
+                  </div>
+                </>
+              )}
+              <div className="space-y-1.5">
+                <Label>{selectedPayout.type === 'archive' ? 'Arxivlangan foyiz' : 'To\'lov summasi'}</Label>
+                <NumberInput value={payoutEditForm.amount} onChange={(v: string) => setPayoutEditForm(f => ({ ...f, amount: v }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Izoh</Label>
+                <Input value={payoutEditForm.note} onChange={e => setPayoutEditForm(f => ({ ...f, note: e.target.value }))} placeholder="Ixtiyoriy" />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button variant="destructive" size="sm" onClick={() => handlePayoutDelete(selectedPayout._id)}>O&apos;chirish</Button>
+                <Button className="flex-1" size="sm" onClick={handlePayoutUpdate}>Saqlash</Button>
+              </div>
             </div>
           )}
         </DialogContent>
