@@ -7,6 +7,8 @@ const CustomerSchema = new Schema({
   note: { type: String },
   totalDebt: { type: Number, default: 0 },
   cashbackPercent: { type: Number, default: 0, min: 0, max: 100 },
+  cashbackStartDate: { type: Date },
+  cashbackEndDate: { type: Date },
 }, { timestamps: true })
 
 CustomerSchema.index({ name: 1 })

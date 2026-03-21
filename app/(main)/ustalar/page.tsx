@@ -15,11 +15,12 @@ import { useDebounce } from '@/lib/hooks'
 
 interface Usta {
   _id: string; name: string; phone?: string; address?: string; note?: string; totalDebt: number; cashbackPercent: number
+  cashbackStartDate?: string; cashbackEndDate?: string
 }
 
 interface CashbackData {
   totalSales: number; percent: number; calculatedAmount: number; alreadyPaid: number; remaining: number
-  payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string }[]
+  payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string; periodFrom: string; periodTo: string; percent: number }[]
 }
 
 interface UstaSale {
@@ -33,7 +34,7 @@ interface UstaSale {
   createdAt: string
 }
 
-const emptyForm = { name: '', phone: '', address: '', note: '', cashbackPercent: 0 }
+const emptyForm = { name: '', phone: '', address: '', note: '', cashbackPercent: 0, cashbackStartDate: '', cashbackEndDate: '' }
 
 export default function UstalarPage() {
   const [ustalar, setUstalar] = useState<Usta[]>([])
@@ -54,12 +55,8 @@ export default function UstalarPage() {
   const [ustaSales, setUstaSales] = useState<UstaSale[]>([])
   const [salesLoading, setSalesLoading] = useState(false)
 
-  // Payout form
-  const [payoutAmount, setPayoutAmount] = useState('')
-  const [payoutType, setPayoutType] = useState<'money' | 'gift'>('money')
-  const [payoutNote, setPayoutNote] = useState('')
-  const [payoutLoading, setPayoutLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
+  const [closingPeriod, setClosingPeriod] = useState(false)
 
   const debouncedSearch = useDebounce(search)
   const fetchUstalar = useCallback(async () => {
@@ -74,19 +71,23 @@ export default function UstalarPage() {
   const fetchCashback = useCallback(async () => {
     if (!detailUsta) return
     setCashbackLoading(true)
-    const range = period === 'month' ? getMonthRange() : getYearRange()
-    const from = range.from.toISOString()
-    const to = range.to.toISOString()
+    const from = detailUsta.cashbackStartDate ? new Date(detailUsta.cashbackStartDate).toISOString() : new Date('2000-01-01').toISOString()
+    const to = detailUsta.cashbackEndDate ? new Date(detailUsta.cashbackEndDate).toISOString() : new Date('2100-01-01').toISOString()
     const res = await fetch(`/api/customers/${detailUsta._id}/cashback?from=${from}&to=${to}`)
     if (!res.ok) { setCashbackLoading(false); return toast.error('Cashback ma\'lumotlarini yuklashda xato') }
     setCashbackData(await res.json())
     setCashbackLoading(false)
-  }, [detailUsta, period])
+  }, [detailUsta])
 
   const fetchUstaSales = useCallback(async () => {
     if (!detailUsta) return
     setSalesLoading(true)
-    const res = await fetch(`/api/sales?customer=${detailUsta._id}`)
+    const from = detailUsta.cashbackStartDate ? new Date(detailUsta.cashbackStartDate).toISOString() : ''
+    const to = detailUsta.cashbackEndDate ? new Date(detailUsta.cashbackEndDate).toISOString() : ''
+    
+    // Add time filters if dates exist
+    const qs = from && to ? `&from=${from}&to=${to}` : ''
+    const res = await fetch(`/api/sales?usta=${detailUsta._id}${qs}`)
     if (res.ok) {
       setUstaSales(await res.json())
     }
@@ -104,18 +105,22 @@ export default function UstalarPage() {
   function openEdit(e: React.MouseEvent, c: Usta) {
     e.stopPropagation()
     setEditing(c)
-    setForm({ name: c.name, phone: c.phone || '', address: c.address || '', note: c.note || '', cashbackPercent: c.cashbackPercent || 0 })
+    setForm({ 
+      name: c.name, 
+      phone: c.phone || '', 
+      address: c.address || '', 
+      note: c.note || '', 
+      cashbackPercent: c.cashbackPercent || 0,
+      cashbackStartDate: c.cashbackStartDate ? new Date(c.cashbackStartDate).toISOString().split('T')[0] : '',
+      cashbackEndDate: c.cashbackEndDate ? new Date(c.cashbackEndDate).toISOString().split('T')[0] : ''
+    })
     setDialog(true)
   }
 
   function openDetail(c: Usta) {
     setDetailUsta(c)
-    setPeriod('month')
     setCashbackData(null)
     setUstaSales([])
-    setPayoutAmount('')
-    setPayoutNote('')
-    setPayoutType('money')
     setDetailOpen(true)
   }
 
@@ -141,33 +146,53 @@ export default function UstalarPage() {
     fetchUstalar()
   }
 
-  async function handlePayout() {
+  async function handleClosePeriod() {
     if (!detailUsta || !cashbackData) return
-    const amount = Number(payoutAmount)
-    if (!amount || amount <= 0) return toast.error('Summani kiriting')
-    if (amount > cashbackData.remaining) return toast.error('Qoldiqdan ko\'p bo\'lishi mumkin emas')
+    if (!confirm('Davrni yopishni va to\'plamcha qilishni tasdiqlaysizmi? Hozirgi hisoblangan barcha summa arxivga ketadi.')) return
 
-    setPayoutLoading(true)
-    const range = period === 'month' ? getMonthRange() : getYearRange()
-    const res = await fetch(`/api/customers/${detailUsta._id}/cashback`, {
+    setClosingPeriod(true)
+    const from = detailUsta.cashbackStartDate ? new Date(detailUsta.cashbackStartDate).toISOString() : new Date('2000-01-01').toISOString()
+    const to = detailUsta.cashbackEndDate ? new Date(detailUsta.cashbackEndDate).toISOString() : new Date().toISOString()
+    
+    // Create archive payout
+    const payoutRes = await fetch(`/api/customers/${detailUsta._id}/cashback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        amount,
-        periodFrom: range.from.toISOString(),
-        periodTo: range.to.toISOString(),
+        amount: cashbackData.calculatedAmount,
+        periodFrom: from,
+        periodTo: to,
         totalSales: cashbackData.totalSales,
         percent: cashbackData.percent,
-        type: payoutType,
-        note: payoutNote || undefined,
+        type: 'archive',
+        note: `Davr oxiri (Arxivlandi)`,
       }),
     })
-    setPayoutLoading(false)
-    if (!res.ok) return toast.error('Xato')
-    toast.success('Foyiz to\'landi')
-    setPayoutAmount('')
-    setPayoutNote('')
-    fetchCashback()
+    if (!payoutRes.ok) { setClosingPeriod(false); return toast.error('Arxivlashda xato') }
+
+    // Update customer dates: new start = old end (or today), new end = start + 1 year
+    const newStart = new Date(to) // already ISO
+    const newEnd = new Date(to)
+    newEnd.setFullYear(newEnd.getFullYear() + 1)
+
+    const updateRes = await fetch(`/api/customers/${detailUsta._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cashbackStartDate: newStart.toISOString(),
+        cashbackEndDate: newEnd.toISOString()
+      }),
+    })
+
+    setClosingPeriod(false)
+    if (!updateRes.ok) return toast.error('Mijozni yangilashda xato, arxiv saqlandi.')
+    
+    toast.success('Davr yopildi, yangi davr boshlandi')
+    fetchUstalar()
+    
+    // Refresh local detailUsta to trigger re-fetches
+    const updatedCustomer = await updateRes.json()
+    setDetailUsta(updatedCustomer)
   }
 
   return (
@@ -313,6 +338,16 @@ export default function UstalarPage() {
               <Input type="number" min={0} max={100} step={0.5} value={form.cashbackPercent}
                 onChange={e => setForm(f => ({ ...f, cashbackPercent: Number(e.target.value) }))} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Boshlanish (ixtiyoriy)</Label>
+                <Input type="date" value={form.cashbackStartDate} onChange={e => setForm(f => ({ ...f, cashbackStartDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Qachongacha hisoblanadi?</Label>
+                <Input type="date" value={form.cashbackEndDate} onChange={e => setForm(f => ({ ...f, cashbackEndDate: e.target.value }))} />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label>Izoh</Label>
               <Textarea rows={2} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
@@ -371,21 +406,16 @@ export default function UstalarPage() {
                 )}
               </div>
 
-              {/* Cashback section */}
+            {/* Cashback section */}
               {detailUsta.cashbackPercent > 0 && (
                 <>
                   <div className="border-t pt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Label className="text-sm whitespace-nowrap">Foyiz hisobi — Davr:</Label>
-                      <Select value={period} onValueChange={(v: 'month' | 'year') => setPeriod(v)}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="month">Bu oy</SelectItem>
-                          <SelectItem value="year">Bu yil</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="text-sm font-medium text-slate-700 mb-2">Foyiz hisobi</div>
+                    <div className="text-xs text-slate-500 mb-4 bg-slate-50 p-2 rounded">
+                      Davr: {detailUsta.cashbackStartDate ? new Date(detailUsta.cashbackStartDate).toLocaleDateString('uz-UZ') : 'Noma\'lum'} dan{' '}
+                      {detailUsta.cashbackEndDate ? new Date(detailUsta.cashbackEndDate).toLocaleDateString('uz-UZ') : 'Noma\'lum'} gacha
+                      <br/>
+                      Ushbu sanalar ichida ishlangan sotuvlardan hisoblanadi. Shartnoma yakunlanganda siz uni "Davrni yopish" orqali arxivlashingiz va yangi sanadan hisob kitobni boshlashingiz mumkin.
                     </div>
 
                     {cashbackLoading ? (
@@ -411,51 +441,30 @@ export default function UstalarPage() {
                           </div>
                         </div>
 
-                        {cashbackData.remaining > 0 && (
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
-                            <div className="text-xs text-amber-600">Qoldiq</div>
-                            <div className="font-bold text-amber-700 text-lg">{formatPrice(cashbackData.remaining)}</div>
+                        <div className="border rounded-lg p-4 space-y-3 mt-4">
+                          <div className="text-sm font-medium text-slate-700">Shartnomani yakunlash</div>
+                          <div className="text-xs text-slate-500">
+                            "Davrni yopish" tugmasi hozirgi hisoblangan {formatPrice(cashbackData.calculatedAmount)} summani arxivga oladi. 
+                            So'ng, qaytadan keyingi 1 yil uchun hisoblash boshlanadi. Davr yakunlangandan keyin usta pulini "Xarajatlar" sahifasida berasiz.
                           </div>
-                        )}
-
-                        {cashbackData.remaining > 0 && (
-                          <div className="border rounded-lg p-3 space-y-2.5 mt-3">
-                            <div className="text-sm font-medium text-slate-700">Foyiz to&apos;lash</div>
-                            <div className="flex gap-2">
-                              <Input type="number" placeholder="Summa" value={payoutAmount}
-                                onChange={e => setPayoutAmount(e.target.value)} className="flex-1" />
-                              <Select value={payoutType} onValueChange={(v: 'money' | 'gift') => setPayoutType(v)}>
-                                <SelectTrigger className="w-28">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="money"><Banknote className="w-3.5 h-3.5 inline mr-1" />Pul</SelectItem>
-                                  <SelectItem value="gift"><Gift className="w-3.5 h-3.5 inline mr-1" />Sovg&apos;a</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Input placeholder="Izoh (ixtiyoriy)" value={payoutNote}
-                              onChange={e => setPayoutNote(e.target.value)} />
-                            <Button size="sm" className="w-full" onClick={handlePayout} disabled={payoutLoading}>
-                              {payoutLoading ? 'Saqlanmoqda...' : 'To\'lash'}
-                            </Button>
-                          </div>
-                        )}
+                          <Button size="sm" className="w-full" onClick={handleClosePeriod} disabled={closingPeriod}>
+                            {closingPeriod ? 'Arxivlanmoqda...' : 'Davrni yopish va arxivlash'}
+                          </Button>
+                        </div>
 
                         {cashbackData.payouts.length > 0 && (
-                          <div className="space-y-2 mt-3">
-                            <div className="text-sm font-medium text-slate-700">To&apos;lovlar tarixi</div>
+                          <div className="space-y-2 mt-4">
+                            <div className="text-sm font-medium text-slate-700">Arxivlangan davrlar</div>
                             {cashbackData.payouts.map(p => (
                               <div key={p._id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                                 <div>
-                                  <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)}</div>
+                                  <div className="text-sm font-medium text-slate-700">{formatPrice(p.amount)} <span className="text-xs font-normal text-slate-500">({p.percent}%)</span></div>
                                   <div className="text-xs text-slate-500">
-                                    {new Date(p.createdAt).toLocaleDateString('uz-UZ')}
-                                    {p.note && ` — ${p.note}`}
+                                    Davr: {new Date(p.periodFrom).toLocaleDateString()} — {new Date(p.periodTo).toLocaleDateString()}
                                   </div>
                                 </div>
-                                <Badge className={p.type === 'gift' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'}>
-                                  {p.type === 'gift' ? 'Sovg\'a' : 'Pul'}
+                                <Badge className={p.type === 'archive' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100' : 'bg-slate-200 text-slate-700 hover:bg-slate-200'}>
+                                  Arxiv
                                 </Badge>
                               </div>
                             ))}

@@ -136,10 +136,10 @@ export const PaymentDialog = React.memo(function PaymentDialog({
     setEditingTotal(false)
   }
 
-  const paymentInputs: { key: 'cash' | 'card' | 'terminal'; label: string; emoji: string; value: string; setter: (v: string) => void }[] = [
-    { key: 'cash', label: 'Naqd', emoji: '\uD83D\uDCB5', value: cashAmount, setter: setCashAmount },
-    { key: 'card', label: 'Karta', emoji: '\uD83D\uDCB3', value: cardAmount, setter: setCardAmount },
-    { key: 'terminal', label: 'Terminal', emoji: '\uD83D\uDCF1', value: terminalAmount, setter: setTerminalAmount },
+  const paymentInputs: { key: 'cash' | 'card' | 'terminal'; label: string; emoji: string; value: string; setter: (v: string) => void; maxLimit: number }[] = [
+    { key: 'cash', label: 'Naqd', emoji: '\uD83D\uDCB5', value: cashAmount, setter: setCashAmount, maxLimit: finalTotal - cardNum - terminalNum },
+    { key: 'card', label: 'Karta', emoji: '\uD83D\uDCB3', value: cardAmount, setter: setCardAmount, maxLimit: finalTotal - cashNum - terminalNum },
+    { key: 'terminal', label: 'Terminal', emoji: '\uD83D\uDCF1', value: terminalAmount, setter: setTerminalAmount, maxLimit: finalTotal - cashNum - cardNum },
   ]
 
   return (
@@ -183,13 +183,13 @@ export const PaymentDialog = React.memo(function PaymentDialog({
 
           {/* 3 payment inputs */}
           <div className="space-y-2.5">
-            {paymentInputs.map(({ key, label, emoji, value, setter }) => (
+            {paymentInputs.map(({ key, label, emoji, value, setter, maxLimit }) => (
               <div key={key} className="flex items-center gap-2">
                 <span className="text-sm w-20 text-slate-600 flex items-center gap-1.5">
                   <span>{emoji}</span> {label}
                 </span>
                 <div className="flex-1">
-                  <NumberInput value={value} onChange={setter} placeholder="0" min={0} />
+                  <NumberInput value={value} onChange={setter} placeholder="0" min={0} max={Math.max(0, maxLimit)} />
                 </div>
                 <Button size="sm" variant="outline" className="text-xs px-3 shrink-0"
                   onClick={() => fillFull(key)}>

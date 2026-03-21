@@ -42,9 +42,18 @@ export function NumberInput({
     const input = e.target.value.replace(/,/g, '')
     // Allow empty, digits, single dot, and leading minus
     if (input !== '' && !/^-?\d*\.?\d*$/.test(input)) return
-    setDisplay(formatDisplay(input))
-    onChange(input)
-  }, [onChange])
+    
+    let num = Number(input)
+    let finalInput = input
+    
+    // Enforce max synchronously
+    if (max !== undefined && !isNaN(num) && num > max) {
+      finalInput = String(max)
+    }
+
+    setDisplay(formatDisplay(finalInput))
+    onChange(finalInput)
+  }, [onChange, max])
 
   const handleFocus = useCallback(() => {
     setFocused(true)

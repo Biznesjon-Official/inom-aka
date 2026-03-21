@@ -27,7 +27,15 @@ export async function POST(req: Request) {
     await connectDB()
     const body = await req.json()
     if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
-    const customer = await Customer.create({ name: body.name.trim(), phone: body.phone, address: body.address, note: body.note })
+    const customer = await Customer.create({ 
+      name: body.name.trim(), 
+      phone: body.phone, 
+      address: body.address, 
+      note: body.note,
+      cashbackPercent: body.cashbackPercent || 0,
+      cashbackStartDate: body.cashbackStartDate ? new Date(body.cashbackStartDate) : undefined,
+      cashbackEndDate: body.cashbackEndDate ? new Date(body.cashbackEndDate) : undefined,
+    })
     return NextResponse.json(customer, { status: 201 })
   } catch (err) { return errorResponse(err) }
 }

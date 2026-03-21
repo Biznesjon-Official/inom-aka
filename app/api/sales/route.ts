@@ -14,10 +14,12 @@ export async function GET(req: Request) {
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     const today = searchParams.get('today')
+    const usta = searchParams.get('usta')
 
     const filter: Record<string, unknown> = {}
     if (cashier) filter.cashier = cashier
     if (customer) filter.customer = customer
+    if (usta) filter.usta = usta
     if (today === '1') {
       const start = new Date()
       start.setHours(0, 0, 0, 0)
