@@ -22,6 +22,7 @@ const ReturnItemSchema = new Schema({
 const SalePaymentSchema = new Schema({
   method: { type: String, enum: ['cash', 'card', 'terminal'], required: true },
   amount: { type: Number, required: true },
+  date: { type: Date, default: Date.now },
 }, { _id: false })
 
 const SaleSchema = new Schema({

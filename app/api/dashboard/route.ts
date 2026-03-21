@@ -15,21 +15,18 @@ export async function GET() {
     const todayStart = new Date(now)
     todayStart.setHours(0, 0, 0, 0)
 
-    // This month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    // Last month
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
 
-    // 30 days ago for chart
     const thirtyDaysAgo = new Date(now)
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29)
     thirtyDaysAgo.setHours(0, 0, 0, 0)
 
     const [
-      todaySalesAgg, todayProfitAgg, todayExpenseAgg,
-      monthSalesAgg, monthProfitAgg, monthExpenseAgg,
-      lastMonthSalesAgg, lastMonthProfitAgg, lastMonthExpenseAgg,
+      todayRevenueAgg, todayProfitAgg, todayExpenseAgg,
+      monthRevenueAgg, monthProfitAgg, monthExpenseAgg,
+      lastMonthRevenueAgg, lastMonthProfitAgg, lastMonthExpenseAgg,
       debtAgg,
       chartSalesAgg, chartExpenseAgg,
       topProductsAgg,
@@ -42,52 +39,67 @@ export async function GET() {
       monthManualDebtAgg,
       lastMonthManualDebtAgg,
       chartManualDebtAgg,
+      todaySalesCountAgg,
+      monthSalesCountAgg,
+      lastMonthSalesCountAgg
     ] = await Promise.all([
-      // Today sales
+      // Today revenue
       Sale.aggregate([
-        { $match: { createdAt: { $gte: todayStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } }, total: { $sum: '$total' } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: todayStart } } },
+        { $group: { _id: null, revenue: { $sum: '$payments.amount' } } },
       ]),
-      // Today profit (sale.total - cost, accounting for discount and returns)
+      // Today profit
       Sale.aggregate([
-        { $match: { createdAt: { $gte: todayStart } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: todayStart } } },
+        { $project: { paymentAmount: '$payments.amount', total: '$total', items: '$items', returnedTotal: { $ifNull: ['$returnedTotal', 0] }, returnedCostTotal: { $ifNull: ['$returnedCostTotal', 0] } }},
         { $unwind: '$items' },
-        { $group: { _id: '$_id', saleTotal: { $first: '$total' }, grossCost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
-        { $group: { _id: null, profit: { $sum: { $subtract: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, { $subtract: ['$grossCost', '$returnedCostTotal'] }] } } } },
+        { $group: { _id: { sid: '$_id', pid: '$payments._id', pamt: '$paymentAmount', tot: '$total', rt: '$returnedTotal', rct: '$returnedCostTotal' }, cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } } } },
+        { $project: { pamt: '$_id.pamt', tot: '$_id.tot', profit: { $subtract: [{ $subtract: ['$_id.tot', '$_id.rt'] }, { $subtract: ['$cost', '$_id.rct'] }] } } },
+        { $group: { _id: null, profit: { $sum: { $cond: [{ $gt: ['$tot', 0] }, { $multiply: ['$profit', { $divide: ['$pamt', '$tot'] }] }, 0] } } } }
       ]),
       // Today expenses
       Expense.aggregate([
         { $match: { date: { $gte: todayStart } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-      // This month sales
+      // This month revenue
       Sale.aggregate([
-        { $match: { createdAt: { $gte: monthStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } }, total: { $sum: '$total' } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: monthStart } } },
+        { $group: { _id: null, revenue: { $sum: '$payments.amount' } } },
       ]),
       // This month profit
       Sale.aggregate([
-        { $match: { createdAt: { $gte: monthStart } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: monthStart } } },
+        { $project: { paymentAmount: '$payments.amount', total: '$total', items: '$items', returnedTotal: { $ifNull: ['$returnedTotal', 0] }, returnedCostTotal: { $ifNull: ['$returnedCostTotal', 0] } }},
         { $unwind: '$items' },
-        { $group: { _id: '$_id', saleTotal: { $first: '$total' }, grossCost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
-        { $group: { _id: null, profit: { $sum: { $subtract: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, { $subtract: ['$grossCost', '$returnedCostTotal'] }] } } } },
+        { $group: { _id: { sid: '$_id', pamt: '$paymentAmount', tot: '$total', rt: '$returnedTotal', rct: '$returnedCostTotal' }, cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } } } },
+        { $project: { pamt: '$_id.pamt', tot: '$_id.tot', profit: { $subtract: [{ $subtract: ['$_id.tot', '$_id.rt'] }, { $subtract: ['$cost', '$_id.rct'] }] } } },
+        { $group: { _id: null, profit: { $sum: { $cond: [{ $gt: ['$tot', 0] }, { $multiply: ['$profit', { $divide: ['$pamt', '$tot'] }] }, 0] } } } }
       ]),
       // This month expenses
       Expense.aggregate([
         { $match: { date: { $gte: monthStart } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-      // Last month sales
+      // Last month revenue
       Sale.aggregate([
-        { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
-        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] } } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+        { $group: { _id: null, revenue: { $sum: '$payments.amount' } } },
       ]),
       // Last month profit
       Sale.aggregate([
-        { $match: { createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+        { $project: { paymentAmount: '$payments.amount', total: '$total', items: '$items', returnedTotal: { $ifNull: ['$returnedTotal', 0] }, returnedCostTotal: { $ifNull: ['$returnedCostTotal', 0] } }},
         { $unwind: '$items' },
-        { $group: { _id: '$_id', saleTotal: { $first: '$total' }, grossCost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } }, returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } }, returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } } } },
-        { $group: { _id: null, profit: { $sum: { $subtract: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, { $subtract: ['$grossCost', '$returnedCostTotal'] }] } } } },
+        { $group: { _id: { sid: '$_id', pamt: '$paymentAmount', tot: '$total', rt: '$returnedTotal', rct: '$returnedCostTotal' }, cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } } } },
+        { $project: { pamt: '$_id.pamt', tot: '$_id.tot', profit: { $subtract: [{ $subtract: ['$_id.tot', '$_id.rt'] }, { $subtract: ['$cost', '$_id.rct'] }] } } },
+        { $group: { _id: null, profit: { $sum: { $cond: [{ $gt: ['$tot', 0] }, { $multiply: ['$profit', { $divide: ['$pamt', '$tot'] }] }, 0] } } } }
       ]),
       // Last month expenses
       Expense.aggregate([
@@ -99,142 +111,71 @@ export async function GET() {
         { $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } },
         { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
       ]),
-      // 30-day chart: sales grouped by date
+      // Chart Revenue & Profit
       Sale.aggregate([
-        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: thirtyDaysAgo } } },
+        { $project: { pamt: '$payments.amount', date: '$payments.date', total: '$total', items: '$items', rt: { $ifNull: ['$returnedTotal', 0] }, rct: { $ifNull: ['$returnedCostTotal', 0] } }},
         { $unwind: '$items' },
-        {
-          $group: {
-            _id: { saleId: '$_id', date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
-            paid: { $first: '$paid' },
-            saleTotal: { $first: '$total' },
-            returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
-            returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
-            grossCost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } },
-          },
-        },
-        {
-          $group: {
-            _id: '$_id.date',
-            revenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] } },
-            profit: { $sum: { $subtract: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, { $subtract: ['$grossCost', '$returnedCostTotal'] }] } },
-          },
-        },
-        { $sort: { _id: 1 } },
+        { $group: { _id: { sid: '$_id', pdate: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }, pamt: '$pamt', tot: '$total', rt: '$rt', rct: '$rct' }, cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } } } },
+        { $project: { pamt: '$_id.pamt', tot: '$_id.tot', date: '$_id.pdate', profit: { $subtract: [{ $subtract: ['$_id.tot', '$_id.rt'] }, { $subtract: ['$cost', '$_id.rct'] }] } } },
+        { $group: { _id: '$date', revenue: { $sum: '$pamt' }, profit: { $sum: { $cond: [{ $gt: ['$tot', 0] }, { $multiply: ['$profit', { $divide: ['$pamt', '$tot'] }] }, 0] } } } }
       ]).allowDiskUse(true),
-      // 30-day chart: expenses grouped by date
+      // Chart expenses
       Expense.aggregate([
         { $match: { date: { $gte: thirtyDaysAgo } } },
-        {
-          $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
-            expense: { $sum: '$amount' },
-          },
-        },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }, expense: { $sum: '$amount' } } }
       ]).allowDiskUse(true),
-      // Today's top 5 products
+      // Top 5 products
       Sale.aggregate([
         { $match: { createdAt: { $gte: todayStart } } },
         { $unwind: '$items' },
-        {
-          $group: {
-            _id: '$items.productName',
-            qty: { $sum: '$items.qty' },
-            revenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
-          },
-        },
+        { $group: { _id: '$items.productName', qty: { $sum: '$items.qty' }, revenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } } } },
         { $sort: { qty: -1 } },
         { $limit: 5 },
         { $project: { _id: 0, name: '$_id', qty: 1, revenue: 1 } },
       ]),
-      // Low stock products (stock <= 5, only active ones)
-      Product.find({ stock: { $lte: 5 }, isActive: true })
-        .select('name stock unit salePrice')
-        .sort({ stock: 1 })
-        .limit(10)
-        .lean(),
-      // Today payment methods (scaled by return ratio for full-payment sales)
+      Product.find({ stock: { $lte: 5 }, isActive: true }).select('name stock unit salePrice').sort({ stock: 1 }).limit(10).lean(),
+      // Payment methods
       Sale.aggregate([
-        { $match: { createdAt: { $gte: todayStart } } },
-        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
-        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
-        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
-      ]),
-      // Month payment methods (scaled by return ratio for full-payment sales)
-      Sale.aggregate([
-        { $match: { createdAt: { $gte: monthStart } } },
-        { $addFields: { effectiveRatio: { $cond: [{ $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] }, { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] }, 1] } } },
-        { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-        { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
-        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
-      ]),
-      // Product stats for dashboard
-      Product.aggregate([
-        { $match: { isActive: true } },
-        {
-          $group: {
-            _id: null,
-            totalProducts: { $sum: 1 },
-            warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } },
-          },
-        },
-      ]),
-      // Personal debts
-      PersonalDebt.aggregate([
-        { $match: { status: 'active' } },
-        { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
-      ]),
-      // Manual Debt payments for today
-      Debt.aggregate([
-        { $match: { sale: { $exists: false } } },
         { $unwind: '$payments' },
         { $match: { 'payments.date': { $gte: todayStart } } },
-        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }
       ]),
-      // Manual Debt payments for this month
-      Debt.aggregate([
-        { $match: { sale: { $exists: false } } },
+      Sale.aggregate([
         { $unwind: '$payments' },
         { $match: { 'payments.date': { $gte: monthStart } } },
-        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
+        { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+        { $project: { _id: 0, method: '$_id', total: 1, count: 1 } }
       ]),
-      // Manual Debt payments for last month
-      Debt.aggregate([
-        { $match: { sale: { $exists: false } } },
-        { $unwind: '$payments' },
-        { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } },
-        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
-      ]),
-      // Manual Debt 30-day chart
-      Debt.aggregate([
-        { $match: { sale: { $exists: false } } },
-        { $unwind: '$payments' },
-        { $match: { 'payments.date': { $gte: thirtyDaysAgo } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, amount: { $sum: '$payments.amount' } } }
-      ]).allowDiskUse(true),
+      Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]),
+      PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]),
+      Debt.aggregate([{ $match: { sale: { $exists: false } } }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: todayStart } } }, { $group: { _id: null, amount: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: { sale: { $exists: false } } }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: monthStart } } }, { $group: { _id: null, amount: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: { sale: { $exists: false } } }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } }, { $group: { _id: null, amount: { $sum: '$payments.amount' } } }]),
+      Debt.aggregate([{ $match: { sale: { $exists: false } } }, { $unwind: '$payments' }, { $match: { 'payments.date': { $gte: thirtyDaysAgo } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, amount: { $sum: '$payments.amount' } } }]),
+      Sale.countDocuments({ createdAt: { $gte: todayStart } }),
+      Sale.countDocuments({ createdAt: { $gte: monthStart } }),
+      Sale.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
     ]) as any
 
     const todayManualDebt = todayManualDebtAgg[0]?.amount || 0
     const monthManualDebt = monthManualDebtAgg[0]?.amount || 0
     const lastMonthManualDebt = lastMonthManualDebtAgg[0]?.amount || 0
 
-    const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
+    const todayRevenue = (todayRevenueAgg[0]?.revenue || 0) + todayManualDebt
     const todayProfit = (todayProfitAgg[0]?.profit || 0) + todayManualDebt
-    const todayRevenue = (todayData.revenue || 0) + todayManualDebt
     const todayExpenses = todayExpenseAgg[0]?.total || 0
 
-    const monthData = monthSalesAgg[0] || { count: 0, revenue: 0, total: 0 }
+    const monthRevenue = (monthRevenueAgg[0]?.revenue || 0) + monthManualDebt
     const monthProfit = (monthProfitAgg[0]?.profit || 0) + monthManualDebt
-    const monthRevenue = (monthData.revenue || 0) + monthManualDebt
     const monthExpenses = monthExpenseAgg[0]?.total || 0
 
-    const lastMonthData = lastMonthSalesAgg[0] || { count: 0, revenue: 0 }
+    const lastMonthRevenue = (lastMonthRevenueAgg[0]?.revenue || 0) + lastMonthManualDebt
     const lastMonthProfit = (lastMonthProfitAgg[0]?.profit || 0) + lastMonthManualDebt
-    const lastMonthRevenue = (lastMonthData.revenue || 0) + lastMonthManualDebt
     const lastMonthExpenses = lastMonthExpenseAgg[0]?.total || 0
 
-    // Build 30-day chart
     const expenseMap = new Map<string, number>(chartExpenseAgg.map((d: any) => [d._id, d.expense || d.total || 0]))
     const salesMap = new Map<string, { revenue: number; profit: number }>(chartSalesAgg.map((d: any) => [d._id, { revenue: d.revenue, profit: d.profit }]))
     const manualDebtMap = new Map<string, number>(chartManualDebtAgg.map((d: any) => [d._id, d.amount]))
@@ -244,10 +185,10 @@ export async function GET() {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
       const key = d.toISOString().slice(0, 10)
-      const sale = salesMap.get(key) as { revenue: number; profit: number } | undefined
+      const sale = salesMap.get(key)
       const manualDebt = Number(manualDebtMap.get(key)) || 0
       chart.push({
-        date: key.slice(5), // MM-DD
+        date: key.slice(5),
         revenue: (sale?.revenue || 0) + manualDebt,
         profit: (sale?.profit || 0) + manualDebt,
         expense: (expenseMap.get(key) as number) || 0,
@@ -255,27 +196,9 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      today: {
-        sales: todayData.count,
-        revenue: todayRevenue,
-        profit: todayProfit,
-        expenses: todayExpenses,
-        netProfit: todayProfit - todayExpenses,
-      },
-      month: {
-        sales: monthData.count,
-        revenue: monthRevenue,
-        profit: monthProfit,
-        expenses: monthExpenses,
-        netProfit: monthProfit - monthExpenses,
-      },
-      lastMonth: {
-        sales: lastMonthData.count,
-        revenue: lastMonthRevenue,
-        profit: lastMonthProfit,
-        expenses: lastMonthExpenses,
-        netProfit: lastMonthProfit - lastMonthExpenses,
-      },
+      today: { sales: todaySalesCountAgg, revenue: todayRevenue, profit: todayProfit, expenses: todayExpenses, netProfit: todayProfit - todayExpenses },
+      month: { sales: monthSalesCountAgg, revenue: monthRevenue, profit: monthProfit, expenses: monthExpenses, netProfit: monthProfit - monthExpenses },
+      lastMonth: { sales: lastMonthSalesCountAgg, revenue: lastMonthRevenue, profit: lastMonthProfit, expenses: lastMonthExpenses, netProfit: lastMonthProfit - lastMonthExpenses },
       customerDebt: debtAgg[0]?.total || 0,
       personalDebt: personalDebtAgg[0]?.total || 0,
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
