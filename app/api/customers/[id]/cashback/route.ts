@@ -48,7 +48,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       { 
         $group: { 
           _id: null, 
-          totalPaid: { $sum: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] } } 
+          totalPaid: { $sum: { $max: [0, { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] }] } } 
         } 
       },
     ])
