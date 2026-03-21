@@ -21,20 +21,68 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const customerId = new Types.ObjectId(id)
 
-    // Find last archive payout to define the start of the current period
     const lastArchive = await CashbackPayout.findOne({ customer: customerId, type: 'archive' }).sort({ periodTo: -1 }).lean() as { periodTo: Date } | null
-    
+    let currentLastArchive = lastArchive
+    let cEnd = customer.cashbackEndDate ? new Date(customer.cashbackEndDate) : null
+
+    // Auto-archive passed periods
+    let changed = false
+    while (cEnd && new Date() > cEnd) {
+      changed = true
+      const pTo = new Date(cEnd)
+      const pFrom = currentLastArchive && currentLastArchive.periodTo ? new Date(currentLastArchive.periodTo) : new Date('2000-01-01')
+
+      const salesAggBefore = await Sale.aggregate([
+        {
+          $match: {
+            $or: [{ customer: customerId }, { usta: customerId }],
+            createdAt: { $gt: pFrom, $lte: pTo },
+          },
+        },
+        { 
+          $group: { 
+            _id: null, 
+            totalPaid: { $sum: { $max: [0, { $subtract: ['$paid', { $ifNull: ['$returnedTotal', 0] }] }] } } 
+          } 
+        },
+      ])
+      
+      const tSales = salesAggBefore[0]?.totalPaid || 0
+      const calcAmt = Math.round(tSales * (customer.cashbackPercent || 0) / 100)
+      
+      if (calcAmt > 0 || tSales > 0) {
+        currentLastArchive = await CashbackPayout.create({
+          customer: id,
+          amount: calcAmt,
+          periodFrom: pFrom,
+          periodTo: pTo,
+          totalSales: tSales,
+          percent: customer.cashbackPercent || 0,
+          type: 'archive',
+          note: `Avtomatik arxiv`,
+        }) as any
+      } else {
+        currentLastArchive = { periodTo: new Date(pTo) } as any
+      }
+      
+      // Advance by 1 month
+      cEnd.setMonth(cEnd.getMonth() + 1)
+    }
+
+    if (changed && cEnd) {
+      await Customer.findByIdAndUpdate(id, { cashbackEndDate: cEnd })
+      customer.cashbackEndDate = cEnd
+    }
+
     let periodFrom: Date
     let periodTo: Date
     
-    // Determine the calculation boundary based on whether a target date ('to') is provided
-    // For Usta Detail view, 'to' will be passed as the cashbackEndDate or current time.
+    // Determine the calculation boundary for the CURRENT active period
     if (from && to) {
-      // Legacy or forced bounds
       periodFrom = new Date(from)
       periodTo = new Date(to)
     } else {
-      periodFrom = lastArchive && lastArchive.periodTo ? new Date(lastArchive.periodTo) : new Date('2000-01-01')
+      periodFrom = currentLastArchive && currentLastArchive.periodTo ? new Date(currentLastArchive.periodTo) : new Date('2000-01-01')
       periodTo = customer.cashbackEndDate ? new Date(customer.cashbackEndDate) : new Date()
     }
 

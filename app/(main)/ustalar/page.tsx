@@ -57,7 +57,6 @@ export default function UstalarPage() {
   const [salesLoading, setSalesLoading] = useState(false)
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
-  const [closingPeriod, setClosingPeriod] = useState(false)
 
   const debouncedSearch = useDebounce(search)
   const fetchUstalar = useCallback(async () => {
@@ -141,52 +140,7 @@ export default function UstalarPage() {
     fetchUstalar()
   }
 
-  async function handleClosePeriod() {
-    if (!detailUsta || !cashbackData) return
-    if (!confirm('Davrni yopishni va to\'plamcha qilishni tasdiqlaysizmi? Hozirgi hisoblangan barcha summa arxivga ketadi.')) return
 
-    if (cashbackData.calculatedAmount <= 0) {
-      return toast.error('Arxivlash uchun hisoblangan foiz yo\'q')
-    }
-
-    setClosingPeriod(true)
-    // Create archive payout
-    const payoutRes = await fetch(`/api/customers/${detailUsta._id}/cashback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: cashbackData.calculatedAmount,
-        periodFrom: cashbackData.periodFrom,
-        periodTo: cashbackData.periodTo,
-        totalSales: cashbackData.totalSales,
-        percent: cashbackData.percent,
-        type: 'archive',
-        note: `Davr oxiri (Arxivlandi)`,
-      }),
-    })
-    if (!payoutRes.ok) { setClosingPeriod(false); return toast.error('Arxivlashda xato') }
-
-    // Update customer dates: new end = old end + 1 year
-    const nextEndDate = detailUsta.cashbackEndDate ? new Date(detailUsta.cashbackEndDate) : new Date()
-    nextEndDate.setFullYear(nextEndDate.getFullYear() + 1)
-
-    const updateRes = await fetch(`/api/customers/${detailUsta._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cashbackEndDate: nextEndDate.toISOString()
-      }),
-    })
-
-    setClosingPeriod(false)
-    if (!updateRes.ok) return toast.error('Mijozni yangilashda xato, arxiv saqlandi.')
-    
-    toast.success('Davr yopildi, yangi davr boshlandi')
-    fetchUstalar()
-    
-    const updatedCustomer = await updateRes.json()
-    setDetailUsta(updatedCustomer)
-  }
 
   return (
     <div className="space-y-4">
@@ -408,7 +362,7 @@ export default function UstalarPage() {
                       Davr: {cashbackData ? new Date(cashbackData.periodFrom).toLocaleDateString('uz-UZ') : '...'} dan{' '}
                       {cashbackData ? new Date(cashbackData.periodTo).toLocaleDateString('uz-UZ') : '...'} gacha
                       <br/>
-                      Ushbu sanalar ichidagi sotuvlar ustaning <b>qolgan toza tushumi</b> orqali (ya'ni tovar qaytarilganlari ayrilib) qattiq hisoblangan holda shakllantirildi. Davrni yopish orqali buni arxivlab qo'yishingiz mumkin.
+                      Ushbu sanalar ichidagi sotuvlar ustaning <b>qolgan toza tushumi</b> orqali (ya'ni tovar qaytarilganlari ayrilib) qattiq hisoblangan holda shakllantirildi. Belgilangan sana kelishi bilan ushbu summa <b>avtomatik arxivlanadi</b> va yangi davr boshlanadi.
                     </div>
 
                     {cashbackLoading ? (
@@ -434,16 +388,6 @@ export default function UstalarPage() {
                           </div>
                         </div>
 
-                        <div className="border rounded-lg p-4 space-y-3 mt-4">
-                          <div className="text-sm font-medium text-slate-700">Shartnomani yakunlash</div>
-                          <div className="text-xs text-slate-500">
-                            "Davrni yopish" tugmasi hozirgi hisoblangan {formatPrice(cashbackData.calculatedAmount)} summani arxivga oladi. 
-                            So'ng, qaytadan keyingi 1 yil uchun hisoblash boshlanadi. Davr yakunlangandan keyin usta pulini "Xarajatlar" sahifasida berasiz.
-                          </div>
-                          <Button size="sm" className="w-full" onClick={handleClosePeriod} disabled={closingPeriod}>
-                            {closingPeriod ? 'Arxivlanmoqda...' : 'Davrni yopish va arxivlash'}
-                          </Button>
-                        </div>
 
                         {cashbackData.payouts.length > 0 && (
                           <div className="space-y-2 mt-4">
