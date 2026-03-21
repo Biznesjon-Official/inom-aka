@@ -23,18 +23,38 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
     }
 
-    const periodFrom = new Date(from)
-    const periodTo = new Date(to)
     const customerId = new Types.ObjectId(id)
+
+    // Find last archive payout to define the start of the current period
+    const lastArchive = await CashbackPayout.findOne({ customer: customerId, type: 'archive' }).sort({ periodTo: -1 }).lean() as { periodTo: Date } | null
+    
+    let periodFrom: Date
+    let periodTo: Date
+    
+    // Determine the calculation boundary based on whether a target date ('to') is provided
+    // For Usta Detail view, 'to' will be passed as the cashbackEndDate or current time.
+    if (from && to) {
+      // Legacy or forced bounds
+      periodFrom = new Date(from)
+      periodTo = new Date(to)
+    } else {
+      periodFrom = lastArchive && lastArchive.periodTo ? new Date(lastArchive.periodTo) : new Date('2000-01-01')
+      periodTo = customer.cashbackEndDate ? new Date(customer.cashbackEndDate) : new Date()
+    }
 
     const salesAgg = await Sale.aggregate([
       {
         $match: {
           $or: [{ customer: customerId }, { usta: customerId }],
-          createdAt: { $gte: periodFrom, $lte: periodTo },
+          createdAt: { $gt: periodFrom, $lte: periodTo },
         },
       },
-      { $group: { _id: null, totalPaid: { $sum: '$paid' } } },
+      { 
+        $group: { 
+          _id: null, 
+          totalPaid: { $sum: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] } } 
+        } 
+      },
     ])
     const totalSales = salesAgg[0]?.totalPaid || 0
 
@@ -44,6 +64,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           customer: customerId,
           periodFrom: { $gte: periodFrom },
           periodTo: { $lte: periodTo },
+          type: { $ne: 'archive' } // other manual deductions? User said no inputs needed.
         },
       },
       { $group: { _id: null, totalPaid: { $sum: '$amount' } } },
@@ -52,9 +73,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const payouts = await CashbackPayout.find({
       customer: customerId,
-      periodFrom: { $gte: periodFrom },
-      periodTo: { $lte: periodTo },
-    }).sort({ createdAt: -1 }).lean()
+      type: 'archive'
+    }).sort({ periodTo: -1 }).lean()
 
     const percent = customer.cashbackPercent || 0
     const calculatedAmount = Math.round(totalSales * percent / 100)
@@ -67,6 +87,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       alreadyPaid,
       remaining,
       payouts,
+      periodFrom,
+      periodTo
     })
   } catch (err) { return errorResponse(err) }
 }

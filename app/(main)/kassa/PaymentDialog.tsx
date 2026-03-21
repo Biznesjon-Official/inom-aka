@@ -87,6 +87,8 @@ export const PaymentDialog = React.memo(function PaymentDialog({
   const costTotal = cart.reduce((s, c) => s + c.costPrice * c.qty, 0)
   const profit = finalTotal - costTotal
 
+  const [debtors, setDebtors] = useState<{name: string, phone: string}[]>([])
+
   // Reset when dialog opens
   useEffect(() => {
     if (open) {
@@ -97,6 +99,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
       setUstaId('none')
       setDebtorName('')
       setDebtorPhone('')
+      fetch('/api/debts/debtors').then(r => r.json()).then(setDebtors).catch(() => {})
     }
   }, [open])
 
@@ -217,7 +220,22 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             <div className="space-y-2">
               <div className="space-y-1.5">
                 <Label>Qarzdor ismi <span className="text-red-500">*</span></Label>
-                <Input placeholder="Ism familiya" value={debtorName} onChange={e => setDebtorName(e.target.value)} />
+                <Input 
+                  list="debtors-list" 
+                  placeholder="Ism familiya" 
+                  value={debtorName} 
+                  onChange={e => {
+                    const val = e.target.value
+                    setDebtorName(val)
+                    const exact = debtors.find(d => d.name === val)
+                    if (exact && exact.phone && !debtorPhone) setDebtorPhone(exact.phone)
+                  }} 
+                />
+                <datalist id="debtors-list">
+                  {debtors.map((d, i) => (
+                    <option key={i} value={d.name} />
+                  ))}
+                </datalist>
               </div>
               <div className="space-y-1.5">
                 <Label>Telefon raqam <span className="text-red-500">*</span></Label>

@@ -9,13 +9,17 @@ export async function GET(req: Request) {
     await connectDB()
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search')
-    const filter: Record<string, unknown> = {}
+    const filter: any = {}
     if (search) {
       const escaped = escapeRegex(search)
       filter.$or = [
         { name: { $regex: escaped, $options: 'i' } },
         { phone: { $regex: escaped, $options: 'i' } },
       ]
+      const asNum = Number(search)
+      if (!isNaN(asNum)) {
+        filter.$or.push({ seqNo: asNum })
+      }
     }
     const customers = await Customer.find(filter).sort({ name: 1 }).limit(200).lean()
     return NextResponse.json(customers)
