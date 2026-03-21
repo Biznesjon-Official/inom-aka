@@ -14,10 +14,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const from = searchParams.get('from')
     const to = searchParams.get('to')
 
-    if (!from || !to) {
-      return NextResponse.json({ error: 'from and to required' }, { status: 400 })
-    }
-
     const customer = await Customer.findById(id)
     if (!customer) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
