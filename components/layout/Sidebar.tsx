@@ -18,7 +18,7 @@ const adminNav = [
 { href: '/qarzlar', label: 'Qarz daftarcha', icon: BookOpen },
   { href: '/shaxsiy-qarzlar', label: 'Shaxsiy qarzlar', icon: Wallet },
   { href: '/xarajatlar', label: 'Xarajatlar', icon: TrendingDown },
-  { href: '/mijozlar', label: 'Mijozlar', icon: Users },
+  { href: '/ustalar', label: 'Ustalar', icon: Users },
   { href: '/ishchilar', label: 'Ishchilar', icon: UserCog },
   { href: '/sozlamalar', label: 'Sozlamalar', icon: Settings },
 ]

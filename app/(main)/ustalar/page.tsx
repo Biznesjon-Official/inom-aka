@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatPrice, getMonthRange, getYearRange } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks'
 
-interface Customer {
+interface Usta {
   _id: string; name: string; phone?: string; address?: string; note?: string; totalDebt: number; cashbackPercent: number
 }
 
@@ -22,7 +22,7 @@ interface CashbackData {
   payouts: { _id: string; amount: number; type: string; note?: string; createdAt: string }[]
 }
 
-interface CustomerSale {
+interface UstaSale {
   _id: string
   receiptNo: number
   total: number
@@ -35,23 +35,23 @@ interface CustomerSale {
 
 const emptyForm = { name: '', phone: '', address: '', note: '', cashbackPercent: 0 }
 
-export default function MijozlarPage() {
-  const [customers, setCustomers] = useState<Customer[]>([])
+export default function UstalarPage() {
+  const [ustalar, setUstalar] = useState<Usta[]>([])
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState(false)
-  const [editing, setEditing] = useState<Customer | null>(null)
+  const [editing, setEditing] = useState<Usta | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(false)
 
   // Detail dialog state
-  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
+  const [detailUsta, setDetailUsta] = useState<Usta | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [period, setPeriod] = useState<'month' | 'year'>('month')
   const [cashbackData, setCashbackData] = useState<CashbackData | null>(null)
   const [cashbackLoading, setCashbackLoading] = useState(false)
 
-  // Customer sales
-  const [customerSales, setCustomerSales] = useState<CustomerSale[]>([])
+  // Usta sales
+  const [ustaSales, setUstaSales] = useState<UstaSale[]>([])
   const [salesLoading, setSalesLoading] = useState(false)
 
   // Payout form
@@ -62,57 +62,57 @@ export default function MijozlarPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
 
   const debouncedSearch = useDebounce(search)
-  const fetchCustomers = useCallback(async () => {
+  const fetchUstalar = useCallback(async () => {
     const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
-    if (!res.ok) return toast.error('Mijozlarni yuklashda xato')
-    setCustomers(await res.json())
+    if (!res.ok) return toast.error('Ustalarni yuklashda xato')
+    setUstalar(await res.json())
   }, [debouncedSearch])
 
-  useEffect(() => { fetchCustomers() }, [fetchCustomers])
+  useEffect(() => { fetchUstalar() }, [fetchUstalar])
 
   // Fetch cashback data when detail dialog opens or period changes
   const fetchCashback = useCallback(async () => {
-    if (!detailCustomer) return
+    if (!detailUsta) return
     setCashbackLoading(true)
     const range = period === 'month' ? getMonthRange() : getYearRange()
     const from = range.from.toISOString()
     const to = range.to.toISOString()
-    const res = await fetch(`/api/customers/${detailCustomer._id}/cashback?from=${from}&to=${to}`)
+    const res = await fetch(`/api/customers/${detailUsta._id}/cashback?from=${from}&to=${to}`)
     if (!res.ok) { setCashbackLoading(false); return toast.error('Cashback ma\'lumotlarini yuklashda xato') }
     setCashbackData(await res.json())
     setCashbackLoading(false)
-  }, [detailCustomer, period])
+  }, [detailUsta, period])
 
-  const fetchCustomerSales = useCallback(async () => {
-    if (!detailCustomer) return
+  const fetchUstaSales = useCallback(async () => {
+    if (!detailUsta) return
     setSalesLoading(true)
-    const res = await fetch(`/api/sales?customer=${detailCustomer._id}`)
+    const res = await fetch(`/api/sales?customer=${detailUsta._id}`)
     if (res.ok) {
-      setCustomerSales(await res.json())
+      setUstaSales(await res.json())
     }
     setSalesLoading(false)
-  }, [detailCustomer])
+  }, [detailUsta])
 
   useEffect(() => {
     if (detailOpen) {
       fetchCashback()
-      fetchCustomerSales()
+      fetchUstaSales()
     }
-  }, [detailOpen, fetchCashback, fetchCustomerSales])
+  }, [detailOpen, fetchCashback, fetchUstaSales])
 
   function openAdd() { setEditing(null); setForm(emptyForm); setDialog(true) }
-  function openEdit(e: React.MouseEvent, c: Customer) {
+  function openEdit(e: React.MouseEvent, c: Usta) {
     e.stopPropagation()
     setEditing(c)
     setForm({ name: c.name, phone: c.phone || '', address: c.address || '', note: c.note || '', cashbackPercent: c.cashbackPercent || 0 })
     setDialog(true)
   }
 
-  function openDetail(c: Customer) {
-    setDetailCustomer(c)
+  function openDetail(c: Usta) {
+    setDetailUsta(c)
     setPeriod('month')
     setCashbackData(null)
-    setCustomerSales([])
+    setUstaSales([])
     setPayoutAmount('')
     setPayoutNote('')
     setPayoutType('money')
@@ -129,7 +129,7 @@ export default function MijozlarPage() {
     if (!res.ok) return toast.error('Xato')
     toast.success(editing ? 'Yangilandi' : 'Qo\'shildi')
     setDialog(false)
-    fetchCustomers()
+    fetchUstalar()
   }
 
   async function handleDelete(e: React.MouseEvent, id: string) {
@@ -138,18 +138,18 @@ export default function MijozlarPage() {
     const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
     if (!res.ok) return toast.error('O\'chirishda xato')
     toast.success('O\'chirildi')
-    fetchCustomers()
+    fetchUstalar()
   }
 
   async function handlePayout() {
-    if (!detailCustomer || !cashbackData) return
+    if (!detailUsta || !cashbackData) return
     const amount = Number(payoutAmount)
     if (!amount || amount <= 0) return toast.error('Summani kiriting')
     if (amount > cashbackData.remaining) return toast.error('Qoldiqdan ko\'p bo\'lishi mumkin emas')
 
     setPayoutLoading(true)
     const range = period === 'month' ? getMonthRange() : getYearRange()
-    const res = await fetch(`/api/customers/${detailCustomer._id}/cashback`, {
+    const res = await fetch(`/api/customers/${detailUsta._id}/cashback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -173,7 +173,7 @@ export default function MijozlarPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Mijozlar</h1>
+        <h1 className="text-xl font-bold text-slate-800">Ustalar</h1>
         <div className="flex gap-2">
           <div className="flex border rounded-lg overflow-hidden">
             <button className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-100' : 'hover:bg-slate-50'}`} onClick={() => setViewMode('grid')}>
@@ -183,13 +183,13 @@ export default function MijozlarPage() {
               <List className="w-4 h-4 text-slate-600" />
             </button>
           </div>
-          <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Qo&apos;shish</Button>
+          <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Usta qo&apos;shish</Button>
         </div>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input placeholder="Ism yoki telefon qidirish..." className="pl-9" value={search}
+        <Input placeholder="Usta ismi yoki telefon qidirish..." className="pl-9" value={search}
           onChange={e => setSearch(e.target.value)} />
       </div>
 
@@ -207,7 +207,7 @@ export default function MijozlarPage() {
               </tr>
             </thead>
             <tbody>
-              {customers.map(c => (
+              {ustalar.map(c => (
                 <tr key={c._id} className="border-b last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => openDetail(c)}>
                   <td className="px-4 py-3 font-medium text-slate-800">{c.name}</td>
                   <td className="px-4 py-3 text-slate-500">{c.phone || '—'}</td>
@@ -234,13 +234,13 @@ export default function MijozlarPage() {
               ))}
             </tbody>
           </table>
-          {customers.length === 0 && (
-            <div className="text-center text-slate-400 py-12">Mijoz topilmadi</div>
+          {ustalar.length === 0 && (
+            <div className="text-center text-slate-400 py-12">Usta topilmadi</div>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {customers.map(c => (
+          {ustalar.map(c => (
             <Card key={c._id} className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => openDetail(c)}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -283,8 +283,8 @@ export default function MijozlarPage() {
               </CardContent>
             </Card>
           ))}
-          {customers.length === 0 && (
-            <div className="col-span-full text-center text-slate-400 py-12">Mijoz topilmadi</div>
+          {ustalar.length === 0 && (
+            <div className="col-span-full text-center text-slate-400 py-12">Usta topilmadi</div>
           )}
         </div>
       )}
@@ -293,7 +293,7 @@ export default function MijozlarPage() {
       <Dialog open={dialog} onOpenChange={setDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Tahrirlash' : 'Yangi mijoz'}</DialogTitle>
+            <DialogTitle>{editing ? 'Tahrirlash' : 'Yangi usta'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -330,20 +330,20 @@ export default function MijozlarPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-500" />
-              {detailCustomer?.name}
+              {detailUsta?.name}
             </DialogTitle>
           </DialogHeader>
 
-          {detailCustomer && (
+          {detailUsta && (
             <div className="space-y-4">
-              {/* Customer sales history */}
+              {/* Usta sales history */}
               <div className="space-y-2">
-                <div className="text-sm font-medium text-slate-700">Savdo tarixi ({customerSales.length})</div>
+                <div className="text-sm font-medium text-slate-700">Savdo tarixi ({ustaSales.length})</div>
                 {salesLoading ? (
                   <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>
-                ) : customerSales.length > 0 ? (
+                ) : ustaSales.length > 0 ? (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {customerSales.map(sale => (
+                    {ustaSales.map(sale => (
                       <div key={sale._id} className="bg-slate-50 rounded-lg p-2.5 text-xs">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
@@ -372,7 +372,7 @@ export default function MijozlarPage() {
               </div>
 
               {/* Cashback section */}
-              {detailCustomer.cashbackPercent > 0 && (
+              {detailUsta.cashbackPercent > 0 && (
                 <>
                   <div className="border-t pt-4">
                     <div className="flex items-center gap-2 mb-3">

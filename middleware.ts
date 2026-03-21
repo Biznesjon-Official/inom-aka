@@ -27,7 +27,7 @@ export default withAuth(
     }
 
     // Admin-only routes
-    const adminRoutes = ['/dashboard', '/tovarlar', '/sotuvlar', '/xarajatlar', '/mijozlar', '/ishchilar', '/hisobot', '/sozlamalar', '/shaxsiy-qarzlar']
+    const adminRoutes = ['/dashboard', '/tovarlar', '/sotuvlar', '/xarajatlar', '/ustalar', '/ishchilar', '/hisobot', '/sozlamalar', '/shaxsiy-qarzlar']
     if (adminRoutes.some(r => path.startsWith(r)) && token?.role !== 'admin') {
       return NextResponse.redirect(new URL('/kassa', req.url))
     }
@@ -42,5 +42,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/sotuvlar/:path*', '/qarzlar/:path*', '/shaxsiy-qarzlar/:path*', '/xarajatlar/:path*', '/mijozlar/:path*', '/ishchilar/:path*', '/sozlamalar/:path*', '/hisobot/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/personal-debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*', '/api/settings/:path*', '/api/reports/:path*', '/api/saved-carts/:path*', '/api/product-stats/:path*'],
+  matcher: ['/dashboard/:path*', '/kassa/:path*', '/tovarlar/:path*', '/sotuvlar/:path*', '/qarzlar/:path*', '/shaxsiy-qarzlar/:path*', '/xarajatlar/:path*', '/ustalar/:path*', '/ishchilar/:path*', '/sozlamalar/:path*', '/hisobot/:path*', '/api/customers/:path*', '/api/products/:path*', '/api/sales/:path*', '/api/debts/:path*', '/api/personal-debts/:path*', '/api/workers/:path*', '/api/expenses/:path*', '/api/expense-sources/:path*', '/api/dashboard/:path*', '/api/categories/:path*', '/api/settings/:path*', '/api/reports/:path*', '/api/saved-carts/:path*', '/api/product-stats/:path*'],
 }
