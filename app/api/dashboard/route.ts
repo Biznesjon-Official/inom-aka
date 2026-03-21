@@ -38,6 +38,10 @@ export async function GET() {
       monthPaymentMethodsAgg,
       productStatsAgg,
       personalDebtAgg,
+      todayManualDebtAgg,
+      monthManualDebtAgg,
+      lastMonthManualDebtAgg,
+      chartManualDebtAgg,
     ] = await Promise.all([
       // Today sales
       Sale.aggregate([
@@ -181,40 +185,72 @@ export async function GET() {
         { $match: { status: 'active' } },
         { $group: { _id: null, total: { $sum: '$remainingAmount' } } },
       ]),
-    ])
+      // Manual Debt payments for today
+      Debt.aggregate([
+        { $match: { sale: { $exists: false } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: todayStart } } },
+        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
+      ]),
+      // Manual Debt payments for this month
+      Debt.aggregate([
+        { $match: { sale: { $exists: false } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: monthStart } } },
+        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
+      ]),
+      // Manual Debt payments for last month
+      Debt.aggregate([
+        { $match: { sale: { $exists: false } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+        { $group: { _id: null, amount: { $sum: '$payments.amount' } } }
+      ]),
+      // Manual Debt 30-day chart
+      Debt.aggregate([
+        { $match: { sale: { $exists: false } } },
+        { $unwind: '$payments' },
+        { $match: { 'payments.date': { $gte: thirtyDaysAgo } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, amount: { $sum: '$payments.amount' } } }
+      ]).allowDiskUse(true),
+    ]) as any
 
-    // Sale.paid is updated on every debt payment, so no separate manualDebt aggregation needed
+    const todayManualDebt = todayManualDebtAgg[0]?.amount || 0
+    const monthManualDebt = monthManualDebtAgg[0]?.amount || 0
+    const lastMonthManualDebt = lastMonthManualDebtAgg[0]?.amount || 0
 
     const todayData = todaySalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const todayProfit = todayProfitAgg[0]?.profit || 0
-    const todayRevenue = todayData.revenue || 0
+    const todayProfit = (todayProfitAgg[0]?.profit || 0) + todayManualDebt
+    const todayRevenue = (todayData.revenue || 0) + todayManualDebt
     const todayExpenses = todayExpenseAgg[0]?.total || 0
 
     const monthData = monthSalesAgg[0] || { count: 0, revenue: 0, total: 0 }
-    const monthProfit = monthProfitAgg[0]?.profit || 0
-    const monthRevenue = monthData.revenue || 0
+    const monthProfit = (monthProfitAgg[0]?.profit || 0) + monthManualDebt
+    const monthRevenue = (monthData.revenue || 0) + monthManualDebt
     const monthExpenses = monthExpenseAgg[0]?.total || 0
 
     const lastMonthData = lastMonthSalesAgg[0] || { count: 0, revenue: 0 }
-    const lastMonthProfit = lastMonthProfitAgg[0]?.profit || 0
-    const lastMonthRevenue = lastMonthData.revenue || 0
+    const lastMonthProfit = (lastMonthProfitAgg[0]?.profit || 0) + lastMonthManualDebt
+    const lastMonthRevenue = (lastMonthData.revenue || 0) + lastMonthManualDebt
     const lastMonthExpenses = lastMonthExpenseAgg[0]?.total || 0
 
     // Build 30-day chart
-    const expenseMap = new Map(chartExpenseAgg.map((d: { _id: string; expense: number }) => [d._id, d.expense]))
-    const salesMap = new Map(chartSalesAgg.map((d: { _id: string; revenue: number; profit: number }) => [d._id, d]))
+    const expenseMap = new Map<string, number>(chartExpenseAgg.map((d: any) => [d._id, d.expense || d.total || 0]))
+    const salesMap = new Map<string, { revenue: number; profit: number }>(chartSalesAgg.map((d: any) => [d._id, { revenue: d.revenue, profit: d.profit }]))
+    const manualDebtMap = new Map<string, number>(chartManualDebtAgg.map((d: any) => [d._id, d.amount]))
 
     const chart: { date: string; revenue: number; profit: number; expense: number }[] = []
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
       const key = d.toISOString().slice(0, 10)
-      const sale = salesMap.get(key)
+      const sale = salesMap.get(key) as { revenue: number; profit: number } | undefined
+      const manualDebt = Number(manualDebtMap.get(key)) || 0
       chart.push({
         date: key.slice(5), // MM-DD
-        revenue: sale?.revenue || 0,
-        profit: sale?.profit || 0,
-        expense: expenseMap.get(key) || 0,
+        revenue: (sale?.revenue || 0) + manualDebt,
+        profit: (sale?.profit || 0) + manualDebt,
+        expense: (expenseMap.get(key) as number) || 0,
       })
     }
 

@@ -35,10 +35,12 @@ export default function ShaxsiyQarzlarPage() {
   const [status, setStatus] = useState('active')
   const [filterCategory, setFilterCategory] = useState('all')
   const [payDialog, setPayDialog] = useState(false)
+  const [addAmountDialog, setAddAmountDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
   const [selectedDebt, setSelectedDebt] = useState<PersonalDebt | null>(null)
   const [amount, setAmount] = useState('')
+  const [addAmountValue, setAddAmountValue] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
@@ -135,6 +137,24 @@ export default function ShaxsiyQarzlarPage() {
     setPayDialog(false)
     setAmount('')
     setNote('')
+    fetchDebts()
+  }
+
+  async function handleAddAmount() {
+    if (!selectedDebt) return
+    const num = Number(addAmountValue)
+    if (!num || num <= 0) return toast.error('Summa noto\'g\'ri')
+    setLoading(true)
+    const res = await fetch(`/api/personal-debts/${selectedDebt._id}/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: num }),
+    })
+    setLoading(false)
+    if (!res.ok) return toast.error('Xato yuz berdi')
+    toast.success('Qarz summasi oshirildi')
+    setAddAmountDialog(false)
+    setAddAmountValue('')
     fetchDebts()
   }
 
@@ -255,9 +275,14 @@ export default function ShaxsiyQarzlarPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-1 justify-end">
                       {d.status === 'active' && (
-                        <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
-                          <CreditCard className="w-3.5 h-3.5 mr-1" />To&apos;lov
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" className="text-orange-600 hover:text-orange-700" onClick={() => { setSelectedDebt(d); setAddAmountDialog(true) }}>
+                            <Plus className="w-3.5 h-3.5 mr-1" />Yana qarz
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
+                            <CreditCard className="w-3.5 h-3.5 mr-1" />To&apos;lov
+                          </Button>
+                        </>
                       )}
                       <button onClick={() => handleDelete(d._id)} className="p-1.5 hover:bg-red-50 rounded">
                         <Trash2 className="w-3.5 h-3.5 text-red-400" />
@@ -297,9 +322,14 @@ export default function ShaxsiyQarzlarPage() {
                     <Trash2 className="w-3.5 h-3.5 text-red-400" />
                   </button>
                   {d.status === 'active' && (
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
-                      <CreditCard className="w-3.5 h-3.5 mr-1.5" />To&apos;lov
-                    </Button>
+                    <>
+                      <Button size="sm" variant="outline" className="text-orange-600 hover:text-orange-700" onClick={() => { setSelectedDebt(d); setAddAmountDialog(true) }}>
+                        <Plus className="w-3.5 h-3.5 mr-1" />Yana qarz
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
+                        <CreditCard className="w-3.5 h-3.5 mr-1.5" />To&apos;lov
+                      </Button>
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -394,6 +424,28 @@ export default function ShaxsiyQarzlarPage() {
                 <Input value={note} onChange={e => setNote(e.target.value)} />
               </div>
               <Button className="w-full" onClick={handlePay} disabled={loading}>
+                {loading ? 'Saqlanmoqda...' : 'Tasdiqlash'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Amount (More Debt) Dialog */}
+      <Dialog open={addAmountDialog} onOpenChange={setAddAmountDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Yangi qarz qo&apos;shish</DialogTitle></DialogHeader>
+          {selectedDebt && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3 text-sm">
+                <div className="font-medium">{selectedDebt.name}</div>
+                <div className="text-slate-500 mt-1">Hozirgi qarz: {formatPrice(selectedDebt.remainingAmount)}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Qo&apos;shimcha qarz summasi</Label>
+                <NumberInput value={addAmountValue} onChange={setAddAmountValue} placeholder="0" min={0} />
+              </div>
+              <Button className="w-full" onClick={handleAddAmount} disabled={loading}>
                 {loading ? 'Saqlanmoqda...' : 'Tasdiqlash'}
               </Button>
             </div>
