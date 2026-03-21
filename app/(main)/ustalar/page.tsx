@@ -59,8 +59,11 @@ export default function UstalarPage() {
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
   const [editPayoutDialog, setEditPayoutDialog] = useState(false)
+  const [editSaleDialog, setEditSaleDialog] = useState(false)
   const [selectedPayout, setSelectedPayout] = useState<any>(null)
+  const [selectedSale, setSelectedSale] = useState<any>(null)
   const [payoutEditForm, setPayoutEditForm] = useState({ amount: '', totalSales: '', percent: '', note: '' })
+  const [saleEditForm, setSaleEditForm] = useState({ total: '', paid: '', paymentType: '' })
   const debouncedSearch = useDebounce(search)
   const fetchUstalar = useCallback(async () => {
     const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`)
@@ -169,6 +172,40 @@ export default function UstalarPage() {
       toast.success('O\'chirildi')
       setEditPayoutDialog(false)
       if (detailUsta) fetchCashback()
+    }
+  }
+
+  async function handleUpdateSale() {
+    if (!selectedSale) return
+    const res = await fetch(`/api/sales/${selectedSale._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        total: Number(saleEditForm.total),
+        paid: Number(saleEditForm.paid),
+        paymentType: saleEditForm.paymentType
+      })
+    })
+
+    if (!res.ok) return toast.error('Xato yuz berdi')
+    toast.success('Savdo yangilandi')
+    setEditSaleDialog(false)
+    if (detailUsta) {
+      fetchCashback()
+      fetchUstaSales()
+    }
+  }
+
+  async function handleDeleteSale(id: string) {
+    if (!confirm('Savdoni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/sales/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('O\'chirildi')
+      setEditSaleDialog(false)
+      if (detailUsta) {
+        fetchCashback()
+        fetchUstaSales()
+      }
     }
   }
 
@@ -357,7 +394,20 @@ export default function UstalarPage() {
                 ) : ustaSales.length > 0 ? (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {ustaSales.map(sale => (
-                      <div key={sale._id} className="bg-slate-50 rounded-lg p-2.5 text-xs">
+                      <div
+                        key={sale._id}
+                        className="bg-slate-50 rounded-lg p-2.5 text-xs cursor-pointer hover:bg-slate-100 transition-colors"
+                        onDoubleClick={() => {
+                          setSelectedSale(sale)
+                          setSaleEditForm({
+                            total: String(sale.total),
+                            paid: String(sale.paid),
+                            paymentType: sale.paymentType
+                          })
+                          setEditSaleDialog(true)
+                        }}
+                        title="Tahrirlash uchun ikki marta bosing"
+                      >
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-slate-700">
@@ -491,6 +541,44 @@ export default function UstalarPage() {
               <div className="flex gap-2 mt-2">
                 <Button variant="destructive" size="sm" onClick={() => handlePayoutDelete(selectedPayout._id)}>O&apos;chirish</Button>
                 <Button className="flex-1" size="sm" onClick={handlePayoutUpdate}>Saqlash</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Sale Dialog */}
+      <Dialog open={editSaleDialog} onOpenChange={setEditSaleDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Savdoni tahrirlash</DialogTitle></DialogHeader>
+          {selectedSale && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 rounded p-3 text-xs">
+                <div className="font-medium">#{selectedSale.receiptNo} — {new Date(selectedSale.createdAt).toLocaleDateString()}</div>
+                <div className="text-slate-400 mt-1">{selectedSale.items.map((i: any) => `${i.productName} x${i.qty}`).join(', ')}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Jami summa</Label>
+                <NumberInput value={saleEditForm.total} onChange={(v: string) => setSaleEditForm(f => ({ ...f, total: v }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>To&apos;langan summa</Label>
+                <NumberInput value={saleEditForm.paid} onChange={(v: string) => setSaleEditForm(f => ({ ...f, paid: v }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>To&apos;lov turi</Label>
+                <Select value={saleEditForm.paymentType} onValueChange={v => setSaleEditForm(f => ({ ...f, paymentType: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">To&apos;liq</SelectItem>
+                    <SelectItem value="partial">Qisman</SelectItem>
+                    <SelectItem value="debt">Qarz</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(selectedSale._id)}>O&apos;chirish</Button>
+                <Button className="flex-1" size="sm" onClick={handleUpdateSale}>Saqlash</Button>
               </div>
             </div>
           )}
