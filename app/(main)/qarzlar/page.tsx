@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Search, CreditCard, Plus, List, LayoutGrid, Trash2, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,13 +13,19 @@ import { formatPrice } from '@/lib/utils'
 import { NumberInput } from '@/components/ui/NumberInput'
 
 interface DebtCategory { _id: string; name: string; description?: string }
+interface SaleItem {
+  productName: string
+  qty: number
+  salePrice: number
+  unit: string
+}
 interface Debt {
   _id: string
   customer?: { _id: string; name: string; phone?: string }
   customerName?: string
   customerPhone?: string
   category?: DebtCategory
-  sale?: string
+  sale?: { _id: string; total: number; paid: number; items: SaleItem[] } | null
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -38,6 +44,7 @@ export default function QarzlarPage() {
   const [payDialog, setPayDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
+  const [expandedDebt, setExpandedDebt] = useState<string | null>(null)
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
   const [amount, setAmount] = useState('')
   const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'terminal'>('cash')
@@ -48,7 +55,7 @@ export default function QarzlarPage() {
   const [newCat, setNewCat] = useState({ name: '', description: '' })
 
   const fetchCategories = useCallback(async () => {
-    const res = await fetch('/api/debt-categories')
+    const res = await fetch('/api/debt-categories?scope=customer')
     if (res.ok) setCategories(await res.json())
   }, [])
 
@@ -85,7 +92,7 @@ export default function QarzlarPage() {
     const res = await fetch('/api/debt-categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCat),
+      body: JSON.stringify({ ...newCat, scope: 'customer' }),
     })
     if (!res.ok) return toast.error('Xato')
     const cat = await res.json()
@@ -244,7 +251,9 @@ export default function QarzlarPage() {
             </thead>
             <tbody>
               {filtered.map(d => (
-                <tr key={d._id} className="border-b last:border-0 hover:bg-slate-50">
+                <React.Fragment key={d._id}>
+                <tr className="border-b last:border-0 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setExpandedDebt(expandedDebt === d._id ? null : d._id)}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{debtorName(d)}</div>
                     {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
@@ -264,7 +273,7 @@ export default function QarzlarPage() {
                     {d.status === 'active' ? <span className="text-red-600">{formatPrice(d.remainingAmount)}</span> : <span className="text-slate-400 font-normal">To&apos;langan</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex gap-1 justify-end">
+                    <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
                       {d.status === 'active' && (
                         <Button size="sm" variant="outline" onClick={() => { setSelectedDebt(d); setPayDialog(true) }}>
                           <CreditCard className="w-3.5 h-3.5 mr-1" />To&apos;lov
@@ -276,6 +285,26 @@ export default function QarzlarPage() {
                     </div>
                   </td>
                 </tr>
+                {expandedDebt === d._id && (
+                  <tr className="bg-slate-50">
+                    <td colSpan={7} className="px-4 py-3">
+                      {d.sale && d.sale.items && d.sale.items.length > 0 ? (
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-slate-500 mb-1">Sotib olingan tovarlar:</div>
+                          {d.sale.items.map((item, i) => (
+                            <div key={i} className="flex justify-between text-xs">
+                              <span className="text-slate-600">{item.productName} x{item.qty} {item.unit}</span>
+                              <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic">Bu qarz to&apos;g&apos;ridan-to&apos;g&apos;ri qo&apos;shilgan (tovar ma&apos;lumoti yo&apos;q)</div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -284,7 +313,8 @@ export default function QarzlarPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map(d => (
-            <Card key={d._id} className="border-0 shadow-sm">
+            <Card key={d._id} className="border-0 shadow-sm cursor-pointer"
+              onClick={() => setExpandedDebt(expandedDebt === d._id ? null : d._id)}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -306,7 +336,24 @@ export default function QarzlarPage() {
                     }
                   </div>
                 </div>
-                <div className="mt-3 flex justify-end gap-2">
+                {expandedDebt === d._id && (
+                  <div className="mt-3 border-t pt-2">
+                    {d.sale && d.sale.items && d.sale.items.length > 0 ? (
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-slate-500 mb-1">Sotib olingan tovarlar:</div>
+                        {d.sale.items.map((item, i) => (
+                          <div key={i} className="flex justify-between text-xs">
+                            <span className="text-slate-600">{item.productName} x{item.qty} {item.unit}</span>
+                            <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">Bu qarz to&apos;g&apos;ridan-to&apos;g&apos;ri qo&apos;shilgan (tovar ma&apos;lumoti yo&apos;q)</div>
+                    )}
+                  </div>
+                )}
+                <div className="mt-3 flex justify-end gap-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => handleDelete(d._id)} className="p-1.5 hover:bg-red-50 rounded">
                     <Trash2 className="w-3.5 h-3.5 text-red-400" />
                   </button>

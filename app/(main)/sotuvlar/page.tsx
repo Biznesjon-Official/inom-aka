@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
@@ -213,7 +213,8 @@ export default function SotuvlarPage() {
             </thead>
             <tbody>
               {filtered.map(sale => (
-                <tr key={sale._id} className="border-b last:border-0 hover:bg-slate-50 cursor-pointer"
+                <React.Fragment key={sale._id}>
+                <tr className="border-b last:border-0 hover:bg-slate-50 cursor-pointer"
                   onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
                   <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
@@ -244,6 +245,32 @@ export default function SotuvlarPage() {
                     </div>
                   </td>
                 </tr>
+                {expandedSale === sale._id && (
+                  <tr className="bg-slate-50">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="space-y-1">
+                        {sale.items.map((item, i) => (
+                          <div key={i} className="flex justify-between text-xs">
+                            <span className="text-slate-600">{item.productName} x{item.qty} {item.unit}</span>
+                            <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
+                          </div>
+                        ))}
+                        {sale.returnedItems && sale.returnedItems.length > 0 && (
+                          <div className="border-t pt-1 mt-1">
+                            <div className="text-[10px] text-orange-500 font-medium mb-0.5">Qaytarilgan:</div>
+                            {sale.returnedItems.map((ri, i) => (
+                              <div key={i} className="flex justify-between text-xs text-orange-500">
+                                <span>{ri.productName} x{ri.qty}</span>
+                                <span>-{formatPrice(ri.salePrice * ri.qty)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

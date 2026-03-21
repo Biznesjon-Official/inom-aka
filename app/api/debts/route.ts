@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
     const debts = await Debt.find(filter)
       .populate('category', 'name')
-      .populate('sale', 'total paid createdAt paymentType')
+      .populate('sale', 'total paid createdAt paymentType items')
       .sort({ createdAt: -1 })
       .limit(100)
       .lean()

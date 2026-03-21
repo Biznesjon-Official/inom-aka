@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const salesAgg = await Sale.aggregate([
       {
         $match: {
-          customer: customerId,
+          $or: [{ customer: customerId }, { usta: customerId }],
           createdAt: { $gte: periodFrom, $lte: periodTo },
         },
       },

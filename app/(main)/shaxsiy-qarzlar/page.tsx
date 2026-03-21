@@ -46,7 +46,7 @@ export default function ShaxsiyQarzlarPage() {
   const [newCat, setNewCat] = useState({ name: '', description: '' })
 
   const fetchCategories = useCallback(async () => {
-    const res = await fetch('/api/debt-categories')
+    const res = await fetch('/api/debt-categories?scope=personal')
     if (res.ok) setCategories(await res.json())
   }, [])
 
@@ -76,7 +76,7 @@ export default function ShaxsiyQarzlarPage() {
     const res = await fetch('/api/debt-categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCat),
+      body: JSON.stringify({ ...newCat, scope: 'personal' }),
     })
     if (!res.ok) return toast.error('Xato')
     const cat = await res.json()
