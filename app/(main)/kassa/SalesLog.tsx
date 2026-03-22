@@ -251,13 +251,17 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
                             <Minus className="w-3 h-3" />
                           </button>
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={maxQty}
+                            type="text"
+                            inputMode="decimal"
                             value={qty}
                             onChange={e => {
-                              const val = parseFloat(e.target.value) || 0
+                              const input = e.target.value.replace(',', '.')
+                              const val = parseFloat(input) || 0
+                              setReturnQtys(p => ({ ...p, [item.product!]: Math.min(maxQty, Math.max(0, val)) }))
+                            }}
+                            onBlur={e => {
+                              const input = e.target.value.replace(',', '.')
+                              const val = parseFloat(input) || 0
                               setReturnQtys(p => ({ ...p, [item.product!]: Math.min(maxQty, Math.max(0, val)) }))
                             }}
                             className="w-16 text-center text-sm font-medium border rounded px-1 py-0.5"
