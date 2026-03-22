@@ -1,7 +1,8 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, CreditCard, Plus, List, LayoutGrid, Trash2, Settings2 } from 'lucide-react'
+import { Search, CreditCard, Plus, List, LayoutGrid, Trash2, Settings2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +37,7 @@ interface Debt {
 }
 
 export default function QarzlarPage() {
+  const router = useRouter()
   const [debts, setDebts] = useState<Debt[]>([])
   const [categories, setCategories] = useState<DebtCategory[]>([])
   const [search, setSearch] = useState('')
@@ -261,7 +263,17 @@ export default function QarzlarPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {d.sale && <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200">Kassadan</Badge>}
+                      {d.sale && (
+                        <Badge 
+                          className="text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/sotuvlar?highlight=${d.sale._id}`)
+                          }}
+                        >
+                          Sotuv #{d.sale._id.slice(-6)} <ExternalLink className="w-3 h-3 ml-1 inline" />
+                        </Badge>
+                      )}
                       {d.category ? <Badge variant="secondary" className="text-xs">{d.category.name}</Badge> : null}
                       {!d.sale && !d.category && <span className="text-slate-300">—</span>}
                     </div>
@@ -322,7 +334,17 @@ export default function QarzlarPage() {
                     {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
                     <div className="text-xs text-slate-400">{new Date(d.createdAt).toLocaleDateString('uz-UZ')}</div>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {d.sale && <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200">Kassadan</Badge>}
+                      {d.sale && (
+                        <Badge 
+                          className="text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/sotuvlar?highlight=${d.sale._id}`)
+                          }}
+                        >
+                          Sotuv #{d.sale._id.slice(-6)} <ExternalLink className="w-3 h-3 ml-1 inline" />
+                        </Badge>
+                      )}
                       {d.category && <Badge variant="secondary" className="text-xs">{d.category.name}</Badge>}
                     </div>
                     {d.note && <div className="text-xs text-slate-400 italic mt-0.5">{d.note}</div>}

@@ -90,6 +90,14 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchReport(from, to) }, [from, to, fetchReport])
 
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchReport(from, to)
+    }, 30000) // 30 seconds
+    return () => clearInterval(interval)
+  }, [from, to, fetchReport])
+
   const exportCSV = () => {
     if (!data) return
     const lines: string[] = []

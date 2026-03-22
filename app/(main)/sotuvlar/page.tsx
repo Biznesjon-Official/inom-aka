@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,9 @@ const methodLabels: Record<string, string> = { cash: 'Naqd', card: 'Karta', term
 
 export default function SotuvlarPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const highlightId = searchParams.get('highlight')
+  
   const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
@@ -83,6 +86,23 @@ export default function SotuvlarPage() {
   }, [dateFrom, dateTo])
 
   useEffect(() => { fetchSales() }, [fetchSales])
+
+  // Auto-expand and scroll to highlighted sale
+  useEffect(() => {
+    if (highlightId && sales.length > 0) {
+      const sale = sales.find(s => s._id === highlightId)
+      if (sale) {
+        setExpandedSale(highlightId)
+        // Scroll to element after a short delay to ensure rendering
+        setTimeout(() => {
+          const element = document.querySelector(`[data-sale-id="${highlightId}"]`)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
+    }
+  }, [highlightId, sales])
 
   // Filter by search (receipt#, customer name, cashier name)
   const filtered = sales.filter(s => {
@@ -212,9 +232,11 @@ export default function SotuvlarPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(sale => (
+              {filtered.map(sale => {
+                const isHighlighted = highlightId === sale._id
+                return (
                 <React.Fragment key={sale._id}>
-                <tr className="border-b last:border-0 hover:bg-slate-50 cursor-pointer"
+                <tr className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
                   onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
                   <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
@@ -271,7 +293,7 @@ export default function SotuvlarPage() {
                   </tr>
                 )}
                 </React.Fragment>
-              ))}
+              )})}
             </tbody>
           </table>
           {!loading && filtered.length === 0 && (
@@ -280,8 +302,10 @@ export default function SotuvlarPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(sale => (
-            <Card key={sale._id} className="border-0 shadow-sm">
+          {filtered.map(sale => {
+            const isHighlighted = highlightId === sale._id
+            return (
+            <Card key={sale._id} className={`border-0 shadow-sm ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2 cursor-pointer"
                   onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
@@ -360,7 +384,7 @@ export default function SotuvlarPage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+          )})}
           {!loading && filtered.length === 0 && (
             <div className="text-center text-slate-400 py-12">Sotuv topilmadi</div>
           )}
