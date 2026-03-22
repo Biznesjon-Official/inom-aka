@@ -25,51 +25,33 @@ export async function GET(req: NextRequest) {
 
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
-    // Sales aggregation (accounting for returns)
-    // Calculate revenue based on actual payments received in this period
+    // Sales aggregation - using createdAt for simplicity and accuracy
     const [salesAgg] = await Sale.aggregate([
-      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-      { $match: { 'payments.date': dateFilter } }, // Filter by payment date
-      {
-        $group: {
-          _id: '$_id',
-          saleTotal: { $first: '$total' },
-          paymentsInPeriod: { $sum: '$payments.amount' },
-          returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
-        },
-      },
+      { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
         $group: {
           _id: '$_id',
-          saleTotal: { $first: '$saleTotal' },
-          paymentsInPeriod: { $first: '$paymentsInPeriod' },
+          saleTotal: { $first: '$total' },
+          paid: { $first: '$paid' },
           grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
-          returnedTotal: { $first: '$returnedTotal' },
+          returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
         },
       },
       {
         $addFields: {
-          effectiveRatio: { $cond: [
-            { $gt: ['$saleTotal', 0] },
-            { $divide: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, '$saleTotal'] },
-            1,
-          ]},
-          effectivePayment: { $multiply: ['$paymentsInPeriod', { $cond: [
-            { $gt: ['$saleTotal', 0] },
-            { $divide: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, '$saleTotal'] },
-            1,
-          ]}]},
-          effectiveCost: { $subtract: ['$grossCost', '$returnedCostTotal'] },
+          netTotal: { $subtract: ['$saleTotal', '$returnedTotal'] },
+          netCost: { $subtract: ['$grossCost', '$returnedCostTotal'] },
+          netPaid: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] },
         },
       },
       {
         $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: '$effectivePayment' },
-          totalNetCost: { $sum: '$effectiveCost' },
+          totalRevenue: { $sum: '$netPaid' },
+          totalNetCost: { $sum: '$netCost' },
         },
       },
       {
@@ -83,10 +65,8 @@ export async function GET(req: NextRequest) {
 
     // Manual debt payments (debts without sale) — these are pure revenue
     const [manualDebtPaymentsAgg] = await Debt.aggregate([
-      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
-      { $group: { _id: null, totalPayments: { $sum: '$payments.amount' } } },
+      { $match: { sale: { $exists: false }, createdAt: dateFilter, paidAmount: { $gt: 0 } } },
+      { $group: { _id: null, totalPayments: { $sum: '$paidAmount' } } },
     ]).allowDiskUse(true)
 
     // Expenses aggregation
@@ -162,15 +142,13 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, date: '$_id', expense: 1 } },
     ]).allowDiskUse(true)
 
-    // Daily manual debt payments (debts without sale)
+    // Daily manual debt payments (debts without sale) - simplified
     const dailyManualDebtPayments = await Debt.aggregate([
-      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
+      { $match: { sale: { $exists: false }, createdAt: dateFilter, paidAmount: { $gt: 0 } } },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } },
-          manualPayment: { $sum: '$payments.amount' },
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          manualPayment: { $sum: '$paidAmount' },
         },
       },
       { $project: { _id: 0, date: '$_id', manualPayment: 1 } },
@@ -247,30 +225,38 @@ export async function GET(req: NextRequest) {
       { $limit: 10 },
     ]).allowDiskUse(true)
 
-    // Payment methods stats — need to account for payments made in this period, not just sales created in this period
+    // Payment methods stats - simplified using createdAt
     const paymentMethodStats = await Sale.aggregate([
-      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
-      { $match: { 'payments.date': dateFilter } }, // Filter by payment date, not sale creation date
+      { $match: { createdAt: dateFilter } },
       { $addFields: {
-        // Calculate effective ratio based on returned items
-        // If items were returned, reduce payment proportionally
-        netTotal: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] },
-        effectiveRatio: { $cond: [
-          { $gt: ['$total', 0] },
-          { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] },
-          1,
-        ]},
+        netPaid: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] },
+        paymentMethod: { $ifNull: ['$paymentType', 'cash'] },
       }},
-      { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
-      { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+      {
+        $facet: {
+          byPaymentType: [
+            { $group: { _id: '$paymentType', total: { $sum: '$netPaid' }, count: { $sum: 1 } } },
+          ],
+          byPaymentMethod: [
+            { $match: { payments: { $exists: true, $ne: [] } } },
+            { $unwind: '$payments' },
+            { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+          ],
+        },
+      },
+      { $project: {
+        combined: { $concatArrays: ['$byPaymentType', '$byPaymentMethod'] },
+      }},
+      { $unwind: '$combined' },
+      { $replaceRoot: { newRoot: '$combined' } },
+      { $group: { _id: '$_id', total: { $sum: '$total' }, count: { $sum: '$count' } } },
+      { $project: { _id: 0, method: { $ifNull: ['$_id', 'cash'] }, total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    // Manual debt payments by method
+    // Manual debt payments by method - simplified (assume cash if no method specified)
     const manualDebtPaymentsByMethod = await Debt.aggregate([
-      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
-      { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+      { $match: { sale: { $exists: false }, createdAt: dateFilter, paidAmount: { $gt: 0 } } },
+      { $group: { _id: 'cash', total: { $sum: '$paidAmount' }, count: { $sum: 1 } } },
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
