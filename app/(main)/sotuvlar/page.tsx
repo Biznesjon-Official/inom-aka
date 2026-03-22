@@ -236,7 +236,9 @@ export default function SotuvlarPage() {
                 const isHighlighted = highlightId === sale._id
                 return (
                 <React.Fragment key={sale._id}>
-                <tr className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
+                <tr 
+                  data-sale-id={sale._id}
+                  className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
                   onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
                   <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
@@ -305,7 +307,10 @@ export default function SotuvlarPage() {
           {filtered.map(sale => {
             const isHighlighted = highlightId === sale._id
             return (
-            <Card key={sale._id} className={`border-0 shadow-sm ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}>
+            <Card 
+              key={sale._id} 
+              data-sale-id={sale._id}
+              className={`border-0 shadow-sm ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2 cursor-pointer"
                   onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
