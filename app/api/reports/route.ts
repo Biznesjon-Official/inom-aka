@@ -197,9 +197,10 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, name: '$_id', qty: '$totalQty', revenue: '$totalRevenue' } },
     ]).allowDiskUse(true)
 
-    // Payment methods stats — Sale.paid is updated on debt payments, so no separate debt aggregation needed
+    // Payment methods stats — need to account for payments made in this period, not just sales created in this period
     const paymentMethodStats = await Sale.aggregate([
-      { $match: { createdAt: dateFilter } },
+      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+      { $match: { 'payments.date': dateFilter } }, // Filter by payment date, not sale creation date
       { $addFields: {
         effectiveRatio: { $cond: [
           { $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] },
@@ -207,7 +208,6 @@ export async function GET(req: NextRequest) {
           1,
         ]},
       }},
-      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
       { $group: { _id: '$payments.method', total: { $sum: { $multiply: ['$payments.amount', '$effectiveRatio'] } }, count: { $sum: 1 } } },
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
