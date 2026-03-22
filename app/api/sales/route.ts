@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
+import { formatPrice } from '@/lib/utils'
 import Sale from '@/models/Sale'
 import Debt from '@/models/Debt'
 import Product from '@/models/Product'
@@ -91,12 +92,50 @@ export async function POST(req: Request) {
 
     const sale = await Sale.create(body)
 
-    // Create debt if partial or full debt
+    // Create or update debt if partial or full debt
     if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.debtorName) {
       const remaining = body.total - (body.paid || 0)
+      const trimmedName = body.debtorName.trim()
+      const trimmedPhone = body.debtorPhone?.trim() || ''
+
+      // Check if there's an existing active debt for this customer (by name and phone)
+      const existingDebt = await Debt.findOne({
+        customerName: trimmedName,
+        customerPhone: trimmedPhone,
+        status: 'active',
+        type: 'customer',
+        sale: { $exists: false }, // only for manually added debts, not sale-linked debts
+      })
+
+      if (existingDebt) {
+        // Add to existing debt
+        existingDebt.totalAmount += body.total
+        existingDebt.paidAmount += (body.paid || 0)
+        existingDebt.remainingAmount += remaining
+        
+        // Add initial payment if any
+        if (body.paid > 0 && Array.isArray(body.payments) && body.payments.length > 0) {
+          body.payments.forEach((p: { method: string; amount: number }) => {
+            existingDebt.payments.push({ amount: p.amount, method: p.method, date: new Date(), fromSale: true })
+          })
+        } else if (body.paid > 0) {
+          existingDebt.payments.push({ amount: body.paid, date: new Date(), fromSale: true })
+        }
+
+        // Add note about this sale
+        const saleNote = `Sotuv #${sale.receiptNo || sale._id}: ${formatPrice(body.total)}`
+        existingDebt.note = existingDebt.note 
+          ? `${existingDebt.note}\n${saleNote}` 
+          : saleNote
+
+        await existingDebt.save()
+        return NextResponse.json({ sale, debt: existingDebt }, { status: 201 })
+      }
+
+      // Create new debt if no existing active debt found
       const debt = await Debt.create({
-        customerName: body.debtorName,
-        customerPhone: body.debtorPhone || undefined,
+        customerName: trimmedName,
+        customerPhone: trimmedPhone || undefined,
         sale: sale._id,
         totalAmount: body.total,
         paidAmount: body.paid || 0,

@@ -39,9 +39,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'customerName and amount required' }, { status: 400 })
     }
 
+    const trimmedName = customerName.trim()
+    const trimmedPhone = customerPhone?.trim() || ''
+
+    // Check if there's an existing active debt for this customer (by name and phone)
+    const existingDebt = await Debt.findOne({
+      customerName: trimmedName,
+      customerPhone: trimmedPhone,
+      status: 'active',
+      type: 'customer',
+      sale: { $exists: false }, // only for manually added debts
+    })
+
+    if (existingDebt) {
+      // Add to existing debt
+      existingDebt.totalAmount += amount
+      existingDebt.remainingAmount += amount
+      if (note) {
+        existingDebt.note = existingDebt.note 
+          ? `${existingDebt.note}\n---\n${note}` 
+          : note
+      }
+      await existingDebt.save()
+      return NextResponse.json(existingDebt, { status: 200 })
+    }
+
+    // Create new debt if no existing active debt found
     const debt = await Debt.create({
-      customerName: customerName.trim(),
-      customerPhone: customerPhone?.trim() || undefined,
+      customerName: trimmedName,
+      customerPhone: trimmedPhone || undefined,
       totalAmount: amount,
       paidAmount: 0,
       remainingAmount: amount,
