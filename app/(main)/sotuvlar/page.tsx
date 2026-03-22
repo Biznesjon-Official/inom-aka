@@ -410,7 +410,18 @@ export default function SotuvlarPage() {
                             onClick={() => setReturnQtys(p => ({ ...p, [item.product!]: Math.max(0, qty - 1) }))}>
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium">{qty}</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={maxQty}
+                            value={qty}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0
+                              setReturnQtys(p => ({ ...p, [item.product!]: Math.min(maxQty, Math.max(0, val)) }))
+                            }}
+                            className="w-16 text-center text-sm font-medium border rounded px-1 py-0.5"
+                          />
                           <button className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
                             onClick={() => setReturnQtys(p => ({ ...p, [item.product!]: Math.min(maxQty, qty + 1) }))}>
                             <Plus className="w-3 h-3" />
