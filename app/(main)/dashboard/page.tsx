@@ -60,9 +60,9 @@ const PRESETS: { key: PresetKey; label: string }[] = [
 ]
 
 export default function DashboardPage() {
-  const [activePreset, setActivePreset] = useState<PresetKey>('month')
-  const [from, setFrom] = useState(() => getPresetDates('month').from)
-  const [to, setTo] = useState(() => getPresetDates('month').to)
+  const [activePreset, setActivePreset] = useState<PresetKey>('today')
+  const [from, setFrom] = useState(() => getPresetDates('today').from)
+  const [to, setTo] = useState(() => getPresetDates('today').to)
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -90,11 +90,11 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchReport(from, to) }, [from, to, fetchReport])
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchReport(from, to)
-    }, 30000) // 30 seconds
+    }, 10000) // 10 seconds
     return () => clearInterval(interval)
   }, [from, to, fetchReport])
 
