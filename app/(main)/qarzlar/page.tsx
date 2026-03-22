@@ -268,7 +268,7 @@ export default function QarzlarPage() {
                           className="text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/sotuvlar?highlight=${d.sale._id}`)
+                            if (d.sale) router.push(`/sotuvlar?highlight=${d.sale._id}`)
                           }}
                         >
                           Sotuv #{d.sale._id.slice(-6)} <ExternalLink className="w-3 h-3 ml-1 inline" />
@@ -339,7 +339,7 @@ export default function QarzlarPage() {
                           className="text-xs bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/sotuvlar?highlight=${d.sale._id}`)
+                            if (d.sale) router.push(`/sotuvlar?highlight=${d.sale._id}`)
                           }}
                         >
                           Sotuv #{d.sale._id.slice(-6)} <ExternalLink className="w-3 h-3 ml-1 inline" />
