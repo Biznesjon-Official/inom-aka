@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
@@ -44,7 +44,7 @@ const payBadge: Record<string, { label: string; variant: 'default' | 'secondary'
 
 const methodLabels: Record<string, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal' }
 
-export default function SotuvlarPage() {
+function SotuvlarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const highlightId = searchParams.get('highlight')
@@ -493,5 +493,13 @@ export default function SotuvlarPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function SotuvlarPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16">Yuklanmoqda...</div>}>
+      <SotuvlarContent />
+    </Suspense>
   )
 }
