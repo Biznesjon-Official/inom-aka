@@ -53,7 +53,6 @@ export async function POST(req: Request) {
         customerPhone: trimmedPhone,
         status: 'active',
         type: 'customer',
-        sale: { $exists: false },
       }
     } else {
       // If no phone provided, match by name and (no phone OR empty phone OR null phone)
@@ -62,7 +61,6 @@ export async function POST(req: Request) {
           { customerName: trimmedName },
           { status: 'active' },
           { type: 'customer' },
-          { sale: { $exists: false } },
           {
             $or: [
               { customerPhone: { $exists: false } },
