@@ -44,22 +44,34 @@ export async function POST(req: Request) {
 
     // Check if there's an existing active debt for this customer (by name and phone)
     // If phone is empty, match by name only; otherwise match by both name and phone
-    const query: Record<string, unknown> = {
-      customerName: trimmedName,
-      status: 'active',
-      type: 'customer',
-      sale: { $exists: false }, // only for manually added debts
-    }
+    let query: Record<string, unknown>
 
     if (trimmedPhone) {
-      query.customerPhone = trimmedPhone
+      // If phone provided, match by both name and phone
+      query = {
+        customerName: trimmedName,
+        customerPhone: trimmedPhone,
+        status: 'active',
+        type: 'customer',
+        sale: { $exists: false },
+      }
     } else {
-      // If no phone provided, match records with no phone or empty phone
-      query.$or = [
-        { customerPhone: { $exists: false } },
-        { customerPhone: '' },
-        { customerPhone: null }
-      ]
+      // If no phone provided, match by name and (no phone OR empty phone OR null phone)
+      query = {
+        $and: [
+          { customerName: trimmedName },
+          { status: 'active' },
+          { type: 'customer' },
+          { sale: { $exists: false } },
+          {
+            $or: [
+              { customerPhone: { $exists: false } },
+              { customerPhone: '' },
+              { customerPhone: null }
+            ]
+          }
+        ]
+      }
     }
 
     const existingDebt = await Debt.findOne(query)
