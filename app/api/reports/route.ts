@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
 
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
+    console.log('Reports API - Date filter:', { from, to, fromDate, toDate })
+
     // Sales aggregation - using createdAt for simplicity and accuracy
     const [salesAgg] = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
@@ -62,6 +64,8 @@ export async function GET(req: NextRequest) {
         },
       },
     ]).allowDiskUse(true)
+
+    console.log('Reports API - Sales aggregation result:', salesAgg)
 
     // Manual debt payments (debts without sale) — these are pure revenue
     const [manualDebtPaymentsAgg] = await Debt.aggregate([
