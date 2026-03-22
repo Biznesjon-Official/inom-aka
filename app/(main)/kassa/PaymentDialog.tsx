@@ -77,6 +77,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
   const [ustaId, setUstaId] = useState('none')
   const [debtorName, setDebtorName] = useState('')
   const [debtorPhone, setDebtorPhone] = useState('')
+  const [showDebtorSuggestions, setShowDebtorSuggestions] = useState(false)
 
   const cashNum = Number(cashAmount) || 0
   const cardNum = Number(cardAmount) || 0
@@ -88,6 +89,11 @@ export const PaymentDialog = React.memo(function PaymentDialog({
   const profit = finalTotal - costTotal
 
   const [debtors, setDebtors] = useState<{name: string, phone: string}[]>([])
+  
+  // Filter debtors based on input
+  const filteredDebtors = debtorName.trim().length > 0
+    ? debtors.filter(d => d.name.toLowerCase().includes(debtorName.toLowerCase()))
+    : []
 
   // Reset when dialog opens
   useEffect(() => {
@@ -99,6 +105,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
       setUstaId('none')
       setDebtorName('')
       setDebtorPhone('')
+      setShowDebtorSuggestions(false)
       fetch('/api/debts/debtors').then(r => r.json()).then(setDebtors).catch(() => {})
     }
   }, [open])
@@ -218,24 +225,37 @@ export const PaymentDialog = React.memo(function PaymentDialog({
 
           {isDebt && (
             <div className="space-y-2">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 relative">
                 <Label>Qarzdor ismi <span className="text-red-500">*</span></Label>
                 <Input 
-                  list="debtors-list" 
                   placeholder="Ism familiya" 
                   value={debtorName} 
                   onChange={e => {
-                    const val = e.target.value
-                    setDebtorName(val)
-                    const exact = debtors.find(d => d.name === val)
-                    if (exact && exact.phone && !debtorPhone) setDebtorPhone(exact.phone)
-                  }} 
+                    setDebtorName(e.target.value)
+                    setShowDebtorSuggestions(true)
+                  }}
+                  onFocus={() => setShowDebtorSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowDebtorSuggestions(false), 200)}
                 />
-                <datalist id="debtors-list">
-                  {debtors.map((d, i) => (
-                    <option key={i} value={d.name} />
-                  ))}
-                </datalist>
+                {showDebtorSuggestions && filteredDebtors.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredDebtors.map((d, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="w-full px-3 py-2 text-left hover:bg-slate-50 border-b last:border-0 text-sm"
+                        onClick={() => {
+                          setDebtorName(d.name)
+                          setDebtorPhone(d.phone || '')
+                          setShowDebtorSuggestions(false)
+                        }}
+                      >
+                        <div className="font-medium text-slate-800">{d.name}</div>
+                        {d.phone && <div className="text-xs text-slate-500">{d.phone}</div>}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Telefon raqam <span className="text-red-500">*</span></Label>
