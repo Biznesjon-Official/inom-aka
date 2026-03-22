@@ -26,27 +26,50 @@ export async function GET(req: NextRequest) {
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
     // Sales aggregation (accounting for returns)
+    // Calculate revenue based on actual payments received in this period
     const [salesAgg] = await Sale.aggregate([
-      { $match: { createdAt: dateFilter } },
-      { $unwind: '$items' },
+      { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
+      { $match: { 'payments.date': dateFilter } }, // Filter by payment date
       {
         $group: {
           _id: '$_id',
           saleTotal: { $first: '$total' },
-          paid: { $first: '$paid' },
-          grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
+          paymentsInPeriod: { $sum: '$payments.amount' },
           returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
+        },
+      },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$_id',
+          saleTotal: { $first: '$saleTotal' },
+          paymentsInPeriod: { $first: '$paymentsInPeriod' },
+          grossCost: { $sum: { $multiply: ['$items.qty', '$items.costPrice'] } },
+          returnedTotal: { $first: '$returnedTotal' },
           returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
         },
       },
-      // Exclude fully-returned sales from count
-      { $match: { $expr: { $lt: ['$returnedTotal', '$saleTotal'] } } },
+      {
+        $addFields: {
+          effectiveRatio: { $cond: [
+            { $gt: ['$saleTotal', 0] },
+            { $divide: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, '$saleTotal'] },
+            1,
+          ]},
+          effectivePayment: { $multiply: ['$paymentsInPeriod', { $cond: [
+            { $gt: ['$saleTotal', 0] },
+            { $divide: [{ $subtract: ['$saleTotal', '$returnedTotal'] }, '$saleTotal'] },
+            1,
+          ]}]},
+          effectiveCost: { $subtract: ['$grossCost', '$returnedCostTotal'] },
+        },
+      },
       {
         $group: {
           _id: null,
           totalSales: { $addToSet: '$_id' },
-          totalRevenue: { $sum: { $subtract: ['$paid', { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$saleTotal', '$paid'] }] }] }] } },
-          totalNetCost: { $sum: { $subtract: ['$grossCost', '$returnedCostTotal'] } },
+          totalRevenue: { $sum: '$effectivePayment' },
+          totalNetCost: { $sum: '$effectiveCost' },
         },
       },
       {
@@ -181,20 +204,47 @@ export async function GET(req: NextRequest) {
     }
     daily.sort((a, b) => a.date.localeCompare(b.date))
 
-    // Top 10 products
+    // Top 10 products (accounting for returns)
     const topProducts = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
         $group: {
-          _id: '$items.productName',
-          totalQty: { $sum: '$items.qty' },
-          totalRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
+          _id: { saleId: '$_id', productName: '$items.productName' },
+          soldQty: { $sum: '$items.qty' },
+          soldRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
+          returnedItems: { $first: '$returnedItems' },
         },
       },
-      { $sort: { totalQty: -1 } },
+      { $unwind: { path: '$returnedItems', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$_id.productName',
+          soldQty: { $sum: '$soldQty' },
+          soldRevenue: { $sum: '$soldRevenue' },
+          returnedQty: { $sum: { $cond: [
+            { $eq: ['$returnedItems.productName', '$_id.productName'] },
+            '$returnedItems.qty',
+            0,
+          ]}},
+          returnedRevenue: { $sum: { $cond: [
+            { $eq: ['$returnedItems.productName', '$_id.productName'] },
+            { $multiply: ['$returnedItems.qty', '$returnedItems.salePrice'] },
+            0,
+          ]}},
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          name: '$_id',
+          qty: { $subtract: ['$soldQty', '$returnedQty'] },
+          revenue: { $subtract: ['$soldRevenue', '$returnedRevenue'] },
+        },
+      },
+      { $match: { qty: { $gt: 0 } } },
+      { $sort: { qty: -1 } },
       { $limit: 10 },
-      { $project: { _id: 0, name: '$_id', qty: '$totalQty', revenue: '$totalRevenue' } },
     ]).allowDiskUse(true)
 
     // Payment methods stats — need to account for payments made in this period, not just sales created in this period
