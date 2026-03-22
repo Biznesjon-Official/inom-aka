@@ -58,7 +58,13 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Sale.paid is updated on every debt payment, so no separate manual debt aggregation needed
+    // Manual debt payments (debts without sale) — these are pure revenue
+    const [manualDebtPaymentsAgg] = await Debt.aggregate([
+      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
+      { $group: { _id: null, totalPayments: { $sum: '$payments.amount' } } },
+    ]).allowDiskUse(true)
 
     // Expenses aggregation
     const [expensesAgg] = await Expense.aggregate([
@@ -133,12 +139,47 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, date: '$_id', expense: 1 } },
     ]).allowDiskUse(true)
 
+    // Daily manual debt payments (debts without sale)
+    const dailyManualDebtPayments = await Debt.aggregate([
+      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } },
+          manualPayment: { $sum: '$payments.amount' },
+        },
+      },
+      { $project: { _id: 0, date: '$_id', manualPayment: 1 } },
+    ]).allowDiskUse(true)
+
     // Merge daily data
     const expenseMap = new Map(dailyExpenses.map((d: { date: string; expense: number }) => [d.date, d.expense]))
-    const daily = dailyBreakdown.map((d: { date: string; revenue: number; profit: number; sales: number }) => ({
-      ...d,
-      expense: expenseMap.get(d.date) || 0,
-    }))
+    const manualPaymentMap = new Map(dailyManualDebtPayments.map((d: { date: string; manualPayment: number }) => [d.date, d.manualPayment]))
+    const daily = dailyBreakdown.map((d: { date: string; revenue: number; profit: number; sales: number }) => {
+      const manualPayment = manualPaymentMap.get(d.date) || 0
+      return {
+        date: d.date,
+        revenue: d.revenue + manualPayment,
+        profit: d.profit + manualPayment, // manual payments are pure profit
+        expense: expenseMap.get(d.date) || 0,
+        sales: d.sales,
+      }
+    })
+
+    // Add days that only have manual payments (no sales)
+    for (const [date, manualPayment] of manualPaymentMap) {
+      if (!daily.find(d => d.date === date)) {
+        daily.push({
+          date,
+          revenue: manualPayment,
+          profit: manualPayment,
+          expense: expenseMap.get(date) || 0,
+          sales: 0,
+        })
+      }
+    }
+    daily.sort((a, b) => a.date.localeCompare(b.date))
 
     // Top 10 products
     const topProducts = await Sale.aggregate([
@@ -171,6 +212,28 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
+    // Manual debt payments by method
+    const manualDebtPaymentsByMethod = await Debt.aggregate([
+      { $match: { sale: { $exists: false }, 'payments.date': dateFilter } },
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true } } },
+      { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
+      { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
+    ]).allowDiskUse(true)
+
+    // Merge payment methods
+    const paymentMethodMap = new Map(paymentMethodStats.map((p: { method: string; total: number; count: number }) => [p.method, p]))
+    for (const mp of manualDebtPaymentsByMethod) {
+      const existing = paymentMethodMap.get(mp.method)
+      if (existing) {
+        existing.total += mp.total
+        existing.count += mp.count
+      } else {
+        paymentMethodMap.set(mp.method, mp)
+      }
+    }
+    const mergedPaymentMethods = Array.from(paymentMethodMap.values())
+
     // Cashier stats
     const cashierStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
@@ -201,18 +264,23 @@ export async function GET(req: NextRequest) {
       { $sort: { totalAmount: -1 } },
     ]).allowDiskUse(true)
 
+    // Add manual debt payments to revenue and profit
+    const manualDebtPayments = manualDebtPaymentsAgg?.totalPayments || 0
+    const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments
+    const totalProfit = (salesAgg?.totalProfit || 0) + manualDebtPayments // manual debt payments are pure profit (no cost)
+
     return NextResponse.json({
       salesCount: salesAgg?.salesCount || 0,
-      totalRevenue: salesAgg?.totalRevenue || 0,
-      totalProfit: salesAgg?.totalProfit || 0,
+      totalRevenue,
+      totalProfit,
       totalExpenses: expensesAgg?.totalExpenses || 0,
-      netProfit: (salesAgg?.totalProfit || 0) - (expensesAgg?.totalExpenses || 0),
+      netProfit: totalProfit - (expensesAgg?.totalExpenses || 0),
       newDebt: debtsAgg?.newDebt || 0,
       paidDebt: debtsAgg?.paidDebt || 0,
       daily,
       topProducts,
       cashierStats,
-      paymentMethods: paymentMethodStats,
+      paymentMethods: mergedPaymentMethods,
       customerDebt: customerDebtAgg[0]?.total || 0,
       personalDebt: personalDebtAgg[0]?.total || 0,
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
