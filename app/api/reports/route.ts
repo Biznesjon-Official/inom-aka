@@ -202,9 +202,12 @@ export async function GET(req: NextRequest) {
       { $unwind: { path: '$payments', preserveNullAndEmptyArrays: false } },
       { $match: { 'payments.date': dateFilter } }, // Filter by payment date, not sale creation date
       { $addFields: {
+        // Calculate effective ratio based on returned items
+        // If items were returned, reduce payment proportionally
+        netTotal: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] },
         effectiveRatio: { $cond: [
-          { $and: [{ $gt: ['$total', 0] }, { $gte: ['$paid', '$total'] }] },
-          { $max: [0, { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] }] },
+          { $gt: ['$total', 0] },
+          { $divide: [{ $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] }, '$total'] },
           1,
         ]},
       }},
