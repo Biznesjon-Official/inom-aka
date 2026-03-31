@@ -42,7 +42,7 @@ function UstaSelect({ value, onChange, open }: { value: string; onChange: (v: st
 
   useEffect(() => {
     if (!open) return
-    fetch('/api/workers').then(r => r.ok ? r.json() : []).then(setUstalar)
+    fetch('/api/customers').then(r => r.ok ? r.json() : []).then(setUstalar)
   }, [open])
 
   return (
