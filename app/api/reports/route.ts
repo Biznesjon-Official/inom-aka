@@ -19,17 +19,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'from and to are required' }, { status: 400 })
     }
 
-    const fromDate = new Date(from)
-    const toDate = new Date(to)
-    toDate.setHours(23, 59, 59, 999)
+    const fromDate = new Date(from + 'T00:00:00')
+    const toDate = new Date(to + 'T23:59:59.999')
 
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
     // Sales count — createdAt bo'yicha (sotuv qachon yaratilgani)
     const salesCount = await Sale.countDocuments({ createdAt: dateFilter })
 
-    // Sales revenue/profit — createdAt bo'yicha (sotuv qachon yaratilgan)
-    // Kirim = paid - max(0, returnedTotal - debt), Foyda = (total-ret) - (cost-retCost)
+    // Sales revenue/profit — calcSaleRevenue/calcSaleProfit (lib/utils.ts) bilan bir xil formula
+    // kirim = paid - max(0, ret - debt) = paid - max(0, ret - (total-paid))
+    // foyda = (total-ret) - (cost-retCost)
     const [salesAgg] = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
             $sum: {
               $subtract: [
                 '$paid',
-                { $max: [0, { $subtract: [{ $add: ['$returnedTotal', '$paid'] }, '$total'] }] },
+                { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$total', '$paid'] }] }] },
               ],
             },
           },
@@ -97,11 +97,10 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Static data (not date-filtered)
-    const [customerDebtAgg, personalDebtAgg, productStatsAgg, lowStockProducts] = await Promise.all([
+    const [customerDebtAgg, personalDebtAgg, productStatsAgg] = await Promise.all([
       Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
       PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
       Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]).allowDiskUse(true),
-      Product.find({ stock: { $lte: 1 }, isActive: true }).select('name stock unit salePrice').sort({ stock: 1 }).limit(10).lean(),
     ])
 
     // Daily breakdown — createdAt bo'yicha, kassa/sotuvlar bilan bir xil formula
@@ -128,7 +127,7 @@ export async function GET(req: NextRequest) {
             $sum: {
               $subtract: [
                 '$_id.paid',
-                { $max: [0, { $subtract: [{ $add: ['$_id.rt', '$_id.paid'] }, '$_id.total'] }] },
+                { $max: [0, { $subtract: ['$_id.rt', { $subtract: ['$_id.total', '$_id.paid'] }] }] },
               ],
             },
           },
@@ -212,49 +211,6 @@ export async function GET(req: NextRequest) {
 
     const daily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
 
-    // Top 10 products
-    const topProducts = await Sale.aggregate([
-      { $match: { createdAt: dateFilter } },
-      { $unwind: '$items' },
-      {
-        $group: {
-          _id: { saleId: '$_id', productName: '$items.productName' },
-          soldQty: { $sum: '$items.qty' },
-          soldRevenue: { $sum: { $multiply: ['$items.qty', '$items.salePrice'] } },
-          returnedItems: { $first: '$returnedItems' },
-        },
-      },
-      { $unwind: { path: '$returnedItems', preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: '$_id.productName',
-          soldQty: { $sum: '$soldQty' },
-          soldRevenue: { $sum: '$soldRevenue' },
-          returnedQty: { $sum: { $cond: [
-            { $eq: ['$returnedItems.productName', '$_id.productName'] },
-            '$returnedItems.qty',
-            0,
-          ]}},
-          returnedRevenue: { $sum: { $cond: [
-            { $eq: ['$returnedItems.productName', '$_id.productName'] },
-            { $multiply: ['$returnedItems.qty', '$returnedItems.salePrice'] },
-            0,
-          ]}},
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          name: '$_id',
-          qty: { $subtract: ['$soldQty', '$returnedQty'] },
-          revenue: { $subtract: ['$soldRevenue', '$returnedRevenue'] },
-        },
-      },
-      { $match: { qty: { $gt: 0 } } },
-      { $sort: { qty: -1 } },
-      { $limit: 10 },
-    ]).allowDiskUse(true)
-
     // Payment methods — createdAt bo'yicha, to'langan miqdorlar
     const paymentMethodStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
@@ -329,14 +285,12 @@ export async function GET(req: NextRequest) {
       newDebt: newDebtAgg?.newDebt || 0,
       paidDebt: paidDebtAgg?.paidDebt || 0,
       daily,
-      topProducts,
       cashierStats,
       paymentMethods: mergedPaymentMethods,
       customerDebt: customerDebtAgg[0]?.total || 0,
       personalDebt: personalDebtAgg[0]?.total || 0,
       totalProducts: productStatsAgg[0]?.totalProducts || 0,
       warehouseValue: productStatsAgg[0]?.warehouseValue || 0,
-      lowStock: lowStockProducts,
     })
   } catch (err) {
     return errorResponse(err)

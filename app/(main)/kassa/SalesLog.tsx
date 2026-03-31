@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatPrice, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
+import { formatPrice, calcSaleRevenue, calcSaleProfit, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
 import { printReceipt } from '@/lib/print'
 import { RefreshCw, Printer, Undo2, Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -111,25 +111,11 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
     fetchSales()
   }
 
-  // Kirim = To'langan - Qaytarilgan naqd
-  // Qaytarilgan naqd = max(0, Qaytarilgan - Qarz)
-  const todaySalesRevenue = sales.reduce((s, x) => {
-    const debt = x.total - x.paid
-    const ret = x.returnedTotal || 0
-    return s + x.paid - Math.max(0, ret - debt)
-  }, 0)
+  const todaySalesRevenue = sales.reduce((s, x) => s + calcSaleRevenue(x), 0)
   const todayDebtRevenue = debtPayments.reduce((s, d) => s + d.todayPaid, 0)
-  const todayRevenue = todaySalesRevenue + todayDebtRevenue
+  const todayRevenue = todaySalesRevenue
   const todayTotal = sales.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
-  
-  // Foyda = (Sotuv - Qaytarilgan) - (Tan narx - Qaytarilgan tan narx)
-  const todayProfit = sales.reduce((s, x) => {
-    const netSales = x.total - (x.returnedTotal || 0)
-    const costTotal = x.items.reduce((sum, item) => sum + item.costPrice * item.qty, 0)
-    const returnedCost = (x.returnedItems || []).reduce((sum, item) => sum + (item.costPrice || 0) * item.qty, 0)
-    const netCost = costTotal - returnedCost
-    return s + (netSales - netCost)
-  }, 0)
+  const todayProfit = sales.reduce((s, x) => s + calcSaleProfit(x), 0)
 
   return (
     <Card className="border-0 shadow-sm">

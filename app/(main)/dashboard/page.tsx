@@ -8,11 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ShoppingCart, TrendingUp, TrendingDown, Wallet, DollarSign,
   Download, Loader2, Banknote, CreditCard, Smartphone,
-  Package, AlertTriangle, BookOpen,
+  Package, BookOpen,
 } from 'lucide-react'
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
 import { formatPrice } from '@/lib/utils'
 
 interface ReportData {
@@ -24,21 +21,24 @@ interface ReportData {
   newDebt: number
   paidDebt: number
   daily: { date: string; revenue: number; profit: number; expense: number; sales: number }[]
-  topProducts: { name: string; qty: number; revenue: number }[]
   cashierStats: { name: string; salesCount: number; totalAmount: number }[]
   paymentMethods: { method: string; total: number; count: number }[]
   customerDebt: number
   personalDebt: number
   totalProducts: number
   warehouseValue: number
-  lowStock: { _id: string; name: string; stock: number; unit: string; salePrice: number }[]
 }
 
 type PresetKey = 'today' | 'week' | 'month' | 'year' | 'custom'
 
 function getPresetDates(key: PresetKey): { from: string; to: string } {
   const now = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
   switch (key) {
     case 'today': return { from: fmt(now), to: fmt(now) }
     case 'week': {
@@ -105,9 +105,6 @@ export default function DashboardPage() {
     lines.push('')
     lines.push('Kunlik,Sotuv,Kirim,Foyda,Xarajat')
     data.daily.forEach(d => lines.push(`${d.date},${d.sales},${d.revenue},${d.profit},${d.expense}`))
-    lines.push('')
-    lines.push('Mahsulot,Soni,Summa')
-    data.topProducts.forEach(p => lines.push(`"${p.name}",${p.qty},${p.revenue}`))
     lines.push('')
     lines.push('Kassir,Sotuv soni,Summa')
     data.cashierStats.forEach(c => lines.push(`"${c.name}",${c.salesCount},${c.totalAmount}`))
@@ -285,123 +282,31 @@ export default function DashboardPage() {
             })}
           </div>
 
-          {/* Chart */}
-          {data.daily.length > 0 && (
+          {/* Kassirlar */}
+          {data.cashierStats.length > 0 && (
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Kunlik ko&apos;rsatkich</CardTitle>
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Kassirlar</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={data.daily}>
-                    <defs>
-                      <linearGradient id="dColorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="dColorProfit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="dColorExpense" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v / 1000000).toFixed(1) + 'M'} />
-                    <Tooltip formatter={(v) => formatPrice(Number(v))} />
-                    <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fill="url(#dColorRevenue)" name="Kirim" strokeWidth={2} />
-                    <Area type="monotone" dataKey="profit" stroke="#10b981" fill="url(#dColorProfit)" name="Foyda" strokeWidth={2} />
-                    <Area type="monotone" dataKey="expense" stroke="#ef4444" fill="url(#dColorExpense)" name="Xarajat" strokeWidth={1.5} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top products + Cashier stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {data.topProducts.length > 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Top 10 mahsulot</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-slate-500">
-                        <th className="pb-2 font-medium">#</th>
-                        <th className="pb-2 font-medium">Mahsulot</th>
-                        <th className="pb-2 font-medium text-right">Soni</th>
-                        <th className="pb-2 font-medium text-right">Summa</th>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-slate-500">
+                      <th className="pb-2 font-medium">Kassir</th>
+                      <th className="pb-2 font-medium text-right">Sotuv</th>
+                      <th className="pb-2 font-medium text-right">Summa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.cashierStats.map(c => (
+                      <tr key={c.name} className="border-b border-slate-100 last:border-0">
+                        <td className="py-1.5 font-medium text-slate-700 dark:text-slate-200">{c.name}</td>
+                        <td className="py-1.5 text-right text-slate-600">{c.salesCount}</td>
+                        <td className="py-1.5 text-right text-slate-600">{formatPrice(c.totalAmount)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {data.topProducts.map((p, i) => (
-                        <tr key={p.name} className="border-b border-slate-100 last:border-0">
-                          <td className="py-1.5 text-slate-400">{i + 1}</td>
-                          <td className="py-1.5 font-medium text-slate-700 dark:text-slate-200 max-w-[140px] truncate">{p.name}</td>
-                          <td className="py-1.5 text-right text-slate-600">{p.qty}</td>
-                          <td className="py-1.5 text-right text-slate-600">{formatPrice(p.revenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            )}
-
-            {data.cashierStats.length > 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Kassirlar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-slate-500">
-                        <th className="pb-2 font-medium">Kassir</th>
-                        <th className="pb-2 font-medium text-right">Sotuv</th>
-                        <th className="pb-2 font-medium text-right">Summa</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.cashierStats.map(c => (
-                        <tr key={c.name} className="border-b border-slate-100 last:border-0">
-                          <td className="py-1.5 font-medium text-slate-700 dark:text-slate-200">{c.name}</td>
-                          <td className="py-1.5 text-right text-slate-600">{c.salesCount}</td>
-                          <td className="py-1.5 text-right text-slate-600">{formatPrice(c.totalAmount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Low stock */}
-          {data.lowStock.length > 0 && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Kam stok ({data.lowStock.length} ta)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {data.lowStock.map(p => (
-                    <div key={p._id} className="bg-amber-50 rounded-lg p-2.5">
-                      <div className="text-xs font-medium text-slate-700 truncate">{p.name}</div>
-                      <div className="text-sm font-bold text-amber-600 mt-0.5">
-                        {p.stock} {p.unit} qoldi
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </CardContent>
             </Card>
           )}

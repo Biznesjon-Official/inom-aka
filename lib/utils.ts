@@ -25,6 +25,31 @@ export function getYearRange(date = new Date()): { from: Date; to: Date } {
   return { from, to }
 }
 
+// Sale revenue/profit helpers — used in SalesLog, Sotuvlar, reports API
+export type SaleForCalc = {
+  total: number
+  paid: number
+  returnedTotal?: number
+  items: { costPrice: number; qty: number }[]
+  returnedItems?: { costPrice?: number; qty: number }[]
+}
+
+// kirim = paid - qaytarilgan naqd
+// qaytarilgan naqd = max(0, returnedTotal - qolgan_qarz)
+export function calcSaleRevenue(s: SaleForCalc): number {
+  const debt = s.total - s.paid
+  const ret = s.returnedTotal || 0
+  return s.paid - Math.max(0, ret - debt)
+}
+
+// foyda = (sotuv - qaytarilgan) - (tannarx - qaytarilgan tannarx)
+export function calcSaleProfit(s: SaleForCalc): number {
+  const netSales = s.total - (s.returnedTotal || 0)
+  const cost = s.items.reduce((a, i) => a + i.costPrice * i.qty, 0)
+  const retCost = (s.returnedItems || []).reduce((a, i) => a + (i.costPrice || 0) * i.qty, 0)
+  return netSales - (cost - retCost)
+}
+
 // Payment status badges
 export const PAYMENT_STATUS = {
   full: { label: "To'liq", variant: 'default' as const },

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatPrice, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
+import { formatPrice, calcSaleRevenue, calcSaleProfit, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 
@@ -169,27 +169,10 @@ function SotuvlarContent() {
     router.refresh()
   }
 
-  // Return reduces debt first, then cash. Kirim = paid - cash_refund, Qarz = max(0, debt - return)
-  const totalRevenue = filtered.reduce((s, x) => {
-    const debt = x.total - x.paid
-    const ret = x.returnedTotal || 0
-    return s + x.paid - Math.max(0, ret - debt)
-  }, 0)
-  const totalDebt = filtered.reduce((s, x) => {
-    const debt = x.total - x.paid
-    const ret = x.returnedTotal || 0
-    return s + Math.max(0, debt - ret)
-  }, 0)
+  const totalRevenue = filtered.reduce((s, x) => s + calcSaleRevenue(x), 0)
+  const totalDebt = filtered.reduce((s, x) => s + Math.max(0, (x.total - x.paid) - (x.returnedTotal || 0)), 0)
   const totalSales = filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
-  
-  // Foyda = (Sotuv - Qaytarilgan) - (Tan narx - Qaytarilgan tan narx)
-  const totalProfit = filtered.reduce((s, x) => {
-    const netSales = x.total - (x.returnedTotal || 0)
-    const costTotal = x.items.reduce((sum, item) => sum + item.costPrice * item.qty, 0)
-    const returnedCost = (x.returnedItems || []).reduce((sum, item) => sum + (item.costPrice || 0) * item.qty, 0)
-    const netCost = costTotal - returnedCost
-    return s + (netSales - netCost)
-  }, 0)
+  const totalProfit = filtered.reduce((s, x) => s + calcSaleProfit(x), 0)
 
   return (
     <div className="space-y-4">

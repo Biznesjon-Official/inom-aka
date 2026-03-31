@@ -37,12 +37,13 @@ interface Usta {
   username?: string
 }
 
-function UstaSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function UstaSelect({ value, onChange, open }: { value: string; onChange: (v: string) => void; open: boolean }) {
   const [ustalar, setUstalar] = useState<Usta[]>([])
 
   useEffect(() => {
+    if (!open) return
     fetch('/api/workers').then(r => r.ok ? r.json() : []).then(setUstalar)
-  }, [])
+  }, [open])
 
   return (
     <div className="space-y-1.5">
@@ -220,7 +221,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             }
           </div>
 
-          <UstaSelect value={ustaId} onChange={setUstaId} />
+          <UstaSelect value={ustaId} onChange={setUstaId} open={open} />
 
           {isDebt && (
             <div className="space-y-2">

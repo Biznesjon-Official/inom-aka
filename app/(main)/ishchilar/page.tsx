@@ -15,6 +15,20 @@ interface Worker {
   salary: { fixed: number; salesPercent: number }
 }
 
+interface UstaSaleItem {
+  _id: string; receiptNo: number; createdAt: string
+  total: number; profit: number; cashback: number
+  paymentType: string; hasReturn: boolean
+  cashier?: { name: string }
+}
+
+interface StatsData {
+  today: { count: number; total: number; profit: number }
+  month: { count: number; total: number; profit: number }
+  ustaToday: { count: number; totalCashback: number }
+  ustaMonth: { count: number; totalCashback: number; sales: UstaSaleItem[] }
+}
+
 const emptyForm = { name: '', username: '', password: '', fixed: '', salesPercent: '' }
 
 export default function IshchilarPage() {
@@ -24,7 +38,7 @@ export default function IshchilarPage() {
   const [editing, setEditing] = useState<Worker | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
-  const [stats, setStats] = useState<{ today: { count: number; total: number; profit: number }; month: { count: number; total: number; profit: number } } | null>(null)
+  const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
 
@@ -42,7 +56,7 @@ export default function IshchilarPage() {
     const res = await fetch(`/api/workers/${id}`)
     if (!res.ok) return toast.error('Statistikani yuklashda xato')
     const data = await res.json()
-    setStats({ today: data.today, month: data.month })
+    setStats({ today: data.today, month: data.month, ustaToday: data.ustaToday, ustaMonth: data.ustaMonth })
     setStatsDialog(true)
   }
 
@@ -235,40 +249,123 @@ export default function IshchilarPage() {
 
       {/* Stats dialog */}
       <Dialog open={statsDialog} onOpenChange={setStatsDialog}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Statistika</DialogTitle>
+            <DialogTitle>
+              {selectedWorker && workers.find(x => x._id === selectedWorker)?.name} — Statistika
+            </DialogTitle>
           </DialogHeader>
           {stats && selectedWorker && (() => {
             const w = workers.find(x => x._id === selectedWorker)
             if (!w) return null
+            const paymentLabel = (t: string) => t === 'full' ? 'To\'liq' : t === 'partial' ? 'Qisman' : 'Qarz'
             return (
               <div className="space-y-4">
-                <Card className="border-0 bg-blue-50">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">Bugun</CardTitle></CardHeader>
-                  <CardContent className="space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-600">Savdolar:</span><span className="font-medium">{stats.today.count} ta</span></div>
-                    <div className="flex justify-between"><span className="text-slate-600">Jami:</span><span className="font-medium">{formatPrice(stats.today.total)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-600">Foyda:</span><span className="font-medium text-green-600">{formatPrice(stats.today.profit)}</span></div>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 bg-indigo-50">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">Bu oy</CardTitle></CardHeader>
-                  <CardContent className="space-y-1 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-600">Savdolar:</span><span className="font-medium">{stats.month.count} ta</span></div>
-                    <div className="flex justify-between"><span className="text-slate-600">Jami:</span><span className="font-medium">{formatPrice(stats.month.total)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-600">Foyda:</span><span className="font-medium text-green-600">{formatPrice(stats.month.profit)}</span></div>
-                    <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                      <span>Hisoblangan maosh:</span>
-                      <span className="text-indigo-600">{formatPrice(calcSalary(w, stats.month.profit))}</span>
-                    </div>
-                    {w.salary.salesPercent > 0 && (
-                      <div className="text-xs text-slate-500">
-                        {formatPrice(w.salary.fixed)} + {w.salary.salesPercent}% × {formatPrice(stats.month.profit)}
+                {/* Kassir statistikasi */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="border-0 bg-blue-50">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Bugun (kassir)</CardTitle></CardHeader>
+                    <CardContent className="space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-600">Savdolar:</span><span className="font-medium">{stats.today.count} ta</span></div>
+                      <div className="flex justify-between"><span className="text-slate-600">Jami:</span><span className="font-medium">{formatPrice(stats.today.total)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-600">Foyda:</span><span className="font-medium text-green-600">{formatPrice(stats.today.profit)}</span></div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 bg-indigo-50">
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Bu oy (kassir)</CardTitle></CardHeader>
+                    <CardContent className="space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-600">Savdolar:</span><span className="font-medium">{stats.month.count} ta</span></div>
+                      <div className="flex justify-between"><span className="text-slate-600">Jami:</span><span className="font-medium">{formatPrice(stats.month.total)}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-600">Foyda:</span><span className="font-medium text-green-600">{formatPrice(stats.month.profit)}</span></div>
+                      <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                        <span>Maosh:</span>
+                        <span className="text-indigo-600">{formatPrice(calcSalary(w, stats.month.profit))}</span>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      {w.salary.salesPercent > 0 && (
+                        <div className="text-xs text-slate-500">
+                          {formatPrice(w.salary.fixed)} + {w.salary.salesPercent}% × {formatPrice(stats.month.profit)}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Usta statistikasi */}
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">Usta sifatidagi sotuvlar</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <Card className="border-0 bg-amber-50">
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Bugun (usta)</CardTitle></CardHeader>
+                      <CardContent className="space-y-1 text-sm">
+                        <div className="flex justify-between"><span className="text-slate-600">Sotuvlar:</span><span className="font-medium">{stats.ustaToday.count} ta</span></div>
+                        <div className="flex justify-between"><span className="text-slate-600">Keshbek:</span><span className="font-medium text-amber-600">{formatPrice(stats.ustaToday.totalCashback)}</span></div>
+                        {w.salary.salesPercent > 0 && (
+                          <div className="text-xs text-slate-400">{w.salary.salesPercent}% foydadan</div>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <Card className="border-0 bg-orange-50">
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Bu oy (usta)</CardTitle></CardHeader>
+                      <CardContent className="space-y-1 text-sm">
+                        <div className="flex justify-between"><span className="text-slate-600">Sotuvlar:</span><span className="font-medium">{stats.ustaMonth.count} ta</span></div>
+                        <div className="flex justify-between font-bold"><span>Keshbek:</span><span className="text-orange-600">{formatPrice(stats.ustaMonth.totalCashback)}</span></div>
+                        {w.salary.salesPercent > 0 && (
+                          <div className="text-xs text-slate-400">{w.salary.salesPercent}% foydadan</div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Usta sotuvlar jadvali */}
+                  {stats.ustaMonth.sales.length > 0 ? (
+                    <div className="bg-white rounded-lg border overflow-hidden">
+                      <div className="text-xs font-medium text-slate-500 px-3 py-2 border-b bg-slate-50">Bu oygi sotuvlar</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b text-left text-slate-400">
+                              <th className="px-3 py-2">#</th>
+                              <th className="px-3 py-2">Sana</th>
+                              <th className="px-3 py-2">Kassir</th>
+                              <th className="px-3 py-2 text-right">Summa</th>
+                              <th className="px-3 py-2 text-right">Foyda</th>
+                              <th className="px-3 py-2 text-right">Keshbek</th>
+                              <th className="px-3 py-2">Holat</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.ustaMonth.sales.map(s => (
+                              <tr key={s._id} className="border-b last:border-0 hover:bg-slate-50">
+                                <td className="px-3 py-2 text-slate-400">{s.receiptNo || '—'}</td>
+                                <td className="px-3 py-2 text-slate-600">
+                                  {new Date(s.createdAt).toLocaleDateString('uz-UZ')}
+                                </td>
+                                <td className="px-3 py-2 text-slate-600">{s.cashier?.name || '—'}</td>
+                                <td className="px-3 py-2 text-right font-medium">
+                                  {formatPrice(s.total)}
+                                  {s.hasReturn && <span className="text-red-400 ml-1">(qaytarilgan)</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right text-green-600">{formatPrice(s.profit)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-orange-600">{formatPrice(s.cashback)}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                    s.paymentType === 'full' ? 'bg-green-100 text-green-700' :
+                                    s.paymentType === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-700'
+                                  }`}>{paymentLabel(s.paymentType)}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-slate-400 text-sm py-6 bg-slate-50 rounded-lg">
+                      Bu oy usta sifatida sotuv yo&apos;q
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })()}
