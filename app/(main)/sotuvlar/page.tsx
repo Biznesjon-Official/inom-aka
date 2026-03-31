@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatPrice, calcSaleRevenue, calcSaleProfit, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
+import { formatPrice, calcSaleRevenue, calcSaleProfit, calcSaleDebt, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 
@@ -170,7 +170,7 @@ function SotuvlarContent() {
   }
 
   const totalRevenue = filtered.reduce((s, x) => s + calcSaleRevenue(x), 0)
-  const totalDebt = filtered.reduce((s, x) => s + Math.max(0, (x.total - x.paid) - (x.returnedTotal || 0)), 0)
+  const totalDebt = filtered.reduce((s, x) => s + calcSaleDebt(x), 0)
   const totalSales = filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
   const totalProfit = filtered.reduce((s, x) => s + calcSaleProfit(x), 0)
 

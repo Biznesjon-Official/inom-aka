@@ -42,6 +42,11 @@ export function calcSaleRevenue(s: SaleForCalc): number {
   return s.paid - Math.max(0, ret - debt)
 }
 
+// qarz = sotuvdan qolgan to'lanmagan summa (qaytarilgan ayirilgan)
+export function calcSaleDebt(s: Pick<SaleForCalc, 'total' | 'paid' | 'returnedTotal'>): number {
+  return Math.max(0, (s.total - s.paid) - (s.returnedTotal || 0))
+}
+
 // foyda = (sotuv - qaytarilgan) - (tannarx - qaytarilgan tannarx)
 export function calcSaleProfit(s: SaleForCalc): number {
   const netSales = s.total - (s.returnedTotal || 0)

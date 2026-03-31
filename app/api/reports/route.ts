@@ -80,13 +80,15 @@ export async function GET(req: NextRequest) {
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]).allowDiskUse(true)
 
-    // Debts aggregation — newDebt: entries.date bo'yicha, paidDebt: payments.date bo'yicha
-    const [newDebtAgg] = await Debt.aggregate([
-      { $unwind: '$entries' },
-      { $match: { 'entries.date': dateFilter } },
+    // newDebt = calcSaleDebt bilan bir xil: max(0, total - paid - returnedTotal)
+    const [newDebtAgg] = await Sale.aggregate([
+      { $match: { createdAt: dateFilter } },
       { $group: {
         _id: null,
-        newDebt: { $sum: '$entries.amount' },
+        newDebt: { $sum: { $max: [0, { $subtract: [
+          { $subtract: ['$total', '$paid'] },
+          { $ifNull: ['$returnedTotal', 0] },
+        ]}] } },
       }},
     ]).allowDiskUse(true)
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatPrice, calcSaleRevenue, calcSaleProfit, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
+import { formatPrice, calcSaleRevenue, calcSaleProfit, calcSaleDebt, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
 import { printReceipt } from '@/lib/print'
 import { RefreshCw, Printer, Undo2, Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -114,7 +114,7 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
   const todaySalesRevenue = sales.reduce((s, x) => s + calcSaleRevenue(x), 0)
   const todayDebtRevenue = debtPayments.reduce((s, d) => s + d.todayPaid, 0)
   const todayRevenue = todaySalesRevenue
-  const todayTotal = sales.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
+  const todayDebt = sales.reduce((s, x) => s + calcSaleDebt(x), 0)
   const todayProfit = sales.reduce((s, x) => s + calcSaleProfit(x), 0)
 
   return (
@@ -133,8 +133,8 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
           {todayDebtRevenue > 0 && (
             <span>Qarz to&apos;lov: <span className="font-medium text-green-600">+{formatPrice(todayDebtRevenue)}</span></span>
           )}
-          {todayTotal > todaySalesRevenue && (
-            <span>Qarz: <span className="font-medium text-orange-600">{formatPrice(todayTotal - todaySalesRevenue)}</span></span>
+          {todayDebt > 0 && (
+            <span>Qarz: <span className="font-medium text-orange-600">{formatPrice(todayDebt)}</span></span>
           )}
         </div>
       </CardHeader>
