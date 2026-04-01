@@ -20,7 +20,7 @@ import { sendDebtsReport } from './reports/debts'
 import { sendLowStockReport } from './reports/low-stock'
 import { sendDailySalesReport } from './reports/daily-sales'
 import { sendDbDump } from './reports/db-dump'
-import { saveLocalBackup } from './reports/local-backup'
+import { saveHourlyBackup, saveDailyBackup } from './reports/local-backup'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 if (!BOT_TOKEN) {
@@ -178,24 +178,31 @@ async function runAllReports(): Promise<void> {
   console.log('Reports done.')
 }
 
-// Cron: every day at 22:00 Tashkent time — full report to Telegram
-cron.schedule('0 22 * * *', runAllReports, { timezone: 'Asia/Tashkent' })
-
-// Cron: every day at 10:00 Tashkent time — full report to Telegram
-cron.schedule('0 10 * * *', runAllReports, { timezone: 'Asia/Tashkent' })
-
-// Cron: every hour — local JSON backup only (no Telegram)
-cron.schedule('0 * * * *', async () => {
-  console.log(`[${new Date().toISOString()}] ⏰ Hourly local backup...`)
+// Cron: every day at 22:00 Tashkent time — full Telegram report + full backup (JSON + uploads)
+cron.schedule('0 22 * * *', async () => {
+  await runAllReports()
   try {
     await connectDB()
-    await saveLocalBackup()
+    await saveDailyBackup()
+  } catch (err) {
+    console.error('Daily backup failed:', err)
+  }
+}, { timezone: 'Asia/Tashkent' })
+
+// Cron: every hour — JSON only backup (no Telegram, no images)
+cron.schedule('0 * * * *', async () => {
+  console.log(`[${new Date().toISOString()}] ⏰ Hourly JSON backup...`)
+  try {
+    await connectDB()
+    await saveHourlyBackup()
   } catch (err) {
     console.error('Hourly backup failed:', err)
   }
 }, { timezone: 'Asia/Tashkent' })
 
-console.log('Bot started. Cron: 10:00 & 22:00 full reports, every hour local backup.')
+console.log('Bot started.')
+console.log('  📊 22:00 — Full Telegram report + JSON + uploads backup')
+console.log('  ⏰ Every hour — JSON only backup')
 if (!isTest) console.log('Polling enabled — waiting for commands...')
 
 // --test flag: run immediately and exit
