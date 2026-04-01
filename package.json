@@ -11,6 +11,7 @@
     "bot:test": "tsx bot/index.ts --test",
     "migrate:images": "tsx scripts/migrate-images.ts",
     "migrate:json": "tsx scripts/migrate-json-to-db.ts",
+    "migrate:personal-debts": "tsx scripts/migrate-personal-debts.ts",
     "create:admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {

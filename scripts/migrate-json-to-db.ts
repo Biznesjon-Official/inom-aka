@@ -15,6 +15,7 @@ import '../models/Expense'
 import '../models/ExpenseSource'
 import '../models/Debt'
 import '../models/DebtCategory'
+import '../models/PersonalDebt'
 import '../models/User'
 import '../models/SavedCart'
 import '../models/CashbackPayout'
@@ -95,6 +96,7 @@ async function migrate() {
       { model: 'ExpenseSource', file: 'expense_sources.json' },
       { model: 'Debt', file: 'debts.json' },
       { model: 'DebtCategory', file: 'debt_categories.json' },
+      { model: 'PersonalDebt', file: 'personal_debts.json' },
       { model: 'User', file: 'users.json' },
       { model: 'SavedCart', file: 'saved_carts.json' },
       { model: 'CashbackPayout', file: 'cashback_payouts.json' },

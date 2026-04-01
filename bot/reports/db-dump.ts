@@ -7,6 +7,7 @@ import Product from '../../models/Product'
 import Category from '../../models/Category'
 import Customer from '../../models/Customer'
 import Debt from '../../models/Debt'
+import PersonalDebt from '../../models/PersonalDebt'
 import Sale from '../../models/Sale'
 import Expense from '../../models/Expense'
 import ExpenseSource from '../../models/ExpenseSource'
@@ -20,7 +21,7 @@ import { formatDate } from '../utils/format'
 
 async function collectAllData() {
   const [
-    products, categories, customers, debts, sales,
+    products, categories, customers, debts, personalDebts, sales,
     expenses, expenseSources, users, cashbackPayouts,
     savedCarts, settings, counters
   ] = await Promise.all([
@@ -28,6 +29,7 @@ async function collectAllData() {
     Category.find().lean(),
     Customer.find().lean(),
     Debt.find().populate('customer', 'name phone').populate('sale', 'receiptNo').lean(),
+    PersonalDebt.find().lean(),
     Sale.find().populate('cashier', 'name').populate('customer', 'name phone')
       .populate('items.product', 'name').populate('returnedItems.product', 'name').lean(),
     Expense.find().populate('source', 'name').lean(),
@@ -40,7 +42,7 @@ async function collectAllData() {
   ])
 
   return {
-    products, categories, customers, debts, sales,
+    products, categories, customers, debts, personalDebts, sales,
     expenses, expenseSources, users, cashbackPayouts,
     savedCarts, settings, counters
   }
@@ -103,6 +105,7 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
     categories: allData.categories,
     customers: allData.customers,
     debts: allData.debts,
+    personal_debts: allData.personalDebts,
     sales: allData.sales,
     expenses: allData.expenses,
     expense_sources: allData.expenseSources,
@@ -119,6 +122,7 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
     `Mahsulotlar: ${allData.products.length}, ` +
     `Sotuvlar: ${allData.sales.length}, ` +
     `Qarzlar: ${allData.debts.length}, ` +
+    `Shaxsiy qarzlar: ${allData.personalDebts.length}, ` +
     `Rasmlar: ${images.length}`
 
   if (chatId) {
