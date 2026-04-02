@@ -50,7 +50,7 @@ export default function UstalarPage() {
   // Detail dialog state
   const [detailUsta, setDetailUsta] = useState<Usta | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [period, setPeriod] = useState<'month' | 'year'>('month')
+  const [salesFilter, setSalesFilter] = useState<'year' | 'all'>('year')
   const [cashbackData, setCashbackData] = useState<CashbackData | null>(null)
   const [cashbackLoading, setCashbackLoading] = useState(false)
 
@@ -127,6 +127,7 @@ export default function UstalarPage() {
     setDetailUsta(c)
     setCashbackData(null)
     setUstaSales([])
+    setSalesFilter('year')
     setEditTotalSales(false)
     setDetailOpen(true)
   }
@@ -431,16 +432,43 @@ export default function UstalarPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {detailUsta && (
+          {detailUsta && (() => {
+            const thisYear = new Date().getFullYear()
+            const yearlySales = ustaSales.filter(s => new Date(s.createdAt).getFullYear() === thisYear)
+            const yearlyTotal = yearlySales.reduce((s, x) => s + x.total, 0)
+            const yearlyCashback = Math.round(yearlyTotal * (detailUsta.cashbackPercent || 0) / 100)
+            const displayedSales = salesFilter === 'year' ? yearlySales : ustaSales
+            return (
             <div className="space-y-4">
+              {/* Yearly cashback summary */}
+              {detailUsta.cashbackPercent > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-amber-50 rounded-lg p-3">
+                    <div className="text-xs text-amber-600">Bu yilgi savdolar</div>
+                    <div className="font-semibold text-amber-800 mt-0.5">{formatPrice(yearlyTotal)}</div>
+                    <div className="text-xs text-amber-500 mt-0.5">{yearlySales.length} ta sotuv</div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3">
+                    <div className="text-xs text-emerald-600">Yillik keshbek ({detailUsta.cashbackPercent}%)</div>
+                    <div className="font-bold text-emerald-700 mt-0.5">{formatPrice(yearlyCashback)}</div>
+                    <div className="text-xs text-emerald-500 mt-0.5">{thisYear}-yil</div>
+                  </div>
+                </div>
+              )}
               {/* Usta sales history */}
               <div className="space-y-2">
-                <div className="text-sm font-medium text-slate-700">Savdo tarixi ({ustaSales.length})</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-slate-700">Savdo tarixi ({displayedSales.length})</div>
+                  <div className="flex border rounded overflow-hidden text-xs">
+                    <button className={`px-2 py-1 ${salesFilter === 'year' ? 'bg-slate-100 font-medium' : 'hover:bg-slate-50'}`} onClick={() => setSalesFilter('year')}>Bu yil</button>
+                    <button className={`px-2 py-1 ${salesFilter === 'all' ? 'bg-slate-100 font-medium' : 'hover:bg-slate-50'}`} onClick={() => setSalesFilter('all')}>Hammasi</button>
+                  </div>
+                </div>
                 {salesLoading ? (
                   <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>
-                ) : ustaSales.length > 0 ? (
+                ) : displayedSales.length > 0 ? (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {ustaSales.map(sale => (
+                    {displayedSales.map(sale => (
                       <div
                         key={sale._id}
                         className="bg-slate-50 rounded-lg p-2.5 text-xs cursor-pointer hover:bg-slate-100 transition-colors"
@@ -587,7 +615,7 @@ export default function UstalarPage() {
                 </>
               )}
             </div>
-          )}
+          )})()}
         </DialogContent>
       </Dialog>
 
