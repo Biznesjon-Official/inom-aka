@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
+import '@/models/Sale' // ensure Sale model is registered for populate
 
 export async function GET(req: Request) {
   try {
@@ -44,8 +45,8 @@ export async function GET(req: Request) {
 
     const debts = await Debt.find(filter)
       .populate('category', 'name')
-      .populate('sale', 'total paid createdAt paymentType items')
-      .populate('entries.sale', 'items')
+      .populate({ path: 'sale', select: 'total paid createdAt paymentType items' })
+      .populate({ path: 'entries.sale', select: 'items', model: 'Sale' })
       .sort({ createdAt: -1 })
       .lean()
 
