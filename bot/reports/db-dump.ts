@@ -20,6 +20,10 @@ import { sendDocumentToAll, sendDocumentTo } from '../utils/send'
 import { formatDate } from '../utils/format'
 
 async function collectAllData() {
+  // Sales: faqat oxirgi 90 kunlik (ZIP hajmini kamaytirish uchun)
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
   const [
     products, categories, customers, debts, personalDebts, sales,
     expenses, expenseSources, users, cashbackPayouts,
@@ -30,7 +34,8 @@ async function collectAllData() {
     Customer.find().lean(),
     Debt.find().populate('customer', 'name phone').populate('sale', 'receiptNo').lean(),
     PersonalDebt.find().lean(),
-    Sale.find().populate('cashier', 'name').populate('customer', 'name phone')
+    Sale.find({ createdAt: { $gte: ninetyDaysAgo } })
+      .populate('cashier', 'name').populate('customer', 'name phone')
       .populate('items.product', 'name').populate('returnedItems.product', 'name').lean(),
     Expense.find().populate('source', 'name').lean(),
     ExpenseSource.find().lean(),
@@ -120,7 +125,7 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
   const filename = `crm_backup_${dateStr}.zip`
   const caption = `📦 CRM Backup — ${dateStr}\n` +
     `Mahsulotlar: ${allData.products.length}, ` +
-    `Sotuvlar: ${allData.sales.length}, ` +
+    `Sotuvlar: ${allData.sales.length} (90 kun), ` +
     `Qarzlar: ${allData.debts.length}, ` +
     `Shaxsiy qarzlar: ${allData.personalDebts.length}, ` +
     `Rasmlar: ${images.length}`
