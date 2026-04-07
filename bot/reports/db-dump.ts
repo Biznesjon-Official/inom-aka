@@ -66,36 +66,36 @@ function extractImages(products: any[]): { name: string; buffer: Buffer; ext: st
   return images
 }
 
-async function createFullZip(data: Record<string, any>, images: { name: string; buffer: Buffer; ext: string }[]): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+function createZipFromEntries(entries: { name: string; buffer: Buffer }[]): Promise<Buffer> {
+  return new Promise((res, rej) => {
     const archive = archiver('zip', { zlib: { level: 9 } })
     const chunks: Buffer[] = []
     const stream = new PassThrough()
-
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk))
-    stream.on('end', () => resolve(Buffer.concat(chunks)))
-    archive.on('error', reject)
-
+    stream.on('data', (c: Buffer) => chunks.push(c))
+    stream.on('end', () => res(Buffer.concat(chunks)))
+    archive.on('error', rej)
     archive.pipe(stream)
-
-    for (const [name, docs] of Object.entries(data)) {
-      const json = JSON.stringify(docs, null, 2)
-      archive.append(Buffer.from(json, 'utf-8'), { name: `${name}.json` })
+    for (const entry of entries) {
+      archive.append(entry.buffer, { name: entry.name })
     }
-
-    for (const img of images) {
-      archive.append(img.buffer, { name: `images/${img.name}.${img.ext}` })
-    }
-
     archive.finalize()
   })
+}
+
+async function send(bot: any, chatId: string | number | undefined, buf: Buffer, filename: string, caption: string) {
+  if (chatId) {
+    await sendDocumentTo(bot, chatId, buf, filename, caption)
+  } else {
+    await sendDocumentToAll(bot, buf, filename, caption)
+  }
 }
 
 export async function sendDbDump(bot: any, chatId?: string | number): Promise<void> {
   const allData = await collectAllData()
   const dateStr = formatDate(new Date())
 
-  const zipData: Record<string, any> = {
+  // Part 1: JSON data
+  const jsonEntries = Object.entries({
     products: allData.products,
     categories: allData.categories,
     customers: allData.customers,
@@ -109,21 +109,38 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
     saved_carts: allData.savedCarts,
     settings: allData.settings,
     counters: allData.counters,
-  }
+  }).map(([name, docs]) => ({
+    name: `${name}.json`,
+    buffer: Buffer.from(JSON.stringify(docs, null, 2), 'utf-8'),
+  }))
 
+  const jsonZip = await createZipFromEntries(jsonEntries)
+  await send(bot, chatId, jsonZip, `crm_db_${dateStr}.zip`,
+    `📦 CRM DB — ${dateStr}\n` +
+    `Mahsulotlar: ${allData.products.length}, Sotuvlar: ${allData.sales.length}, ` +
+    `Qarzlar: ${allData.debts.length}, Shaxsiy qarzlar: ${allData.personalDebts.length}\n` +
+    `(1/${allData.products.length > 0 ? '3' : '1'} — JSON ma\'lumotlar)`
+  )
+
+  // Part 2 & 3: Images split in half
   const images = extractImages(allData.products)
-  const zipBuffer = await createFullZip(zipData, images)
-  const filename = `crm_backup_${dateStr}.zip`
-  const caption = `📦 CRM Backup — ${dateStr}\n` +
-    `Mahsulotlar: ${allData.products.length}, ` +
-    `Sotuvlar: ${allData.sales.length}, ` +
-    `Qarzlar: ${allData.debts.length}, ` +
-    `Shaxsiy qarzlar: ${allData.personalDebts.length}, ` +
-    `Rasmlar: ${images.length}`
+  if (images.length === 0) return
 
-  if (chatId) {
-    await sendDocumentTo(bot, chatId, zipBuffer, filename, caption)
-  } else {
-    await sendDocumentToAll(bot, zipBuffer, filename, caption)
+  const half = Math.ceil(images.length / 2)
+  const parts = [images.slice(0, half), images.slice(half)]
+
+  for (let i = 0; i < parts.length; i++) {
+    const chunk = parts[i]
+    if (chunk.length === 0) continue
+    const entries = chunk.map(img => ({
+      name: `images/${img.name}.${img.ext}`,
+      buffer: img.buffer,
+    }))
+    const zipBuf = await createZipFromEntries(entries)
+    const partNum = i + 2
+    await send(bot, chatId, zipBuf, `crm_images_part${i + 1}_${dateStr}.zip`,
+      `🖼 Rasmlar ${i + 1}-qism — ${dateStr}\n` +
+      `${chunk.length} ta rasm (${partNum}/3)`
+    )
   }
 }
