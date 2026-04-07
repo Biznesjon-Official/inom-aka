@@ -16,29 +16,74 @@ export async function GET(req: Request) {
     const to = searchParams.get('to')
     const today = searchParams.get('today')
     const usta = searchParams.get('usta')
+    const ids = searchParams.get('ids')
 
-    const filter: Record<string, unknown> = {}
-    if (cashier) filter.cashier = cashier
-    if (customer) filter.customer = customer
-    if (usta) filter.usta = usta
-    if (today === '1') {
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      filter.createdAt = { $gte: start }
-    } else if (from || to) {
-      filter.createdAt = {}
-      if (from) (filter.createdAt as Record<string, unknown>).$gte = new Date(from)
-      if (to) (filter.createdAt as Record<string, unknown>).$lte = new Date(to)
+    // Specific sale IDs mode (for debt archive view)
+    if (ids) {
+      const idList = ids.split(',').filter(Boolean)
+      const sales = await Sale.find({ _id: { $in: idList } })
+        .populate('cashier', 'name')
+        .populate('customer', 'name phone')
+        .populate('usta', 'name')
+        .sort({ createdAt: -1 })
+        .lean()
+        .allowDiskUse(true)
+      return NextResponse.json(sales)
     }
 
-    const sales = await Sale.find(filter)
+    const search = searchParams.get('search')
+
+    const filter: Record<string, unknown> = {}
+    if (search) {
+      // Search mode: search across all sales, no date/limit restriction
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const searchNum = Number(search)
+      if (!isNaN(searchNum) && search.trim() !== '') {
+        // Receipt number exact match
+        filter.receiptNo = searchNum
+      } else {
+        // Name search: registered customers + debt customers (customerName on Debt)
+        const regex = new RegExp(escapedSearch, 'i')
+        const Customer = (await import('@/models/Customer')).default
+        const [matchingCustomers, matchingDebts] = await Promise.all([
+          Customer.find({ name: regex }).select('_id').lean() as Promise<{ _id: unknown }[]>,
+          Debt.find({ customerName: regex }).select('sale entries.sale').lean() as Promise<{ sale?: unknown; entries?: { sale?: unknown }[] }[]>,
+        ])
+        // Collect sale IDs from debts (debt customers don't have Customer record)
+        const debtSaleIds: unknown[] = []
+        for (const d of matchingDebts) {
+          if (d.sale) debtSaleIds.push(d.sale)
+          if (d.entries) for (const e of d.entries) if (e.sale) debtSaleIds.push(e.sale)
+        }
+        filter.$or = [
+          { customer: { $in: matchingCustomers.map(c => c._id) } },
+          ...(debtSaleIds.length > 0 ? [{ _id: { $in: debtSaleIds } }] : [{ _id: null }]),
+        ]
+      }
+    } else {
+      if (cashier) filter.cashier = cashier
+      if (customer) filter.customer = customer
+      if (usta) filter.usta = usta
+      if (today === '1') {
+        const start = new Date()
+        start.setHours(0, 0, 0, 0)
+        filter.createdAt = { $gte: start }
+      } else if (from || to) {
+        filter.createdAt = {}
+        if (from) (filter.createdAt as Record<string, unknown>).$gte = new Date(from)
+        if (to) (filter.createdAt as Record<string, unknown>).$lte = new Date(to)
+      }
+    }
+
+    const q = Sale.find(filter)
       .populate('cashier', 'name')
       .populate('customer', 'name phone')
       .populate('usta', 'name')
       .sort({ createdAt: -1 })
-      .limit(100)
       .lean()
       .allowDiskUse(true)
+    if (!search) q.limit(100)
+    const sales = await q
 
     return NextResponse.json(sales)
   } catch (err) { return errorResponse(err) }

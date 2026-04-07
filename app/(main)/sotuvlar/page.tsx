@@ -41,7 +41,9 @@ function SotuvlarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const highlightId = searchParams.get('highlight')
-  
+  const idsParam = searchParams.get('ids')
+  const idsMode = !!(idsParam && idsParam.length > 0)
+
   const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
@@ -64,24 +66,24 @@ function SotuvlarContent() {
   const debouncedSearch = useDebounce(search)
 
   const fetchSales = useCallback(async () => {
+    if (idsMode) return  // ids mode uses separate fetch
     setLoading(true)
     const params = new URLSearchParams()
-    
-    if (selectedDate) {
-      // Tanlangan kun boshi va oxiri
+
+    if (debouncedSearch) {
+      // Search mode: search across all sales (no date restriction)
+      params.set('search', debouncedSearch)
+    } else if (selectedDate) {
       const startOfDay = new Date(selectedDate)
       startOfDay.setHours(0, 0, 0, 0)
-      
       const endOfDay = new Date(selectedDate)
       endOfDay.setHours(23, 59, 59, 999)
-      
       params.set('from', startOfDay.toISOString())
       params.set('to', endOfDay.toISOString())
     } else {
-      // Agar sana tanlanmagan bo'lsa, bugungi sotuvlar
       params.set('today', '1')
     }
-    
+
     const res = await fetch(`/api/sales?${params}`)
     if (res.ok) {
       setSales(await res.json())
@@ -89,10 +91,21 @@ function SotuvlarContent() {
       toast.error('Sotuvlarni yuklashda xato')
     }
     setLoading(false)
-  }, [selectedDate])
+  }, [selectedDate, idsMode, debouncedSearch])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchSales() }, [fetchSales])
+
+  // ids mode: fetch specific sales
+  useEffect(() => {
+    if (!idsMode || !idsParam) return
+    setLoading(true)
+    fetch(`/api/sales?ids=${idsParam}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setSales(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsParam])
 
   // Auto-expand and scroll to highlighted sale
   useEffect(() => {
@@ -110,16 +123,8 @@ function SotuvlarContent() {
       }
     }
   }, [highlightId, sales])
-  // Filter by search (receipt#, customer name, cashier name)
-  const filtered = sales.filter(s => {
-    if (!debouncedSearch) return true
-    const q = debouncedSearch.toLowerCase()
-    return (
-      String(s.receiptNo).includes(q) ||
-      (s.customer?.name || '').toLowerCase().includes(q) ||
-      (s.cashier?.name || '').toLowerCase().includes(q)
-    )
-  })
+  // When search active, server already filtered; otherwise client-side filter for cashier name
+  const filtered = debouncedSearch ? sales : sales
 
   function openReturn(sale: Sale) {
     setReturnSale(sale)
@@ -194,7 +199,16 @@ function SotuvlarContent() {
         </div>
       </div>
 
+      {/* ids mode banner */}
+      {idsMode && (
+        <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
+          <span className="text-sm text-orange-700 font-medium">Arxivdagi qarzdorning sotuvlari ko&apos;rsatilmoqda</span>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>Orqaga</Button>
+        </div>
+      )}
+
       {/* Filters */}
+      {!idsMode && (
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -202,17 +216,17 @@ function SotuvlarContent() {
             onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex items-center gap-2">
-          <Input 
-            type="date" 
-            className="w-44" 
-            value={selectedDate} 
+          <Input
+            type="date"
+            className="w-44"
+            value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
             placeholder="Sana tanlang"
           />
           {selectedDate && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setSelectedDate('')}
               className="whitespace-nowrap"
             >
@@ -221,15 +235,17 @@ function SotuvlarContent() {
           )}
         </div>
       </div>
+      )}
 
       {/* Stats */}
       <div className="flex gap-4 text-sm text-slate-600 flex-wrap items-center">
-        {selectedDate && (
+        {!idsMode && debouncedSearch && <span className="font-medium text-purple-600">Barcha vaqtlar</span>}
+        {!idsMode && !debouncedSearch && selectedDate && (
           <span className="font-medium text-blue-600">
             📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
           </span>
         )}
-        {!selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
+        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
         <span className="text-slate-300">|</span>
         <span>{filtered.length} ta sotuv</span>
         <span>Jami: <span className="font-bold text-slate-800">{formatPrice(totalSales)}</span></span>
@@ -264,7 +280,7 @@ function SotuvlarContent() {
                 <tr 
                   data-sale-id={sale._id}
                   className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
-                  onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
+                  onClick={() => !idsMode && setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
                   <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                     {new Date(sale.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -295,7 +311,7 @@ function SotuvlarContent() {
                     </div>
                   </td>
                 </tr>
-                {expandedSale === sale._id && (
+                {(idsMode || expandedSale === sale._id) && (
                   <tr className="bg-slate-50">
                     <td colSpan={8} className="px-4 py-3">
                       <div className="space-y-1">
@@ -339,7 +355,7 @@ function SotuvlarContent() {
               className={`border-0 shadow-sm ${isHighlighted ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-center justify-between gap-2 cursor-pointer"
-                  onClick={() => setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
+                  onClick={() => !idsMode && setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="text-sm">
                       <span className="font-medium text-slate-700">#{sale.receiptNo}</span>
@@ -398,7 +414,7 @@ function SotuvlarContent() {
                   </div>
                 )}
 
-                {expandedSale === sale._id && (
+                {(idsMode || expandedSale === sale._id) && (
                   <div className="mt-3 border-t pt-2 space-y-1">
                     {sale.items.map((item, i) => (
                       <div key={i} className="flex justify-between text-xs">

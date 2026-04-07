@@ -37,16 +37,28 @@ export async function GET(req: Request) {
       return NextResponse.json(results)
     }
 
+    const search = searchParams.get('search')
+
     const filter: Record<string, unknown> = {}
-    if (status) filter.status = status
-    if (customer) filter.customer = customer
-    if (category) filter.category = category
-    filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+    if (search) {
+      // Search mode: search across ALL statuses
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(escapedSearch, 'i')
+      filter.$and = [
+        { $or: [{ type: 'customer' }, { type: { $exists: false } }] },
+        { $or: [{ customerName: regex }, { customerPhone: regex }] },
+      ]
+    } else {
+      if (status) filter.status = status
+      if (customer) filter.customer = customer
+      if (category) filter.category = category
+      filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+    }
 
     const debts = await Debt.find(filter)
       .populate('category', 'name')
-      .populate({ path: 'sale', select: 'total paid createdAt paymentType items' })
-      .populate({ path: 'entries.sale', select: 'items', model: 'Sale' })
+      .populate({ path: 'sale', select: 'total paid createdAt paymentType items receiptNo' })
+      .populate({ path: 'entries.sale', select: 'items receiptNo', model: 'Sale' })
       .sort({ createdAt: -1 })
       .lean()
 
