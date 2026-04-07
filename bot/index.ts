@@ -21,6 +21,7 @@ import { sendLowStockReport } from './reports/low-stock'
 import { sendDailySalesReport } from './reports/daily-sales'
 import { sendDbDump } from './reports/db-dump'
 import { saveHourlyBackup, saveDailyBackup } from './reports/local-backup'
+import { sendToAll } from './utils/send'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 if (!BOT_TOKEN) {
@@ -183,26 +184,29 @@ cron.schedule('0 22 * * *', async () => {
   await runAllReports()
   try {
     await connectDB()
-    await saveDailyBackup()
+    const msg = await saveDailyBackup()
+    await sendToAll(bot, msg)
   } catch (err) {
     console.error('Daily backup failed:', err)
+    await sendToAll(bot, '❌ Kunlik backup xato: ' + String(err)).catch(() => {})
   }
 }, { timezone: 'Asia/Tashkent' })
 
-// Cron: every hour — JSON only backup (no Telegram, no images)
+// Cron: every hour — JSON only backup
 cron.schedule('0 * * * *', async () => {
-  console.log(`[${new Date().toISOString()}] ⏰ Hourly JSON backup...`)
   try {
     await connectDB()
-    await saveHourlyBackup()
+    const msg = await saveHourlyBackup(bot)
+    await sendToAll(bot, msg)
   } catch (err) {
     console.error('Hourly backup failed:', err)
+    await sendToAll(bot, '❌ Soatlik backup xato: ' + String(err)).catch(() => {})
   }
 }, { timezone: 'Asia/Tashkent' })
 
 console.log('Bot started.')
-console.log('  📊 22:00 — Full Telegram report + JSON + uploads backup')
-console.log('  ⏰ Every hour — JSON only backup')
+console.log('  📊 22:00 — Full Telegram report + JSON + uploads backup + xabar')
+console.log('  ⏰ Every hour — JSON backup + Telegram xabar')
 if (!isTest) console.log('Polling enabled — waiting for commands...')
 
 // --test flag: run immediately and exit

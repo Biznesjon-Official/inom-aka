@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import archiver from 'archiver'
 import { PassThrough } from 'stream'
+import { readFileSync, existsSync } from 'fs'
+import { resolve, extname } from 'path'
 import Product from '../../models/Product'
 import Category from '../../models/Category'
 import Customer from '../../models/Customer'
@@ -46,7 +48,25 @@ async function collectAllData() {
   }
 }
 
-async function createJsonZip(data: Record<string, any>): Promise<Buffer> {
+function extractImages(products: any[]): { name: string; buffer: Buffer; ext: string }[] {
+  const uploadsDir = resolve(process.cwd(), 'public/uploads')
+  const images: { name: string; buffer: Buffer; ext: string }[] = []
+  for (const product of products) {
+    if (!product.image) continue
+    const filename = product.image.replace(/^\/api\/uploads\//, '')
+    const filePath = resolve(uploadsDir, filename)
+    if (!existsSync(filePath)) continue
+    try {
+      const buffer = readFileSync(filePath)
+      const safeName = product.name.replace(/[/\\?%*:|"<>]/g, '_')
+      const ext = extname(filename).replace('.', '') || 'webp'
+      images.push({ name: safeName, buffer, ext })
+    } catch { /* skip unreadable files */ }
+  }
+  return images
+}
+
+async function createFullZip(data: Record<string, any>, images: { name: string; buffer: Buffer; ext: string }[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const archive = archiver('zip', { zlib: { level: 9 } })
     const chunks: Buffer[] = []
@@ -61,6 +81,10 @@ async function createJsonZip(data: Record<string, any>): Promise<Buffer> {
     for (const [name, docs] of Object.entries(data)) {
       const json = JSON.stringify(docs, null, 2)
       archive.append(Buffer.from(json, 'utf-8'), { name: `${name}.json` })
+    }
+
+    for (const img of images) {
+      archive.append(img.buffer, { name: `images/${img.name}.${img.ext}` })
     }
 
     archive.finalize()
@@ -87,14 +111,15 @@ export async function sendDbDump(bot: any, chatId?: string | number): Promise<vo
     counters: allData.counters,
   }
 
-  const zipBuffer = await createJsonZip(zipData)
+  const images = extractImages(allData.products)
+  const zipBuffer = await createFullZip(zipData, images)
   const filename = `crm_backup_${dateStr}.zip`
   const caption = `📦 CRM Backup — ${dateStr}\n` +
     `Mahsulotlar: ${allData.products.length}, ` +
     `Sotuvlar: ${allData.sales.length}, ` +
     `Qarzlar: ${allData.debts.length}, ` +
-    `Shaxsiy qarzlar: ${allData.personalDebts.length}\n` +
-    `(Rasmlar mahalliy backupda saqlangan)`
+    `Shaxsiy qarzlar: ${allData.personalDebts.length}, ` +
+    `Rasmlar: ${images.length}`
 
   if (chatId) {
     await sendDocumentTo(bot, chatId, zipBuffer, filename, caption)

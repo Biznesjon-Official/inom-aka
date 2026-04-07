@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync, rmdirSync, copyFileSync } from 'fs'
 import { resolve } from 'path'
+import archiver from 'archiver'
+import { PassThrough } from 'stream'
+import { sendDocumentToAll } from '../utils/send'
 import Product from '../../models/Product'
 import Category from '../../models/Category'
 import Customer from '../../models/Customer'
@@ -136,8 +139,24 @@ function copyUploads(backupPath: string) {
   return count
 }
 
-// Har soat - faqat JSON backup
-export async function saveHourlyBackup(): Promise<void> {
+function createJsonZip(data: Record<string, any[]>): Promise<Buffer> {
+  return new Promise((res, rej) => {
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    const chunks: Buffer[] = []
+    const stream = new PassThrough()
+    stream.on('data', (c: Buffer) => chunks.push(c))
+    stream.on('end', () => res(Buffer.concat(chunks)))
+    archive.on('error', rej)
+    archive.pipe(stream)
+    for (const [name, docs] of Object.entries(data)) {
+      archive.append(Buffer.from(JSON.stringify(docs, null, 2), 'utf-8'), { name: `${name}.json` })
+    }
+    archive.finalize()
+  })
+}
+
+// Har soat - JSON backup (local + Telegram ZIP)
+export async function saveHourlyBackup(bot?: any): Promise<string> {
   const now = new Date()
   const dateStr = formatDateTime(now)
   const backupPath = resolve(BACKUP_DIR, `hourly_${dateStr}`)
@@ -152,11 +171,25 @@ export async function saveHourlyBackup(): Promise<void> {
   cleanOldBackups('hourly_', MAX_HOURLY)
 
   const total = Object.values(data).reduce((s, d) => s + d.length, 0)
-  console.log(`  ✅ Hourly backup: ${total} records → ${backupPath}`)
+  const msg = `⏰ Soatlik backup: ${total} ta yozuv saqlandi`
+  console.log(`  ✅ ${msg}`)
+
+  if (bot) {
+    try {
+      const zipBuffer = await createJsonZip(data)
+      const filename = `hourly_${dateStr}.zip`
+      const caption = `⏰ Soatlik backup — ${dateStr.replace('T', ' ').replace(/-/g, ':').slice(0, 19)}\n${total} ta yozuv`
+      await sendDocumentToAll(bot, zipBuffer, filename, caption)
+    } catch (err) {
+      console.error('  ⚠️  Failed to send hourly ZIP to Telegram:', err)
+    }
+  }
+
+  return msg
 }
 
 // Har kuni 22:00 - JSON + uploads/images full backup
-export async function saveDailyBackup(): Promise<void> {
+export async function saveDailyBackup(): Promise<string> {
   const now = new Date()
   const dateStr = formatDateTime(now)
   const backupPath = resolve(BACKUP_DIR, `daily_${dateStr}`)
@@ -173,7 +206,9 @@ export async function saveDailyBackup(): Promise<void> {
   cleanOldBackups('daily_', MAX_DAILY)
 
   const total = Object.values(data).reduce((s, d) => s + d.length, 0)
-  console.log(`  ✅ Daily backup: ${total} records + ${imgCount} images → ${backupPath}`)
+  const msg = `📦 Kunlik backup: ${total} ta yozuv + ${imgCount} ta rasm saqlandi`
+  console.log(`  ✅ ${msg}`)
+  return msg
 }
 
 // Eski saveLocalBackup - backward compat
