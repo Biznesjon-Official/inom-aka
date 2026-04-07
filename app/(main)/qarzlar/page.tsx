@@ -85,12 +85,10 @@ export default function QarzlarPage() {
 
   const fetchDebts = useCallback(async () => {
     const params = new URLSearchParams()
+    params.set('status', status)
+    if (filterCategory !== 'all') params.set('category', filterCategory)
     if (debouncedSearch) {
-      // Search mode: search across all statuses
       params.set('search', debouncedSearch)
-    } else {
-      params.set('status', status)
-      if (filterCategory !== 'all') params.set('category', filterCategory)
     }
     const res = await fetch(`/api/debts?${params}`)
     if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
