@@ -40,19 +40,18 @@ export async function GET(req: Request) {
     const search = searchParams.get('search')
 
     const filter: Record<string, unknown> = {}
+    filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+    if (status) filter.status = status
+    if (customer) filter.customer = customer
+    if (category) filter.category = category
     if (search) {
-      // Search mode: search across ALL statuses
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const regex = new RegExp(escapedSearch, 'i')
       filter.$and = [
-        { $or: [{ type: 'customer' }, { type: { $exists: false } }] },
+        { $or: filter.$or as unknown[] },
         { $or: [{ customerName: regex }, { customerPhone: regex }] },
       ]
-    } else {
-      if (status) filter.status = status
-      if (customer) filter.customer = customer
-      if (category) filter.category = category
-      filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+      delete filter.$or
     }
 
     const debts = await Debt.find(filter)

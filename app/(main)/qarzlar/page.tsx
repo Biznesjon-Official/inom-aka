@@ -108,12 +108,12 @@ export default function QarzlarPage() {
 
   const getAllItems = (d: Debt): SaleItem[] => {
     const items: SaleItem[] = []
+    if (d.sale?.items?.length) items.push(...d.sale.items)
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.items) items.push(...entry.sale.items)
+        if (entry.sale?.items?.length) items.push(...entry.sale.items)
       }
     }
-    if (!items.length && d.sale?.items) items.push(...d.sale.items)
     return items
   }
 
@@ -128,7 +128,6 @@ export default function QarzlarPage() {
     return [...ids]
   }
 
-  // When search active, server already filtered by name/phone across all statuses
   const filtered = debts
 
   const totalDebt = filtered.filter(d => d.status === 'active').reduce((s, d) => s + d.remainingAmount, 0)
