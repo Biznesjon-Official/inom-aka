@@ -334,13 +334,6 @@ export default function QarzlarPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Barcha kategoriya" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Barcha kategoriya</SelectItem>
-            {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Table view */}
