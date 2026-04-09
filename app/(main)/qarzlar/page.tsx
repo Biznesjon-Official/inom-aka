@@ -108,7 +108,6 @@ export default function QarzlarPage() {
 
   const getAllItems = (d: Debt): SaleItem[] => {
     const items: SaleItem[] = []
-    if (d.sale?.items?.length) items.push(...d.sale.items)
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.items?.length) items.push(...entry.sale.items)

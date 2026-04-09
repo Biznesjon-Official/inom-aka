@@ -66,9 +66,24 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Qarz to'lovlari (faqat sale ref yo'q bo'lganlar — sale bor bo'lsa allaqachon Sale.payments ga sync bo'lgan)
+    // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh (double-count oldini olish)
     const [manualDebtPaymentsAgg] = await Debt.aggregate([
-      { $match: { sale: null } },
+      {
+        $lookup: {
+          from: 'sales',
+          let: { saleId: '$sale' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$saleId'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'saleInPeriod',
+        },
+      },
+      { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       { $group: { _id: null, totalPayments: { $sum: '$payments.amount' } } },
@@ -168,9 +183,24 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, date: '$_id', expense: 1 } },
     ]).allowDiskUse(true)
 
-    // Daily qarz to'lovlari (faqat sale ref yo'q bo'lganlar)
+    // Daily qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
     const dailyManualDebtPayments = await Debt.aggregate([
-      { $match: { sale: null } },
+      {
+        $lookup: {
+          from: 'sales',
+          let: { saleId: '$sale' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$saleId'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'saleInPeriod',
+        },
+      },
+      { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       {
@@ -221,9 +251,24 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    // Qarz to'lovlari by method (faqat sale ref yo'q bo'lganlar)
+    // Qarz to'lovlari by method — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
     const manualDebtPaymentsByMethod = await Debt.aggregate([
-      { $match: { sale: null } },
+      {
+        $lookup: {
+          from: 'sales',
+          let: { saleId: '$sale' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$saleId'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'saleInPeriod',
+        },
+      },
+      { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       { $group: { _id: { $ifNull: ['$payments.method', 'cash'] }, total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
@@ -280,6 +325,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       salesCount,
+      salesRevenue: salesAgg?.totalRevenue || 0,
+      debtRevenue: manualDebtPayments,
       totalRevenue,
       totalProfit,
       totalExpenses: expensesAgg?.totalExpenses || 0,
