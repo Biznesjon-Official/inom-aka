@@ -47,12 +47,14 @@ export function calcSaleDebt(s: Pick<SaleForCalc, 'total' | 'paid' | 'returnedTo
   return Math.max(0, (s.total - s.paid) - (s.returnedTotal || 0))
 }
 
-// foyda = (sotuv - qaytarilgan) - (tannarx - qaytarilgan tannarx)
+// foyda = max(0, olingan_pul - tannarx)
+// Avval tannarx qoplanadi, keyin qolgan qism foyda
 export function calcSaleProfit(s: SaleForCalc): number {
-  const netSales = s.total - (s.returnedTotal || 0)
   const cost = s.items.reduce((a, i) => a + i.costPrice * i.qty, 0)
   const retCost = (s.returnedItems || []).reduce((a, i) => a + (i.costPrice || 0) * i.qty, 0)
-  return netSales - (cost - retCost)
+  const netCost = cost - retCost
+  const revenue = calcSaleRevenue(s)
+  return Math.max(0, revenue - netCost)
 }
 
 // Payment status badges

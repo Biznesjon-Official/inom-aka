@@ -36,11 +36,40 @@ export async function GET(req: NextRequest) {
       {
         $group: {
           _id: '$_id',
-          paid: { $first: '$paid' },
           total: { $first: '$total' },
-          returnedTotal: { $first: { $ifNull: ['$returnedTotal', 0] } },
-          returnedCostTotal: { $first: { $ifNull: ['$returnedCostTotal', 0] } },
           cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } },
+          // Only payments within this period
+          periodPaid: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$payments', []] }, as: 'p',
+                  cond: { $and: [{ $gte: ['$$p.date', fromDate] }, { $lte: ['$$p.date', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', '$$this.amount'] },
+              },
+            },
+          },
+          // Only returns within this period (avoids cross-period return distorting historical reports)
+          periodReturnedTotal: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                  cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', { $multiply: ['$$this.salePrice', '$$this.qty'] }] },
+              },
+            },
+          },
+          periodReturnedCostTotal: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                  cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', { $multiply: ['$$this.costPrice', '$$this.qty'] }] },
+              },
+            },
+          },
         },
       },
       {
@@ -49,17 +78,19 @@ export async function GET(req: NextRequest) {
           totalRevenue: {
             $sum: {
               $subtract: [
-                '$paid',
-                { $max: [0, { $subtract: ['$returnedTotal', { $subtract: ['$total', '$paid'] }] }] },
+                '$periodPaid',
+                { $max: [0, { $subtract: ['$periodReturnedTotal', { $subtract: ['$total', '$periodPaid'] }] }] },
               ],
             },
           },
           totalProfit: {
             $sum: {
-              $subtract: [
-                { $subtract: ['$total', '$returnedTotal'] },
-                { $subtract: ['$cost', '$returnedCostTotal'] },
-              ],
+              $max: [0, {
+                $subtract: [
+                  { $subtract: ['$periodPaid', { $max: [0, { $subtract: ['$periodReturnedTotal', { $subtract: ['$total', '$periodPaid'] }] }] }] },
+                  { $subtract: ['$cost', '$periodReturnedCostTotal'] },
+                ],
+              }],
             },
           },
         },
@@ -67,6 +98,7 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh (double-count oldini olish)
+    // Foyda: max(0, sale.paid - saleCost) - max(0, (sale.paid - payment.amount) - saleCost)
     const [manualDebtPaymentsAgg] = await Debt.aggregate([
       {
         $lookup: {
@@ -86,7 +118,43 @@ export async function GET(req: NextRequest) {
       { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
-      { $group: { _id: null, totalPayments: { $sum: '$payments.amount' } } },
+      // Sale items tannarxini olish
+      {
+        $lookup: {
+          from: 'sales',
+          localField: 'sale',
+          foreignField: '_id',
+          as: 'saleDoc',
+        },
+      },
+      { $unwind: { path: '$saleDoc', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$saleDoc.items', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { debtId: '$_id', pmtDate: '$payments.date', pmtAmt: '$payments.amount' },
+          totalPayments: { $first: '$payments.amount' },
+          // salePayedBefore: to'lovdan oldingi sale.paid (pay/route.ts da saqlanadi)
+          salePayedBefore: { $first: { $ifNull: ['$payments.salePayedBefore', 0] } },
+          saleCost: { $sum: { $multiply: [{ $ifNull: ['$saleDoc.items.costPrice', 0] }, { $ifNull: ['$saleDoc.items.qty', 0] }] } },
+          saleRetCost: { $first: { $ifNull: ['$saleDoc.returnedCostTotal', 0] } },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalPayments: { $sum: '$totalPayments' },
+          // foyda = max(0, paid_now - netCost) - max(0, paid_before - netCost)
+          // paid_now = salePayedBefore + payment, paid_before = salePayedBefore
+          totalProfit: {
+            $sum: {
+              $subtract: [
+                { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$totalPayments'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+              ],
+            },
+          },
+        },
+      },
     ]).allowDiskUse(true)
 
     // Expenses aggregation
@@ -120,7 +188,7 @@ export async function GET(req: NextRequest) {
       Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]).allowDiskUse(true),
     ])
 
-    // Daily breakdown — createdAt bo'yicha, kassa/sotuvlar bilan bir xil formula
+    // Daily breakdown — period-filtered payments AND returns
     const dailyBreakdown = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
@@ -129,12 +197,39 @@ export async function GET(req: NextRequest) {
           _id: {
             sid: '$_id',
             date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-            paid: '$paid',
             total: '$total',
-            rt: { $ifNull: ['$returnedTotal', 0] },
-            rct: { $ifNull: ['$returnedCostTotal', 0] },
           },
           cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } },
+          periodPaid: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$payments', []] }, as: 'p',
+                  cond: { $and: [{ $gte: ['$$p.date', fromDate] }, { $lte: ['$$p.date', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', '$$this.amount'] },
+              },
+            },
+          },
+          periodReturnedTotal: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                  cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', { $multiply: ['$$this.salePrice', '$$this.qty'] }] },
+              },
+            },
+          },
+          periodReturnedCostTotal: {
+            $first: {
+              $reduce: {
+                input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                  cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+                initialValue: 0,
+                in: { $add: ['$$value', { $multiply: ['$$this.costPrice', '$$this.qty'] }] },
+              },
+            },
+          },
         },
       },
       {
@@ -143,17 +238,19 @@ export async function GET(req: NextRequest) {
           revenue: {
             $sum: {
               $subtract: [
-                '$_id.paid',
-                { $max: [0, { $subtract: ['$_id.rt', { $subtract: ['$_id.total', '$_id.paid'] }] }] },
+                '$periodPaid',
+                { $max: [0, { $subtract: ['$periodReturnedTotal', { $subtract: ['$_id.total', '$periodPaid'] }] }] },
               ],
             },
           },
           profit: {
             $sum: {
-              $subtract: [
-                { $subtract: ['$_id.total', '$_id.rt'] },
-                { $subtract: ['$cost', '$_id.rct'] },
-              ],
+              $max: [0, {
+                $subtract: [
+                  { $subtract: ['$periodPaid', { $max: [0, { $subtract: ['$periodReturnedTotal', { $subtract: ['$_id.total', '$periodPaid'] }] }] }] },
+                  { $subtract: ['$cost', '$periodReturnedCostTotal'] },
+                ],
+              }],
             },
           },
           sales: { $addToSet: '$_id.sid' },
@@ -204,12 +301,39 @@ export async function GET(req: NextRequest) {
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } },
-          manualPayment: { $sum: '$payments.amount' },
+        $lookup: {
+          from: 'sales',
+          localField: 'sale',
+          foreignField: '_id',
+          as: 'saleDoc',
         },
       },
-      { $project: { _id: 0, date: '$_id', manualPayment: 1 } },
+      { $unwind: { path: '$saleDoc', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$saleDoc.items', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, debtId: '$_id', pmtAmt: '$payments.amount' },
+          pmtAmt: { $first: '$payments.amount' },
+          salePayedBefore: { $first: { $ifNull: ['$payments.salePayedBefore', 0] } },
+          saleCost: { $sum: { $multiply: [{ $ifNull: ['$saleDoc.items.costPrice', 0] }, { $ifNull: ['$saleDoc.items.qty', 0] }] } },
+          saleRetCost: { $first: { $ifNull: ['$saleDoc.returnedCostTotal', 0] } },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          manualPayment: { $sum: '$pmtAmt' },
+          manualProfit: {
+            $sum: {
+              $subtract: [
+                { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$pmtAmt'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+              ],
+            },
+          },
+        },
+      },
+      { $project: { _id: 0, date: '$_id', manualPayment: 1, manualProfit: 1 } },
     ]).allowDiskUse(true)
 
     // Merge daily data
@@ -225,9 +349,9 @@ export async function GET(req: NextRequest) {
       const existing = dailyMap.get(d.date)
       if (existing) {
         existing.revenue += d.manualPayment
-        existing.profit += d.manualPayment
+        existing.profit += d.manualProfit || 0
       } else {
-        dailyMap.set(d.date, { date: d.date, revenue: d.manualPayment, profit: d.manualPayment, expense: 0, sales: 0 })
+        dailyMap.set(d.date, { date: d.date, revenue: d.manualPayment, profit: d.manualProfit || 0, expense: 0, sales: 0 })
       }
     }
 
@@ -243,10 +367,11 @@ export async function GET(req: NextRequest) {
 
     const daily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
 
-    // Payment methods — createdAt bo'yicha, to'langan miqdorlar
+    // Payment methods — faqat shu davrda to'langan to'lovlar (payments.date bo'yicha filter)
     const paymentMethodStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter } },
       { $group: { _id: '$payments.method', total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
@@ -320,8 +445,9 @@ export async function GET(req: NextRequest) {
 
     // Total calculations
     const manualDebtPayments = manualDebtPaymentsAgg?.totalPayments || 0
+    const debtProfit = manualDebtPaymentsAgg?.totalProfit || 0
     const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments
-    const totalProfit = (salesAgg?.totalProfit || 0) + manualDebtPayments
+    const totalProfit = (salesAgg?.totalProfit || 0) + debtProfit
 
     return NextResponse.json({
       salesCount,

@@ -47,7 +47,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId })
+    // Save sale.paid BEFORE this payment for accurate profit calculation in reports
+    let salePayedBefore = 0
+    if (targetSaleId) {
+      const saleSnap = await Sale.findById(targetSaleId).select('paid').lean() as { paid: number } | null
+      salePayedBefore = saleSnap?.paid || 0
+    }
+
+    debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore })
     debt.paidAmount = Math.round((debt.paidAmount || 0) * 100 + amount * 100) / 100
     debt.remainingAmount = Math.round(debt.remainingAmount * 100 - amount * 100) / 100
     

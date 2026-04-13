@@ -14,6 +14,8 @@ import { formatPrice } from '@/lib/utils'
 
 interface ReportData {
   salesCount: number
+  salesRevenue: number
+  debtRevenue: number
   totalRevenue: number
   totalProfit: number
   totalExpenses: number
@@ -165,10 +167,12 @@ export default function DashboardPage() {
       {!loading && data && (
         <>
           {/* Stats: filterlangan */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { key: 'sales', label: 'Sotuv soni', value: data.salesCount + ' ta', icon: ShoppingCart, color: 'text-blue-500', bg: 'bg-blue-50' },
-              { key: 'revenue', label: 'Kirim', value: formatPrice(data.totalRevenue), icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50' },
+              { key: 'salesRevenue', label: 'Sotuvdan kirim', value: formatPrice(data.salesRevenue), icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50' },
+              { key: 'debtRevenue', label: 'Qarzdan kirim', value: formatPrice(data.debtRevenue), icon: TrendingUp, color: 'text-teal-500', bg: 'bg-teal-50' },
+              { key: 'revenue', label: 'Umumiy kirim', value: formatPrice(data.totalRevenue), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
               { key: 'profit', label: 'Foyda', value: formatPrice(data.totalProfit), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
               { key: 'expense', label: 'Xarajat', value: formatPrice(data.totalExpenses), icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' },
               { key: 'net', label: 'Sof foyda', value: formatPrice(data.netProfit), icon: DollarSign, color: 'text-violet-500', bg: 'bg-violet-50' },
@@ -320,7 +324,9 @@ export default function DashboardPage() {
             <DialogHeader>
               <DialogTitle className="text-base">
                 {detailCard === 'sales' && 'Sotuv tafsiloti'}
-                {detailCard === 'revenue' && 'Kirim tafsiloti'}
+                {detailCard === 'salesRevenue' && 'Sotuvdan kirim'}
+                {detailCard === 'debtRevenue' && 'Qarzdan kirim'}
+                {detailCard === 'revenue' && 'Umumiy kirim tafsiloti'}
                 {detailCard === 'profit' && 'Foyda tafsiloti'}
                 {detailCard === 'expense' && 'Xarajat tafsiloti'}
                 {detailCard === 'net' && 'Sof foyda tafsiloti'}
@@ -352,6 +358,20 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {detailCard === 'salesRevenue' && (
+              <div className="space-y-2 text-sm">
+                <div className="text-slate-500">Faqat sotuvlardan tushgan pul (qarz to&apos;lovlarsiz)</div>
+                <div className="font-bold text-green-700 text-lg">{formatPrice(data.salesRevenue)}</div>
+              </div>
+            )}
+
+            {detailCard === 'debtRevenue' && (
+              <div className="space-y-2 text-sm">
+                <div className="text-slate-500">Sotuvga bog&apos;liq bo&apos;lmagan qarzlar bo&apos;yicha to&apos;lovlar</div>
+                <div className="font-bold text-teal-700 text-lg">{formatPrice(data.debtRevenue)}</div>
               </div>
             )}
 
@@ -387,8 +407,8 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="text-sm text-slate-500">Jami foyda: <span className="font-bold text-emerald-700">{formatPrice(data.totalProfit)}</span></div>
                 <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1">
-                  <div className="flex justify-between"><span>Kirim:</span><span className="text-slate-700">{formatPrice(data.totalRevenue)}</span></div>
-                  <div className="flex justify-between"><span>Tan narx (taxminiy):</span><span className="text-slate-700">{formatPrice(data.totalRevenue - data.totalProfit)}</span></div>
+                  <div className="flex justify-between"><span>Sotuvdan kirim:</span><span className="text-slate-700">{formatPrice(data.salesRevenue)}</span></div>
+                  <div className="flex justify-between"><span>Tan narx (taxminiy):</span><span className="text-slate-700">{formatPrice(data.salesRevenue - data.totalProfit)}</span></div>
                   <div className="flex justify-between border-t pt-1 font-medium"><span>Foyda:</span><span className="text-emerald-700">{formatPrice(data.totalProfit)}</span></div>
                 </div>
                 {data.daily.length > 0 && (

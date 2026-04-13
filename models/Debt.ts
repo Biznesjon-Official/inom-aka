@@ -9,6 +9,7 @@ const DebtPaymentSchema = new Schema({
   fromSale: { type: Boolean, default: false }, // initial payment from kassa — already counted in Sale.paid
   refunded: { type: Boolean, default: false }, // marked true when sale is returned
   saleRef: { type: Types.ObjectId, ref: 'Sale' }, // which sale this payment belongs to
+  salePayedBefore: { type: Number, default: 0 }, // sale.paid value BEFORE this payment (for accurate profit calc)
 }, { _id: false })
 
 const DebtEntrySchema = new Schema({
