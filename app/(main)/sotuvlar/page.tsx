@@ -126,6 +126,13 @@ function SotuvlarContent() {
   // When search active, server already filtered; otherwise client-side filter for cashier name
   const filtered = debouncedSearch ? sales : sales
 
+  function getPaymentType(sale: Sale): keyof typeof PAYMENT_STATUS {
+    const remaining = Math.max(0, sale.total - sale.paid - (sale.returnedTotal || 0))
+    if (remaining <= 0.01) return 'full'
+    if (sale.paid > 0.01) return 'partial'
+    return 'debt'
+  }
+
   function openReturn(sale: Sale) {
     setReturnSale(sale)
     const qtys: Record<string, number> = {}
@@ -289,8 +296,8 @@ function SotuvlarContent() {
                   <td className="px-4 py-3 text-slate-500">{sale.usta?.name || '—'}</td>
                   <td className="px-4 py-3 text-slate-500">{sale.customer?.name || '—'}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={PAYMENT_STATUS[sale.paymentType as keyof typeof PAYMENT_STATUS]?.variant || 'default'} className="text-xs">
-                      {PAYMENT_STATUS[sale.paymentType as keyof typeof PAYMENT_STATUS]?.label || sale.paymentType}
+                    <Badge variant={PAYMENT_STATUS[getPaymentType(sale)].variant} className="text-xs">
+                      {PAYMENT_STATUS[getPaymentType(sale)].label}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -368,8 +375,8 @@ function SotuvlarContent() {
                     {sale.cashier && (
                       <span className="text-xs text-slate-500">{sale.cashier.name}</span>
                     )}
-                    <Badge variant={PAYMENT_STATUS[sale.paymentType as keyof typeof PAYMENT_STATUS]?.variant || 'default'} className="text-xs">
-                      {PAYMENT_STATUS[sale.paymentType as keyof typeof PAYMENT_STATUS]?.label || sale.paymentType}
+                    <Badge variant={PAYMENT_STATUS[getPaymentType(sale)].variant} className="text-xs">
+                      {PAYMENT_STATUS[getPaymentType(sale)].label}
                     </Badge>
                     <span className="font-bold text-sm text-slate-800">{formatPrice(sale.total)}</span>
                     <button className="p-1 hover:bg-orange-50 rounded" title="Qaytarish"

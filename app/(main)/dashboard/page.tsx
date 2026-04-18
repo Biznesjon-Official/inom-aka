@@ -198,7 +198,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Yangi qarz (yaratilgan)</span>
+                  <span className="text-xs text-slate-500 font-medium">Yangi qarz</span>
                   <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
                   </div>

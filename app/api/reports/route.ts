@@ -196,10 +196,17 @@ export async function GET(req: NextRequest) {
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]).allowDiskUse(true)
 
-    // newDebt = Debt model orqali: shu davrda yaratilgan qarzlarning umumiy summasi (retroaktiv o'zgarmas)
-    const [newDebtAgg] = await Debt.aggregate([
-      { $match: { createdAt: dateFilter, direction: 'receivable' } },
-      { $group: { _id: null, newDebt: { $sum: '$totalAmount' } } },
+    // newDebt = shu davrda yaratilgan savdolarning hozirgi to'lanmagan qoldig'i
+    // calcSaleDebt bilan bir xil: max(0, total - paid - returnedTotal)
+    const [newDebtAgg] = await Sale.aggregate([
+      { $match: { createdAt: dateFilter } },
+      { $group: {
+        _id: null,
+        newDebt: { $sum: { $max: [0, { $subtract: [
+          { $subtract: ['$total', '$paid'] },
+          { $ifNull: ['$returnedTotal', 0] },
+        ]}] } },
+      }},
     ]).allowDiskUse(true)
 
     const [paidDebtAgg] = await Debt.aggregate([
