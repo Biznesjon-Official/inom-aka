@@ -27,7 +27,7 @@ interface Sale {
   total: number
   paid: number
   paymentType: string
-  payments?: { method: string; amount: number }[]
+  payments?: { method: string; amount: number; date: string }[]
   customer?: { name: string; phone?: string }
   cashier?: { name: string; role?: string }
   usta?: { name: string }
@@ -339,6 +339,20 @@ function SotuvlarContent() {
                             ))}
                           </div>
                         )}
+                        {sale.payments && sale.payments.length > 0 && (
+                          <div className="border-t pt-1 mt-1">
+                            <div className="text-[10px] text-green-600 font-medium mb-0.5">To&apos;lovlar:</div>
+                            {sale.payments.map((p, i) => (
+                              <div key={i} className="flex justify-between text-xs text-green-700">
+                                <span>
+                                  {new Date(p.date).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                  {' · '}{PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] || p.method}
+                                </span>
+                                <span className="font-medium">{formatPrice(p.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -436,6 +450,20 @@ function SotuvlarContent() {
                           <div key={i} className="flex justify-between text-xs text-orange-500">
                             <span>{ri.productName} x{ri.qty}</span>
                             <span>-{formatPrice(ri.salePrice * ri.qty)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {sale.payments && sale.payments.length > 0 && (
+                      <div className="border-t pt-1 mt-1">
+                        <div className="text-[10px] text-green-600 font-medium mb-0.5">To&apos;lovlar:</div>
+                        {sale.payments.map((p, i) => (
+                          <div key={i} className="flex justify-between text-xs text-green-700">
+                            <span>
+                              {new Date(p.date).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              {' · '}{PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] || p.method}
+                            </span>
+                            <span className="font-medium">{formatPrice(p.amount)}</span>
                           </div>
                         ))}
                       </div>
