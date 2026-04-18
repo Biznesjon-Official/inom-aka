@@ -157,22 +157,49 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
+    // Returns on sales created BEFORE this period but returned IN this period
+    const [crossPeriodReturnsAgg] = await Sale.aggregate([
+      { $match: { createdAt: { $lt: fromDate } } },
+      {
+        $addFields: {
+          periodReturnedTotal: {
+            $reduce: {
+              input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: ['$$this.salePrice', '$$this.qty'] }] },
+            },
+          },
+          periodReturnedCostTotal: {
+            $reduce: {
+              input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: ['$$this.costPrice', '$$this.qty'] }] },
+            },
+          },
+        },
+      },
+      { $match: { periodReturnedTotal: { $gt: 0 } } },
+      {
+        $group: {
+          _id: null,
+          returnedRevenue: { $sum: '$periodReturnedTotal' },
+          returnedCost: { $sum: '$periodReturnedCostTotal' },
+        },
+      },
+    ]).allowDiskUse(true)
+
     // Expenses aggregation
     const [expensesAgg] = await Expense.aggregate([
       { $match: { date: dateFilter } },
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]).allowDiskUse(true)
 
-    // newDebt = calcSaleDebt bilan bir xil: max(0, total - paid - returnedTotal)
-    const [newDebtAgg] = await Sale.aggregate([
-      { $match: { createdAt: dateFilter } },
-      { $group: {
-        _id: null,
-        newDebt: { $sum: { $max: [0, { $subtract: [
-          { $subtract: ['$total', '$paid'] },
-          { $ifNull: ['$returnedTotal', 0] },
-        ]}] } },
-      }},
+    // newDebt = Debt model orqali: shu davrda yaratilgan qarzlarning umumiy summasi (retroaktiv o'zgarmas)
+    const [newDebtAgg] = await Debt.aggregate([
+      { $match: { createdAt: dateFilter, direction: 'receivable' } },
+      { $group: { _id: null, newDebt: { $sum: '$totalAmount' } } },
     ]).allowDiskUse(true)
 
     const [paidDebtAgg] = await Debt.aggregate([
@@ -413,14 +440,26 @@ export async function GET(req: NextRequest) {
     }
     const mergedPaymentMethods = Array.from(paymentMethodMap.values())
 
-    // Cashier stats
+    // Cashier stats — use period-filtered returns, not cumulative returnedTotal
     const cashierStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
+      {
+        $addFields: {
+          periodReturnedTotal: {
+            $reduce: {
+              input: { $filter: { input: { $ifNull: ['$returnedItems', []] }, as: 'ri',
+                cond: { $and: [{ $gte: ['$$ri.returnedAt', fromDate] }, { $lte: ['$$ri.returnedAt', toDate] }] } } },
+              initialValue: 0,
+              in: { $add: ['$$value', { $multiply: ['$$this.salePrice', '$$this.qty'] }] },
+            },
+          },
+        },
+      },
       {
         $group: {
           _id: '$cashier',
           salesCount: { $sum: 1 },
-          totalAmount: { $sum: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] } },
+          totalAmount: { $sum: { $subtract: ['$total', '$periodReturnedTotal'] } },
         },
       },
       {
@@ -446,13 +485,17 @@ export async function GET(req: NextRequest) {
     // Total calculations
     const manualDebtPayments = manualDebtPaymentsAgg?.totalPayments || 0
     const debtProfit = manualDebtPaymentsAgg?.totalProfit || 0
-    const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments
-    const totalProfit = (salesAgg?.totalProfit || 0) + debtProfit
+    const crossReturnRevenue = crossPeriodReturnsAgg?.returnedRevenue || 0
+    const crossReturnCost = crossPeriodReturnsAgg?.returnedCost || 0
+    // Cross-period returns: revenue decreases, cost is recovered → profit impact = costRecovered - returnedRevenue
+    const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments - crossReturnRevenue
+    const totalProfit = (salesAgg?.totalProfit || 0) + debtProfit + (crossReturnCost - crossReturnRevenue)
 
     return NextResponse.json({
       salesCount,
       salesRevenue: salesAgg?.totalRevenue || 0,
       debtRevenue: manualDebtPayments,
+      crossPeriodReturns: crossReturnRevenue,
       totalRevenue,
       totalProfit,
       totalExpenses: expensesAgg?.totalExpenses || 0,

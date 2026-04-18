@@ -16,6 +16,7 @@ interface ReportData {
   salesCount: number
   salesRevenue: number
   debtRevenue: number
+  crossPeriodReturns: number
   totalRevenue: number
   totalProfit: number
   totalExpenses: number
@@ -172,6 +173,7 @@ export default function DashboardPage() {
               { key: 'sales', label: 'Sotuv soni', value: data.salesCount + ' ta', icon: ShoppingCart, color: 'text-blue-500', bg: 'bg-blue-50' },
               { key: 'salesRevenue', label: 'Sotuvdan kirim', value: formatPrice(data.salesRevenue), icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50' },
               { key: 'debtRevenue', label: 'Qarzdan kirim', value: formatPrice(data.debtRevenue), icon: TrendingUp, color: 'text-teal-500', bg: 'bg-teal-50' },
+              ...(data.crossPeriodReturns > 0 ? [{ key: 'crossReturns', label: "O'tgan davr qaytarish", value: '−' + formatPrice(data.crossPeriodReturns), icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50' }] : []),
               { key: 'revenue', label: 'Umumiy kirim', value: formatPrice(data.totalRevenue), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
               { key: 'profit', label: 'Foyda', value: formatPrice(data.totalProfit), icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' },
               { key: 'expense', label: 'Xarajat', value: formatPrice(data.totalExpenses), icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' },
@@ -196,7 +198,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Yangi qarz</span>
+                  <span className="text-xs text-slate-500 font-medium">Yangi qarz (yaratilgan)</span>
                   <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
                   </div>
@@ -207,7 +209,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Qarz to&apos;lovi</span>
+                  <span className="text-xs text-slate-500 font-medium">Qarz to&apos;lovi (qo&apos;lda)</span>
                   <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
                     <TrendingDown className="w-3.5 h-3.5 text-green-500" />
                   </div>
@@ -218,7 +220,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Mijoz qarzlari</span>
+                  <span className="text-xs text-slate-500 font-medium">Mijoz qarzlari <span className="text-slate-400 font-normal">(bugungi)</span></span>
                   <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
                     <BookOpen className="w-3.5 h-3.5 text-orange-500" />
                   </div>
@@ -229,7 +231,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Shaxsiy qarzlar</span>
+                  <span className="text-xs text-slate-500 font-medium">Shaxsiy qarzlar <span className="text-slate-400 font-normal">(bugungi)</span></span>
                   <div className="w-7 h-7 bg-red-50 rounded-lg flex items-center justify-center">
                     <Wallet className="w-3.5 h-3.5 text-red-500" />
                   </div>
@@ -240,7 +242,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Tovarlar</span>
+                  <span className="text-xs text-slate-500 font-medium">Tovarlar <span className="text-slate-400 font-normal">(bugungi)</span></span>
                   <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center">
                     <Package className="w-3.5 h-3.5 text-slate-500" />
                   </div>
@@ -251,7 +253,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Ombor qiymati</span>
+                  <span className="text-xs text-slate-500 font-medium">Ombor qiymati <span className="text-slate-400 font-normal">(bugungi)</span></span>
                   <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
                     <Package className="w-3.5 h-3.5 text-blue-500" />
                   </div>
@@ -363,14 +365,14 @@ export default function DashboardPage() {
 
             {detailCard === 'salesRevenue' && (
               <div className="space-y-2 text-sm">
-                <div className="text-slate-500">Faqat sotuvlardan tushgan pul (qarz to&apos;lovlarsiz)</div>
+                <div className="text-slate-500">Shu davrda yaratilgan savdolar bo&apos;yicha qabul qilingan to&apos;lovlar</div>
                 <div className="font-bold text-green-700 text-lg">{formatPrice(data.salesRevenue)}</div>
               </div>
             )}
 
             {detailCard === 'debtRevenue' && (
               <div className="space-y-2 text-sm">
-                <div className="text-slate-500">Sotuvga bog&apos;liq bo&apos;lmagan qarzlar bo&apos;yicha to&apos;lovlar</div>
+                <div className="text-slate-500">Oldingi davrlarda yaratilgan savdolar uchun shu davrda qabul qilingan qarz to&apos;lovlari</div>
                 <div className="font-bold text-teal-700 text-lg">{formatPrice(data.debtRevenue)}</div>
               </div>
             )}
@@ -407,8 +409,8 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="text-sm text-slate-500">Jami foyda: <span className="font-bold text-emerald-700">{formatPrice(data.totalProfit)}</span></div>
                 <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1">
-                  <div className="flex justify-between"><span>Sotuvdan kirim:</span><span className="text-slate-700">{formatPrice(data.salesRevenue)}</span></div>
-                  <div className="flex justify-between"><span>Tan narx (taxminiy):</span><span className="text-slate-700">{formatPrice(data.salesRevenue - data.totalProfit)}</span></div>
+                  <div className="flex justify-between"><span>Jami kirim:</span><span className="text-slate-700">{formatPrice(data.totalRevenue)}</span></div>
+                  <div className="flex justify-between"><span>Tan narx (taxminiy):</span><span className="text-slate-700">{formatPrice(data.totalRevenue - data.totalProfit)}</span></div>
                   <div className="flex justify-between border-t pt-1 font-medium"><span>Foyda:</span><span className="text-emerald-700">{formatPrice(data.totalProfit)}</span></div>
                 </div>
                 {data.daily.length > 0 && (
