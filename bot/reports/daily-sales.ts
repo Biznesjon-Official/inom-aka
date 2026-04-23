@@ -54,12 +54,59 @@ export async function sendDailySalesReport(bot: any, chatId?: string | number): 
     },
   ]).allowDiskUse(true)
 
-  // Manual debt payments (sale ref yo'q bo'lganlar)
+  // Manual debt payments — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
   const [manualDebtPaymentsAgg] = await Debt.aggregate([
-    { $match: { sale: null } },
+    {
+      $lookup: {
+        from: 'sales',
+        let: { saleId: '$sale' },
+        pipeline: [
+          { $match: { $expr: { $and: [
+            { $eq: ['$_id', '$saleId'] },
+            { $gte: ['$createdAt', from] },
+            { $lte: ['$createdAt', to] },
+          ] } } },
+          { $project: { _id: 1 } },
+        ],
+        as: 'saleInPeriod',
+      },
+    },
+    { $match: { saleInPeriod: { $size: 0 } } },
     { $unwind: '$payments' },
     { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
-    { $group: { _id: null, totalPayments: { $sum: '$payments.amount' } } },
+    {
+      $lookup: {
+        from: 'sales',
+        localField: 'sale',
+        foreignField: '_id',
+        as: 'saleDoc',
+      },
+    },
+    { $unwind: { path: '$saleDoc', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: '$saleDoc.items', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: { debtId: '$_id', pmtDate: '$payments.date', pmtAmt: '$payments.amount' },
+        totalPayments: { $first: '$payments.amount' },
+        salePayedBefore: { $first: { $ifNull: ['$payments.salePayedBefore', 0] } },
+        saleCost: { $sum: { $multiply: [{ $ifNull: ['$saleDoc.items.costPrice', 0] }, { $ifNull: ['$saleDoc.items.qty', 0] }] } },
+        saleRetCost: { $first: { $ifNull: ['$saleDoc.returnedCostTotal', 0] } },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalPayments: { $sum: '$totalPayments' },
+        totalProfit: {
+          $sum: {
+            $subtract: [
+              { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$totalPayments'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+              { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+            ],
+          },
+        },
+      },
+    },
   ]).allowDiskUse(true)
 
   // Expenses
@@ -85,9 +132,24 @@ export async function sendDailySalesReport(bot: any, chatId?: string | number): 
     { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
   ]).allowDiskUse(true)
 
-  // Manual debt payments by method
+  // Manual debt payments by method — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
   const manualDebtPaymentsByMethod = await Debt.aggregate([
-    { $match: { sale: null } },
+    {
+      $lookup: {
+        from: 'sales',
+        let: { saleId: '$sale' },
+        pipeline: [
+          { $match: { $expr: { $and: [
+            { $eq: ['$_id', '$saleId'] },
+            { $gte: ['$createdAt', from] },
+            { $lte: ['$createdAt', to] },
+          ] } } },
+          { $project: { _id: 1 } },
+        ],
+        as: 'saleInPeriod',
+      },
+    },
+    { $match: { saleInPeriod: { $size: 0 } } },
     { $unwind: '$payments' },
     { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
     { $group: { _id: { $ifNull: ['$payments.method', 'cash'] }, total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
@@ -108,8 +170,9 @@ export async function sendDailySalesReport(bot: any, chatId?: string | number): 
   const mergedPaymentMethods = Array.from(paymentMethodMap.values())
 
   const manualDebtPayments = manualDebtPaymentsAgg?.totalPayments || 0
+  const debtProfit = manualDebtPaymentsAgg?.totalProfit || 0
   const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments
-  const totalProfit = (salesAgg?.totalProfit || 0) + manualDebtPayments
+  const totalProfit = (salesAgg?.totalProfit || 0) + debtProfit
   const totalExpenses = expensesAgg?.totalExpenses || 0
   const netProfit = totalProfit - totalExpenses
 
