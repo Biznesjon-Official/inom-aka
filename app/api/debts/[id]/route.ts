@@ -57,6 +57,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       { customerName, customerPhone },
       { new: true }
     )
+      .populate('category', 'name')
+      .populate({ path: 'sale', select: 'total paid createdAt paymentType items receiptNo' })
+      .populate({ path: 'entries.sale', select: 'items receiptNo', model: 'Sale' })
     if (!debt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(debt)
   } catch (err) { return errorResponse(err) }
