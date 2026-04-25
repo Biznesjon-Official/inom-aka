@@ -47,14 +47,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    // Save sale.paid BEFORE this payment for accurate profit calculation in reports
-    let salePayedBefore = 0
-    if (targetSaleId) {
-      const saleSnap = await Sale.findById(targetSaleId).select('paid').lean() as { paid: number } | null
-      salePayedBefore = saleSnap?.paid || 0
+    // Multi-entry debt: create separate payment entry per sale for accurate profit calculation
+    if (saleAllocations.size > 0) {
+      for (const [saleId, allocated] of saleAllocations) {
+        const snap = await Sale.findById(saleId).select('paid').lean() as { paid: number } | null
+        debt.payments.push({
+          amount: allocated,
+          method: validMethod,
+          date: new Date(),
+          note,
+          saleRef: new Types.ObjectId(saleId),
+          salePayedBefore: snap?.paid || 0,
+        })
+      }
+    } else {
+      // Single-entry debt: save sale.paid BEFORE this payment for accurate profit calculation
+      let salePayedBefore = 0
+      if (targetSaleId) {
+        const saleSnap = await Sale.findById(targetSaleId).select('paid').lean() as { paid: number } | null
+        salePayedBefore = saleSnap?.paid || 0
+      }
+      debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore })
     }
 
-    debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore })
     debt.paidAmount = Math.round((debt.paidAmount || 0) * 100 + amount * 100) / 100
     debt.remainingAmount = Math.round(debt.remainingAmount * 100 - amount * 100) / 100
     

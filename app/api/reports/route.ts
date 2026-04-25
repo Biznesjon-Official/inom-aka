@@ -210,6 +210,22 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     const [paidDebtAgg] = await Debt.aggregate([
+      {
+        $lookup: {
+          from: 'sales',
+          let: { saleId: '$sale' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$saleId'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'saleInPeriod',
+        },
+      },
+      { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.refunded': { $ne: true }, 'payments.fromSale': { $ne: true } } },
       { $group: { _id: null, paidDebt: { $sum: '$payments.amount' } } },

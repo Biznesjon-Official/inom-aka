@@ -48,27 +48,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         },
       ]).allowDiskUse(true)
 
-      // Include personal debts in archive calculation
-      const PersonalDebt = (await import('@/models/PersonalDebt')).default
-      const personalDebtsAggBefore = await PersonalDebt.aggregate([
-        {
-          $match: {
-            customer: customerId,
-            direction: 'payable',
-            createdAt: { $gt: pFrom, $lte: pTo },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalAmount: { $sum: '$totalAmount' },
-          },
-        },
-      ])
-
       const salesTotal = salesAggBefore[0]?.totalSales || 0
-      const personalDebtsTotal = personalDebtsAggBefore[0]?.totalAmount || 0
-      const tSales = salesTotal + personalDebtsTotal
+      const tSales = salesTotal
       const calcAmt = Math.round(tSales * (customer.cashbackPercent || 0) / 100)
       
       if (calcAmt > 0 || tSales > 0) {
@@ -123,27 +104,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       },
     ]).allowDiskUse(true)
     
-    // Also include personal debts where customer is linked
-    const PersonalDebt = (await import('@/models/PersonalDebt')).default
-    const personalDebtsAgg = await PersonalDebt.aggregate([
-      {
-        $match: {
-          customer: customerId,
-          direction: 'payable', // Only debts owed by the usta
-          createdAt: { $gt: periodFrom, $lte: periodTo },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$totalAmount' },
-        },
-      },
-    ])
-    
     const salesTotal = salesAgg[0]?.totalSales || 0
-    const personalDebtsTotal = personalDebtsAgg[0]?.totalAmount || 0
-    const calculatedSales = salesTotal + personalDebtsTotal
+    const calculatedSales = salesTotal
     const totalSales = customer.totalSalesOverride != null ? customer.totalSalesOverride : calculatedSales
 
     const payoutsAgg = await CashbackPayout.aggregate([
