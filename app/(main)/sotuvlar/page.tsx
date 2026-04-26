@@ -80,8 +80,9 @@ function SotuvlarContent() {
         endOfDay.setHours(23, 59, 59, 999)
         params.set('from', startOfDay.toISOString())
         params.set('to', endOfDay.toISOString())
+      } else {
+        params.set('today', '1')
       }
-      // no default date restriction — API returns last 100 sales
 
       const res = await fetch(`/api/sales?${params}`)
       if (res.ok) {
@@ -255,7 +256,7 @@ function SotuvlarContent() {
             📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
           </span>
         )}
-        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">So&apos;nggi sotuvlar</span>}
+        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
         <span className="text-slate-300">|</span>
         <span>{filtered.length} ta sotuv</span>
         <span>Jami: <span className="font-bold text-slate-800">{formatPrice(totalSales)}</span></span>
