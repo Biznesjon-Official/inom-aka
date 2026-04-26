@@ -68,29 +68,32 @@ function SotuvlarContent() {
   const fetchSales = useCallback(async () => {
     if (idsMode) return  // ids mode uses separate fetch
     setLoading(true)
-    const params = new URLSearchParams()
+    try {
+      const params = new URLSearchParams()
 
-    if (debouncedSearch) {
-      // Search mode: search across all sales (no date restriction)
-      params.set('search', debouncedSearch)
-    } else if (selectedDate) {
-      const startOfDay = new Date(selectedDate)
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date(selectedDate)
-      endOfDay.setHours(23, 59, 59, 999)
-      params.set('from', startOfDay.toISOString())
-      params.set('to', endOfDay.toISOString())
-    } else {
-      params.set('today', '1')
-    }
+      if (debouncedSearch) {
+        params.set('search', debouncedSearch)
+      } else if (selectedDate) {
+        const startOfDay = new Date(selectedDate)
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(selectedDate)
+        endOfDay.setHours(23, 59, 59, 999)
+        params.set('from', startOfDay.toISOString())
+        params.set('to', endOfDay.toISOString())
+      }
+      // no default date restriction — API returns last 100 sales
 
-    const res = await fetch(`/api/sales?${params}`)
-    if (res.ok) {
-      setSales(await res.json())
-    } else {
-      toast.error('Sotuvlarni yuklashda xato')
+      const res = await fetch(`/api/sales?${params}`)
+      if (res.ok) {
+        setSales(await res.json())
+      } else {
+        toast.error('Sotuvlarni yuklashda xato')
+      }
+    } catch {
+      toast.error('Tarmoq xatosi')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [selectedDate, idsMode, debouncedSearch])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,7 +255,7 @@ function SotuvlarContent() {
             📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
           </span>
         )}
-        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
+        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">So&apos;nggi sotuvlar</span>}
         <span className="text-slate-300">|</span>
         <span>{filtered.length} ta sotuv</span>
         <span>Jami: <span className="font-bold text-slate-800">{formatPrice(totalSales)}</span></span>
