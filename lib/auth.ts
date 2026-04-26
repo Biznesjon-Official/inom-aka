@@ -58,17 +58,5 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   session: { strategy: 'jwt', maxAge: 12 * 60 * 60 },
-  cookies: {
-    sessionToken: {
-      name: 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        // maxAge yo'q — brauzer yopilganda session o'chadi
-      },
-    },
-  },
   secret: process.env.NEXTAUTH_SECRET,
 }
