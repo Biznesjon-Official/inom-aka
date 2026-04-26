@@ -46,7 +46,8 @@ function getPresetDates(key: PresetKey): { from: string; to: string } {
     case 'today': return { from: fmt(now), to: fmt(now) }
     case 'week': {
       const start = new Date(now)
-      start.setDate(now.getDate() - now.getDay())
+      const day = now.getDay()
+      start.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
       return { from: fmt(start), to: fmt(now) }
     }
     case 'month': return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) }
