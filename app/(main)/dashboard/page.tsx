@@ -210,7 +210,7 @@ export default function DashboardPage() {
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-500 font-medium">Qarz to&apos;lovi (qo&apos;lda)</span>
+                  <span className="text-xs text-slate-500 font-medium">Qarzdan kirim</span>
                   <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
                     <TrendingDown className="w-3.5 h-3.5 text-green-500" />
                   </div>
