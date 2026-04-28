@@ -171,6 +171,13 @@ export interface DebtPrintItem {
   salePrice: number
 }
 
+export interface ReturnedPrintItem {
+  productName: string
+  qty: number
+  unit: string
+  salePrice: number
+}
+
 export function printDebtReceipt(data: {
   customerName: string
   customerPhone?: string
@@ -178,6 +185,7 @@ export function printDebtReceipt(data: {
   paidAmount: number
   remainingAmount: number
   items: DebtPrintItem[]
+  returnedItems?: ReturnedPrintItem[]
   createdAt: string
   shopName?: string
 }) {
@@ -192,6 +200,18 @@ export function printDebtReceipt(data: {
       <div class="item-detail">
         <span>${i.qty} ${i.unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
         <span class="bold">${lineTotal.toLocaleString('uz-UZ')}</span>
+      </div>
+    </div>`
+  }).join('')
+
+  const returnedHtml = (data.returnedItems ?? []).map(i => {
+    const lineTotal = i.salePrice * i.qty
+    return `
+    <div class="item returned-item">
+      <div class="item-name">↩ ${i.productName}</div>
+      <div class="item-detail">
+        <span>${i.qty} ${i.unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
+        <span class="bold">-${lineTotal.toLocaleString('uz-UZ')}</span>
       </div>
     </div>`
   }).join('')
@@ -218,6 +238,9 @@ export function printDebtReceipt(data: {
   .divider { border-top: 1px dashed #000; margin: 2mm 0; }
   .item { border-bottom: 1px dotted #ccc; padding: 1.5mm 0; }
   .item-name { font-weight: bold; font-size: 15px; word-break: break-word; }
+  .returned-item { background: #fff3f3; }
+  .returned-item .item-name { color: #cc0000; }
+  .returned-item .item-detail { color: #cc0000; }
   .item-detail { display: flex; justify-content: space-between; font-size: 14px; margin-top: 0.5mm; }
   .info { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; }
   .debt-total { text-align: center; font-size: 18px; font-weight: bold; margin: 2mm 0; padding: 2mm; background: #f5f5f5; }
@@ -233,6 +256,11 @@ export function printDebtReceipt(data: {
   <div class="info"><span>Sana:</span><span>${date}</span></div>
   <div class="divider"></div>
   ${itemsHtml}
+  ${data.returnedItems?.length ? `
+  <div class="divider"></div>
+  <div style="text-align:center;font-size:13px;font-weight:bold;color:#cc0000;margin:1mm 0">QAYTARILGAN TOVARLAR</div>
+  ${returnedHtml}
+  ` : ''}
   <div class="divider"></div>
   <div class="info"><span>Jami:</span><span class="bold">${data.totalAmount.toLocaleString('uz-UZ')} so'm</span></div>
   <div class="info"><span>To'langan:</span><span>${data.paidAmount.toLocaleString('uz-UZ')} so'm</span></div>
