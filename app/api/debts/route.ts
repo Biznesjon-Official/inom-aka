@@ -56,7 +56,7 @@ export async function GET(req: Request) {
 
     const debts = await Debt.find(filter)
       .populate('category', 'name')
-      .populate({ path: 'sale', select: 'total paid createdAt paymentType items receiptNo' })
+      .populate({ path: 'sale', select: 'total paid createdAt paymentType items returnedItems receiptNo' })
       .populate({ path: 'entries.sale', select: 'items returnedItems receiptNo', model: 'Sale' })
       .sort({ createdAt: -1 })
       .lean()

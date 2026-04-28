@@ -35,7 +35,7 @@ interface Debt {
   customerName?: string
   customerPhone?: string
   category?: DebtCategory
-  sale?: { _id: string; receiptNo?: number; total: number; paid: number; items: SaleItem[] } | null
+  sale?: { _id: string; receiptNo?: number; total: number; paid: number; items: SaleItem[]; returnedItems?: ReturnedItem[] } | null
   totalAmount: number
   paidAmount: number
   remainingAmount: number
@@ -115,6 +115,9 @@ export default function QarzlarPage() {
 
   const getAllItems = (d: Debt): SaleItem[] => {
     const items: SaleItem[] = []
+    // debt.sale (kassadan yaratilgan qarz)
+    if (d.sale?.items?.length) items.push(...d.sale.items)
+    // debt.entries (qo'lda qo'shilgan qarz)
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.items?.length) items.push(...entry.sale.items)
@@ -125,15 +128,14 @@ export default function QarzlarPage() {
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
     const items: ReturnedItem[] = []
+    // debt.sale (kassadan yaratilgan qarz)
+    if (d.sale?.returnedItems?.length) items.push(...d.sale.returnedItems)
+    // debt.entries (qo'lda qo'shilgan qarz)
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.returnedItems?.length) {
-          console.log('Found returned items:', entry.sale.returnedItems)
-          items.push(...entry.sale.returnedItems)
-        }
+        if (entry.sale?.returnedItems?.length) items.push(...entry.sale.returnedItems)
       }
     }
-    console.log('Total returned items:', items.length)
     return items
   }
 
