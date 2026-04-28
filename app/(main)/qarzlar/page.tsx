@@ -127,9 +127,13 @@ export default function QarzlarPage() {
     const items: ReturnedItem[] = []
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.returnedItems?.length) items.push(...entry.sale.returnedItems)
+        if (entry.sale?.returnedItems?.length) {
+          console.log('Found returned items:', entry.sale.returnedItems)
+          items.push(...entry.sale.returnedItems)
+        }
       }
     }
+    console.log('Total returned items:', items.length)
     return items
   }
 
