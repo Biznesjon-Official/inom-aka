@@ -13,6 +13,7 @@ const SaleItemSchema = new Schema({
 const ReturnItemSchema = new Schema({
   product: { type: Types.ObjectId, ref: 'Product', required: true },
   productName: { type: String, required: true },
+  unit: { type: String, default: 'dona' },
   qty: { type: Number, required: true },
   salePrice: { type: Number, required: true },
   costPrice: { type: Number, default: 0 },

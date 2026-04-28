@@ -30,11 +30,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     let returnTotal = 0
     let returnCostTotal = 0
-    const returnedItems: { product: string; productName: string; qty: number; salePrice: number; costPrice: number }[] = []
+    const returnedItems: { product: string; productName: string; unit: string; qty: number; salePrice: number; costPrice: number }[] = []
 
     for (const returnItem of items) {
       const saleItem = sale.items.find(
-        (si: { product: { toString: () => string }; qty: number; productName: string; salePrice: number; costPrice: number }) =>
+        (si: { product: { toString: () => string }; qty: number; productName: string; unit: string; salePrice: number; costPrice: number }) =>
           si.product.toString() === returnItem.product
       )
       if (!saleItem) continue
@@ -55,6 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       returnedItems.push({
         product: returnItem.product,
         productName: saleItem.productName,
+        unit: saleItem.unit,
         qty,
         salePrice: saleItem.salePrice,
         costPrice: saleItem.costPrice || 0,

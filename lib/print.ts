@@ -174,7 +174,7 @@ export interface DebtPrintItem {
 export interface ReturnedPrintItem {
   productName: string
   qty: number
-  unit: string
+  unit?: string
   salePrice: number
 }
 
@@ -206,11 +206,12 @@ export function printDebtReceipt(data: {
 
   const returnedHtml = (data.returnedItems ?? []).map(i => {
     const lineTotal = i.salePrice * i.qty
+    const unit = i.unit || 'dona'
     return `
     <div class="item returned-item">
       <div class="item-name">↩ ${i.productName}</div>
       <div class="item-detail">
-        <span>${i.qty} ${i.unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
+        <span>${i.qty} ${unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
         <span class="bold">-${lineTotal.toLocaleString('uz-UZ')}</span>
       </div>
     </div>`

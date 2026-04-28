@@ -26,7 +26,7 @@ interface ReturnedItem {
   productName: string
   qty: number
   salePrice: number
-  unit: string
+  unit?: string
   returnedAt?: string
 }
 interface Debt {
