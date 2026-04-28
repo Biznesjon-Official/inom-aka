@@ -259,7 +259,7 @@ export function printDebtReceipt(data: {
   ${itemsHtml}
   ${data.returnedItems?.length ? `
   <div class="divider"></div>
-  <div style="text-align:center;font-size:13px;font-weight:bold;color:#cc0000;margin:1mm 0">QAYTARILGAN TOVARLAR</div>
+  <div style="text-align:center;font-size:16px;font-weight:bold;color:#cc0000;margin:3mm 0;padding:2mm 0;border-top:2px solid #cc0000;border-bottom:2px solid #cc0000">⚠ QAYTARILGAN TOVARLAR ⚠</div>
   ${returnedHtml}
   ` : ''}
   <div class="divider"></div>
