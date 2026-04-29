@@ -186,11 +186,17 @@ export function printDebtReceipt(data: {
   remainingAmount: number
   items: DebtPrintItem[]
   returnedItems?: ReturnedPrintItem[]
+  discount?: number
   createdAt: string
   shopName?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
   const date = new Date(data.createdAt).toLocaleDateString('uz-UZ')
+
+  // Tovarlar asl narxi jami
+  const itemsTotal = data.items.reduce((s, i) => s + i.salePrice * i.qty, 0)
+  // Chegirma: agar discount berilgan bo'lsa ishlatamiz, aks holda totalAmount bilan farqdan hisoblaymiz
+  const discount = data.discount ?? Math.max(0, itemsTotal - data.totalAmount)
 
   const itemsHtml = data.items.map(i => {
     const lineTotal = i.salePrice * i.qty
@@ -216,6 +222,8 @@ export function printDebtReceipt(data: {
       </div>
     </div>`
   }).join('')
+
+  const returnedTotal = (data.returnedItems ?? []).reduce((s, i) => s + i.salePrice * i.qty, 0)
 
   const html = `<!DOCTYPE html>
 <html>
@@ -244,8 +252,11 @@ export function printDebtReceipt(data: {
   .returned-item .item-detail { color: #cc0000; }
   .item-detail { display: flex; justify-content: space-between; font-size: 14px; margin-top: 0.5mm; }
   .info { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; }
+  .info-red { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; color: #cc0000; }
+  .info-green { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; color: #007700; }
   .debt-total { text-align: center; font-size: 18px; font-weight: bold; margin: 2mm 0; padding: 2mm; background: #f5f5f5; }
   .customer-name { text-align: center; font-size: 16px; font-weight: bold; margin: 2mm 0; }
+  .section-title { text-align:center; font-size:14px; font-weight:bold; color:#cc0000; margin:3mm 0; padding:2mm 0; border-top:2px solid #cc0000; border-bottom:2px solid #cc0000; }
 </style>
 </head>
 <body>
@@ -257,13 +268,16 @@ export function printDebtReceipt(data: {
   <div class="info"><span>Sana:</span><span>${date}</span></div>
   <div class="divider"></div>
   ${itemsHtml}
-  ${data.returnedItems?.length ? `
+  ${returnedTotal > 0 ? `
   <div class="divider"></div>
-  <div style="text-align:center;font-size:16px;font-weight:bold;color:#cc0000;margin:3mm 0;padding:2mm 0;border-top:2px solid #cc0000;border-bottom:2px solid #cc0000">⚠ QAYTARILGAN TOVARLAR ⚠</div>
+  <div class="section-title">⚠ QAYTARILGAN TOVARLAR ⚠</div>
   ${returnedHtml}
   ` : ''}
   <div class="divider"></div>
-  <div class="info"><span>Jami:</span><span class="bold">${data.totalAmount.toLocaleString('uz-UZ')} so'm</span></div>
+  <div class="info"><span>Tovarlar jami:</span><span>${itemsTotal.toLocaleString('uz-UZ')} so'm</span></div>
+  ${returnedTotal > 0 ? `<div class="info-red"><span>Qaytarilgan:</span><span>-${returnedTotal.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
+  ${discount > 0 ? `<div class="info-green"><span>Chegirma:</span><span>-${discount.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
+  <div class="info bold"><span>Jami qarz:</span><span>${data.totalAmount.toLocaleString('uz-UZ')} so'm</span></div>
   <div class="info"><span>To'langan:</span><span>${data.paidAmount.toLocaleString('uz-UZ')} so'm</span></div>
   <div class="debt-total">QARZ: ${data.remainingAmount.toLocaleString('uz-UZ')} so'm</div>
 </body>

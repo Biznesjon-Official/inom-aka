@@ -422,6 +422,7 @@ export default function QarzlarPage() {
                           remainingAmount: d.remainingAmount,
                           items: getAllItems(d),
                           returnedItems: getAllReturnedItems(d),
+                          discount: d.sale ? Math.max(0, (d.sale.items?.reduce((s,i) => s + i.salePrice * i.qty, 0) || 0) - d.sale.total) : 0,
                           createdAt: d.createdAt,
                         })} className="p-1.5 hover:bg-blue-50 rounded">
                           <Printer className="w-3.5 h-3.5 text-blue-500" />
@@ -612,6 +613,7 @@ export default function QarzlarPage() {
                       remainingAmount: d.remainingAmount,
                       items: getAllItems(d),
                       returnedItems: getAllReturnedItems(d),
+                      discount: d.sale ? Math.max(0, (d.sale.items?.reduce((s,i) => s + i.salePrice * i.qty, 0) || 0) - d.sale.total) : 0,
                       createdAt: d.createdAt,
                     })} className="p-1.5 hover:bg-blue-50 rounded">
                       <Printer className="w-3.5 h-3.5 text-blue-500" />
