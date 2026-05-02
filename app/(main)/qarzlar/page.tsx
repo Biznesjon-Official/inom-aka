@@ -413,8 +413,7 @@ export default function QarzlarPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                      {getAllItems(d).length > 0 && (
-                        <button onClick={() => printDebtReceipt({
+                      <button onClick={() => printDebtReceipt({
                           customerName: debtorName(d),
                           customerPhone: debtorPhone(d) || undefined,
                           totalAmount: d.totalAmount,
@@ -427,7 +426,6 @@ export default function QarzlarPage() {
                         })} className="p-1.5 hover:bg-blue-50 rounded">
                           <Printer className="w-3.5 h-3.5 text-blue-500" />
                         </button>
-                      )}
                       <button onClick={() => { setEditDebt(d); setEditForm({ customerName: debtorName(d), customerPhone: debtorPhone(d) }); setEditDialog(true) }} className="p-1.5 hover:bg-slate-100 rounded">
                         <Pencil className="w-3.5 h-3.5 text-slate-400" />
                       </button>
@@ -604,8 +602,7 @@ export default function QarzlarPage() {
                   </div>
                 )}
                 <div className="mt-3 flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                  {getAllItems(d).length > 0 && (
-                    <button onClick={() => printDebtReceipt({
+                  <button onClick={() => printDebtReceipt({
                       customerName: debtorName(d),
                       customerPhone: debtorPhone(d) || undefined,
                       totalAmount: d.totalAmount,
@@ -618,7 +615,6 @@ export default function QarzlarPage() {
                     })} className="p-1.5 hover:bg-blue-50 rounded">
                       <Printer className="w-3.5 h-3.5 text-blue-500" />
                     </button>
-                  )}
                   <button onClick={() => { setEditDebt(d); setEditForm({ customerName: debtorName(d), customerPhone: debtorPhone(d) }); setEditDialog(true) }} className="p-1.5 hover:bg-slate-100 rounded">
                     <Pencil className="w-3.5 h-3.5 text-slate-400" />
                   </button>
