@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: { debtId: '$_id', pmtDate: '$payments.date', pmtAmt: '$payments.amount' },
           totalPayments: { $first: '$payments.amount' },
-          // salePayedBefore: to'lovdan oldingi sale.paid (pay/route.ts da saqlanadi)
+          hasSale: { $first: { $cond: [{ $ifNull: ['$saleDoc._id', false] }, true, false] } },
           salePayedBefore: { $first: { $ifNull: ['$payments.salePayedBefore', 0] } },
           saleCost: { $sum: { $multiply: [{ $ifNull: ['$saleDoc.items.costPrice', 0] }, { $ifNull: ['$saleDoc.items.qty', 0] }] } },
           saleRetCost: { $first: { $ifNull: ['$saleDoc.returnedCostTotal', 0] } },
@@ -143,13 +143,17 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: null,
           totalPayments: { $sum: '$totalPayments' },
-          // foyda = max(0, paid_now - netCost) - max(0, paid_before - netCost)
-          // paid_now = salePayedBefore + payment, paid_before = salePayedBefore
           totalProfit: {
             $sum: {
-              $subtract: [
-                { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$totalPayments'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
-                { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+              $cond: [
+                '$hasSale',
+                {
+                  $subtract: [
+                    { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$totalPayments'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                    { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                  ],
+                },
+                '$totalPayments',
               ],
             },
           },
