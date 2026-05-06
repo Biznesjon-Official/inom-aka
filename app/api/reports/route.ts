@@ -24,12 +24,10 @@ export async function GET(req: NextRequest) {
 
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
-    // Sales count — createdAt bo'yicha (sotuv qachon yaratilgani)
+    // Sales count
     const salesCount = await Sale.countDocuments({ createdAt: dateFilter })
 
-    // Sales revenue/profit — calcSaleRevenue/calcSaleProfit (lib/utils.ts) bilan bir xil formula
-    // kirim = paid - max(0, ret - debt) = paid - max(0, ret - (total-paid))
-    // foyda = (total-ret) - (cost-retCost)
+    // Sales revenue/profit
     const [salesAgg] = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
@@ -38,7 +36,6 @@ export async function GET(req: NextRequest) {
           _id: '$_id',
           total: { $first: '$total' },
           cost: { $sum: { $multiply: ['$items.costPrice', '$items.qty'] } },
-          // Only payments within this period
           periodPaid: {
             $first: {
               $reduce: {
@@ -49,7 +46,6 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          // Only returns within this period (avoids cross-period return distorting historical reports)
           periodReturnedTotal: {
             $first: {
               $reduce: {
@@ -97,8 +93,8 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh (double-count oldini olish)
-    // Foyda: max(0, sale.paid - saleCost) - max(0, (sale.paid - payment.amount) - saleCost)
+    // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
+    // $$saleId — let bilan belgilangan o'zgaruvchi
     const [manualDebtPaymentsAgg] = await Debt.aggregate([
       {
         $lookup: {
@@ -118,7 +114,6 @@ export async function GET(req: NextRequest) {
       { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
-      // Sale items tannarxini olish
       {
         $lookup: {
           from: 'sales',
@@ -147,12 +142,14 @@ export async function GET(req: NextRequest) {
             $sum: {
               $cond: [
                 '$hasSale',
+                // Sotuvga bog'liq qarz: foyda = to'lov - tannarx
                 {
                   $subtract: [
                     { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$totalPayments'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
                     { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
                   ],
                 },
+                // Qo'lda qo'shilgan qarz (sale yo'q): foyda = to'lov summasi
                 '$totalPayments',
               ],
             },
@@ -194,14 +191,13 @@ export async function GET(req: NextRequest) {
       },
     ]).allowDiskUse(true)
 
-    // Expenses aggregation
+    // Expenses
     const [expensesAgg] = await Expense.aggregate([
       { $match: { date: dateFilter } },
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]).allowDiskUse(true)
 
-    // newDebt = shu davrda yaratilgan savdolarning hozirgi to'lanmagan qoldig'i
-    // calcSaleDebt bilan bir xil: max(0, total - paid - returnedTotal)
+    // newDebt
     const [newDebtAgg] = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $group: {
@@ -213,6 +209,7 @@ export async function GET(req: NextRequest) {
       }},
     ]).allowDiskUse(true)
 
+    // paidDebt — faqat oldingi davr sotuvlari uchun to'lovlar
     const [paidDebtAgg] = await Debt.aggregate([
       {
         $lookup: {
@@ -235,14 +232,14 @@ export async function GET(req: NextRequest) {
       { $group: { _id: null, paidDebt: { $sum: '$payments.amount' } } },
     ]).allowDiskUse(true)
 
-    // Static data (not date-filtered)
+    // Static data
     const [customerDebtAgg, personalDebtAgg, productStatsAgg] = await Promise.all([
       Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
       PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
       Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]).allowDiskUse(true),
     ])
 
-    // Daily breakdown — period-filtered payments AND returns
+    // Daily breakdown
     const dailyBreakdown = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
@@ -322,7 +319,7 @@ export async function GET(req: NextRequest) {
       { $sort: { date: 1 } },
     ]).allowDiskUse(true)
 
-    // Daily expenses for chart
+    // Daily expenses
     const dailyExpenses = await Expense.aggregate([
       { $match: { date: dateFilter } },
       {
@@ -334,7 +331,7 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, date: '$_id', expense: 1 } },
     ]).allowDiskUse(true)
 
-    // Daily qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
+    // Daily qarz to'lovlari
     const dailyManualDebtPayments = await Debt.aggregate([
       {
         $lookup: {
@@ -368,6 +365,7 @@ export async function GET(req: NextRequest) {
         $group: {
           _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$payments.date' } }, debtId: '$_id', pmtAmt: '$payments.amount' },
           pmtAmt: { $first: '$payments.amount' },
+          hasSale: { $first: { $cond: [{ $ifNull: ['$saleDoc._id', false] }, true, false] } },
           salePayedBefore: { $first: { $ifNull: ['$payments.salePayedBefore', 0] } },
           saleCost: { $sum: { $multiply: [{ $ifNull: ['$saleDoc.items.costPrice', 0] }, { $ifNull: ['$saleDoc.items.qty', 0] }] } },
           saleRetCost: { $first: { $ifNull: ['$saleDoc.returnedCostTotal', 0] } },
@@ -379,9 +377,15 @@ export async function GET(req: NextRequest) {
           manualPayment: { $sum: '$pmtAmt' },
           manualProfit: {
             $sum: {
-              $subtract: [
-                { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$pmtAmt'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
-                { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+              $cond: [
+                '$hasSale',
+                {
+                  $subtract: [
+                    { $max: [0, { $subtract: [{ $add: ['$salePayedBefore', '$pmtAmt'] }, { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                    { $max: [0, { $subtract: ['$salePayedBefore', { $subtract: ['$saleCost', '$saleRetCost'] }] }] },
+                  ],
+                },
+                '$pmtAmt',
               ],
             },
           },
@@ -393,12 +397,9 @@ export async function GET(req: NextRequest) {
     // Merge daily data
     const dailyMap = new Map<string, { date: string; revenue: number; profit: number; expense: number; sales: number }>()
 
-    // Sales data
     for (const d of dailyBreakdown) {
       dailyMap.set(d.date, { date: d.date, revenue: d.revenue, profit: d.profit, expense: 0, sales: d.sales })
     }
-
-    // Manual debt payments
     for (const d of dailyManualDebtPayments) {
       const existing = dailyMap.get(d.date)
       if (existing) {
@@ -408,8 +409,6 @@ export async function GET(req: NextRequest) {
         dailyMap.set(d.date, { date: d.date, revenue: d.manualPayment, profit: d.manualProfit || 0, expense: 0, sales: 0 })
       }
     }
-
-    // Expenses
     for (const d of dailyExpenses) {
       const existing = dailyMap.get(d.date)
       if (existing) {
@@ -421,7 +420,7 @@ export async function GET(req: NextRequest) {
 
     const daily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
 
-    // Payment methods — faqat shu davrda to'langan to'lovlar (payments.date bo'yicha filter)
+    // Payment methods
     const paymentMethodStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$payments' },
@@ -430,7 +429,6 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    // Qarz to'lovlari by method — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
     const manualDebtPaymentsByMethod = await Debt.aggregate([
       {
         $lookup: {
@@ -454,7 +452,6 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    // Merge payment methods
     const paymentMethodMap = new Map(paymentMethodStats.map((p: { method: string; total: number; count: number }) => [p.method, p]))
     for (const mp of manualDebtPaymentsByMethod) {
       const existing = paymentMethodMap.get(mp.method)
@@ -467,7 +464,7 @@ export async function GET(req: NextRequest) {
     }
     const mergedPaymentMethods = Array.from(paymentMethodMap.values())
 
-    // Cashier stats — use period-filtered returns, not cumulative returnedTotal
+    // Cashier stats
     const cashierStats = await Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       {
@@ -514,7 +511,6 @@ export async function GET(req: NextRequest) {
     const debtProfit = manualDebtPaymentsAgg?.totalProfit || 0
     const crossReturnRevenue = crossPeriodReturnsAgg?.returnedRevenue || 0
     const crossReturnCost = crossPeriodReturnsAgg?.returnedCost || 0
-    // Cross-period returns: revenue decreases, cost is recovered → profit impact = costRecovered - returnedRevenue
     const totalRevenue = (salesAgg?.totalRevenue || 0) + manualDebtPayments - crossReturnRevenue
     const totalProfit = (salesAgg?.totalProfit || 0) + debtProfit + (crossReturnCost - crossReturnRevenue)
 
