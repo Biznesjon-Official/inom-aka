@@ -28,6 +28,7 @@ interface ReturnedItem {
   salePrice: number
   unit?: string
   returnedAt?: string
+  receiptNo?: number
 }
 interface Debt {
   _id: string
@@ -128,12 +129,12 @@ export default function QarzlarPage() {
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
     const items: ReturnedItem[] = []
-    // debt.sale (kassadan yaratilgan qarz)
-    if (d.sale?.returnedItems?.length) items.push(...d.sale.returnedItems)
-    // debt.entries (qo'lda qo'shilgan qarz)
+    if (d.sale?.returnedItems?.length)
+      items.push(...d.sale.returnedItems.map(i => ({ ...i, receiptNo: d.sale!.receiptNo })))
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.returnedItems?.length) items.push(...entry.sale.returnedItems)
+        if (entry.sale?.returnedItems?.length)
+          items.push(...entry.sale.returnedItems.map(i => ({ ...i, receiptNo: entry.sale!.receiptNo })))
       }
     }
     return items

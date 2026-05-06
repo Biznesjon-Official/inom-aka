@@ -176,6 +176,8 @@ export interface ReturnedPrintItem {
   qty: number
   unit?: string
   salePrice: number
+  receiptNo?: number
+  returnedAt?: string
 }
 
 export function printDebtReceipt(data: {
@@ -210,18 +212,27 @@ export function printDebtReceipt(data: {
     </div>`
   }).join('')
 
-  const returnedHtml = (data.returnedItems ?? []).map(i => {
-    const lineTotal = i.salePrice * i.qty
-    const unit = i.unit || 'dona'
-    return `
-    <div class="item returned-item">
+  const returnedGroups = new Map<string, ReturnedPrintItem[]>()
+  for (const item of (data.returnedItems ?? [])) {
+    const key = item.receiptNo ? `Chek #${item.receiptNo}` : 'Qaytarilgan'
+    if (!returnedGroups.has(key)) returnedGroups.set(key, [])
+    returnedGroups.get(key)!.push(item)
+  }
+  let returnedHtml = ''
+  for (const [groupTitle, groupItems] of returnedGroups) {
+    returnedHtml += `<div class="return-group-title">${groupTitle}</div>`
+    returnedHtml += groupItems.map(i => {
+      const lineTotal = i.salePrice * i.qty
+      const unit = i.unit || 'dona'
+      return `<div class="item returned-item">
       <div class="item-name">↩ ${i.productName}</div>
       <div class="item-detail">
         <span>${i.qty} ${unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
         <span class="bold">-${lineTotal.toLocaleString('uz-UZ')}</span>
       </div>
     </div>`
-  }).join('')
+    }).join('')
+  }
 
   const returnedTotal = (data.returnedItems ?? []).reduce((s, i) => s + i.salePrice * i.qty, 0)
 
@@ -257,6 +268,7 @@ export function printDebtReceipt(data: {
   .debt-total { text-align: center; font-size: 18px; font-weight: bold; margin: 2mm 0; padding: 2mm; background: #f5f5f5; }
   .customer-name { text-align: center; font-size: 16px; font-weight: bold; margin: 2mm 0; }
   .section-title { text-align:center; font-size:14px; font-weight:bold; color:#cc0000; margin:3mm 0; padding:2mm 0; border-top:2px solid #cc0000; border-bottom:2px solid #cc0000; }
+  .return-group-title { font-size:13px; color:#cc0000; font-weight:bold; padding:1mm 0; margin-top:1.5mm; border-bottom:1px dashed #cc0000; }
 </style>
 </head>
 <body>
