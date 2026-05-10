@@ -55,7 +55,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const debt = await Debt.findByIdAndUpdate(
       id,
       { customerName, customerPhone },
-      { new: true }
+      { returnDocument: 'after' }
     )
       .populate('category', 'name')
       .populate({ path: 'sale', select: 'total paid createdAt paymentType items receiptNo' })

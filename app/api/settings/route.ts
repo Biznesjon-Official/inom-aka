@@ -28,7 +28,7 @@ export async function PUT(req: Request) {
     await Settings.findOneAndUpdate(
       { key },
       { value },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     )
     return NextResponse.json({ success: true })
   } catch (err) {

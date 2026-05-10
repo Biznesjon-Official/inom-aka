@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       const result = await Product.findOneAndUpdate(
         { _id: item.product, stock: { $gte: item.qty } },
         { $inc: { stock: -item.qty } },
-        { new: true }
+        { returnDocument: 'after' }
       )
       if (!result) {
         // Rollback already decremented stocks

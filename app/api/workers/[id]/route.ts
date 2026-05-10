@@ -25,7 +25,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       allowedFields.password = await bcrypt.hash(body.password, 10)
     }
 
-    const worker = await User.findByIdAndUpdate(id, allowedFields, { new: true }).select('-password')
+    const worker = await User.findByIdAndUpdate(id, allowedFields, { returnDocument: 'after' }).select('-password')
     if (!worker) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(worker)
   } catch (err) { return errorResponse(err) }

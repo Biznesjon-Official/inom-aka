@@ -23,7 +23,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const { name } = await req.json()
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
-    const category = await Category.findByIdAndUpdate(id, { name: name.trim() }, { new: true })
+    const category = await Category.findByIdAndUpdate(id, { name: name.trim() }, { returnDocument: 'after' })
     return NextResponse.json(category)
   } catch (err) { return errorResponse(err) }
 }

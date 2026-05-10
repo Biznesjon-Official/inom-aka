@@ -21,7 +21,7 @@ CustomerSchema.pre('save', async function () {
     const counter = await Counter.findByIdAndUpdate(
       'customerSeqNo',
       { $inc: { seq: 1 } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     )
     this.seqNo = counter.seq
   }

@@ -19,7 +19,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (paid !== undefined) update.paid = paid
     if (paymentType !== undefined) update.paymentType = paymentType
 
-    const sale = await Sale.findByIdAndUpdate(id, update, { new: true })
+    const sale = await Sale.findByIdAndUpdate(id, update, { returnDocument: 'after' })
 
     if (!sale) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
 

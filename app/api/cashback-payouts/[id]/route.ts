@@ -13,7 +13,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const payout = await CashbackPayout.findByIdAndUpdate(
       id,
       { amount, totalSales, percent, note },
-      { new: true }
+      { returnDocument: 'after' }
     )
 
     if (!payout) return NextResponse.json({ error: 'Payout not found' }, { status: 404 })

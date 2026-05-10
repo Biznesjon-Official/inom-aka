@@ -9,7 +9,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const { name, description } = await req.json()
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
-    const source = await ExpenseSource.findByIdAndUpdate(id, { name: name.trim(), description }, { new: true })
+    const source = await ExpenseSource.findByIdAndUpdate(id, { name: name.trim(), description }, { returnDocument: 'after' })
     return NextResponse.json(source)
   } catch (err) { return errorResponse(err) }
 }

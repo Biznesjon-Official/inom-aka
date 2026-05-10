@@ -34,7 +34,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.cashbackStartDate !== undefined) update.cashbackStartDate = body.cashbackStartDate ? new Date(body.cashbackStartDate) : null
     if (body.cashbackEndDate !== undefined) update.cashbackEndDate = body.cashbackEndDate ? new Date(body.cashbackEndDate) : null
     if (body.totalSalesOverride !== undefined) update.totalSalesOverride = body.totalSalesOverride === null || body.totalSalesOverride === '' ? null : Number(body.totalSalesOverride)
-    const customer = await Customer.findByIdAndUpdate(id, update, { new: true })
+    const customer = await Customer.findByIdAndUpdate(id, update, { returnDocument: 'after' })
     if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(customer)
   } catch (err) { return errorResponse(err) }
