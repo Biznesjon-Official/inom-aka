@@ -115,26 +115,38 @@ export default function QarzlarPage() {
   const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
 
   const getAllItems = (d: Debt): SaleItem[] => {
+    const seenSaleIds = new Set<string>()
     const items: SaleItem[] = []
     // debt.sale (kassadan yaratilgan qarz)
-    if (d.sale?.items?.length) items.push(...d.sale.items)
-    // debt.entries (qo'lda qo'shilgan qarz)
+    if (d.sale?.items?.length) {
+      seenSaleIds.add(d.sale._id)
+      items.push(...d.sale.items)
+    }
+    // debt.entries (qo'lda qo'shilgan qarz) — faqat yangi sale lar
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.items?.length) items.push(...entry.sale.items)
+        if (entry.sale?.items?.length && !seenSaleIds.has(entry.sale._id)) {
+          seenSaleIds.add(entry.sale._id)
+          items.push(...entry.sale.items)
+        }
       }
     }
     return items
   }
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
+    const seenSaleIds = new Set<string>()
     const items: ReturnedItem[] = []
-    if (d.sale?.returnedItems?.length)
-      items.push(...d.sale.returnedItems.map(i => ({ ...i, receiptNo: d.sale!.receiptNo })))
+    if (d.sale?.returnedItems?.length) {
+      seenSaleIds.add(d.sale._id)
+      items.push(...d.sale.returnedItems)
+    }
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.returnedItems?.length)
-          items.push(...entry.sale.returnedItems.map(i => ({ ...i, receiptNo: entry.sale!.receiptNo })))
+        if (entry.sale?.returnedItems?.length && !seenSaleIds.has(entry.sale._id)) {
+          seenSaleIds.add(entry.sale._id)
+          items.push(...entry.sale.returnedItems)
+        }
       }
     }
     return items
