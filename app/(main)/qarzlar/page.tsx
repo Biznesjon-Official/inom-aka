@@ -117,16 +117,14 @@ export default function QarzlarPage() {
   const getAllItems = (d: Debt): SaleItem[] => {
     const seenSaleIds = new Set<string>()
     const items: SaleItem[] = []
-    // debt.sale (kassadan yaratilgan qarz)
     if (d.sale?.items?.length) {
-      seenSaleIds.add(d.sale._id)
+      seenSaleIds.add(String(d.sale._id))
       items.push(...d.sale.items)
     }
-    // debt.entries (qo'lda qo'shilgan qarz) — faqat yangi sale lar
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.items?.length && !seenSaleIds.has(entry.sale._id)) {
-          seenSaleIds.add(entry.sale._id)
+        if (entry.sale?.items?.length && !seenSaleIds.has(String(entry.sale._id))) {
+          seenSaleIds.add(String(entry.sale._id))
           items.push(...entry.sale.items)
         }
       }
@@ -138,18 +136,28 @@ export default function QarzlarPage() {
     const seenSaleIds = new Set<string>()
     const items: ReturnedItem[] = []
     if (d.sale?.returnedItems?.length) {
-      seenSaleIds.add(d.sale._id)
+      seenSaleIds.add(String(d.sale._id))
       items.push(...d.sale.returnedItems)
     }
     if (d.entries?.length) {
       for (const entry of d.entries) {
-        if (entry.sale?.returnedItems?.length && !seenSaleIds.has(entry.sale._id)) {
-          seenSaleIds.add(entry.sale._id)
+        if (entry.sale?.returnedItems?.length && !seenSaleIds.has(String(entry.sale._id))) {
+          seenSaleIds.add(String(entry.sale._id))
           items.push(...entry.sale.returnedItems)
         }
       }
     }
     return items
+  }
+
+  // Chegirmani hisoblash: barcha sotuvlar bo'yicha
+  const getDiscount = (d: Debt): number => {
+    let discount = 0
+    if (d.sale?.items?.length) {
+      const itemsTotal = d.sale.items.reduce((s, i) => s + i.salePrice * i.qty, 0)
+      discount += Math.max(0, itemsTotal - d.sale.total)
+    }
+    return discount
   }
 
   const getSaleIds = (d: Debt): string[] => {
@@ -434,7 +442,7 @@ export default function QarzlarPage() {
                           remainingAmount: d.remainingAmount,
                           items: getAllItems(d),
                           returnedItems: getAllReturnedItems(d),
-                          discount: d.sale ? Math.max(0, (d.sale.items?.reduce((s,i) => s + i.salePrice * i.qty, 0) || 0) - d.sale.total) : 0,
+                          discount: getDiscount(d),
                           createdAt: d.createdAt,
                         })} className="p-1.5 hover:bg-blue-50 rounded">
                           <Printer className="w-3.5 h-3.5 text-blue-500" />
@@ -623,7 +631,7 @@ export default function QarzlarPage() {
                       remainingAmount: d.remainingAmount,
                       items: getAllItems(d),
                       returnedItems: getAllReturnedItems(d),
-                      discount: d.sale ? Math.max(0, (d.sale.items?.reduce((s,i) => s + i.salePrice * i.qty, 0) || 0) - d.sale.total) : 0,
+                      discount: getDiscount(d),
                       createdAt: d.createdAt,
                     })} className="p-1.5 hover:bg-blue-50 rounded">
                       <Printer className="w-3.5 h-3.5 text-blue-500" />
