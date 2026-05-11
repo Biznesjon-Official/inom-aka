@@ -115,23 +115,31 @@ export default function QarzlarPage() {
   const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
 
   const getAllItems = (d: Debt): SaleItem[] => {
-    // Agar debt.sale bor bo'lsa — faqat shu sotuvning tovarlarini qaytaramiz
-    // entries.sale xuddi shu sotuv bo'lishi mumkin → duplicate oldini olish
     if (d.sale?.items?.length) {
       return [...d.sale.items]
     }
-    // Faqat debt.sale yo'q bo'lganda entries dan tovarlarni olamiz
     const seenSaleIds = new Set<string>()
-    const items: SaleItem[] = []
+    const raw: SaleItem[] = []
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.items?.length && !seenSaleIds.has(String(entry.sale._id))) {
           seenSaleIds.add(String(entry.sale._id))
-          items.push(...entry.sale.items)
+          raw.push(...entry.sale.items)
         }
       }
     }
-    return items
+    // Merge same product+price across different sales to avoid duplicate rows
+    const merged = new Map<string, SaleItem>()
+    for (const item of raw) {
+      const key = `${item.productName}__${item.salePrice}`
+      const existing = merged.get(key)
+      if (existing) {
+        existing.qty = Math.round((existing.qty + item.qty) * 100) / 100
+      } else {
+        merged.set(key, { ...item })
+      }
+    }
+    return [...merged.values()]
   }
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
@@ -406,7 +414,7 @@ export default function QarzlarPage() {
                     <div className="font-medium text-slate-800">{debtorName(d)}</div>
                     {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
                     {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
-                    {getAllItems(d).length > 0 && (
+                    {expandedDebt !== d._id && getAllItems(d).length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {getAllItems(d).slice(0, 3).map((item, i) => (
                           <div key={i} className="text-xs text-slate-500">
@@ -555,7 +563,7 @@ export default function QarzlarPage() {
                       {d.category && <Badge variant="secondary" className="text-xs">{d.category.name}</Badge>}
                     </div>
                     {d.note && <div className="text-xs text-slate-400 italic mt-0.5">{d.note}</div>}
-                    {getAllItems(d).length > 0 && (
+                    {expandedDebt !== d._id && getAllItems(d).length > 0 && (
                       <div className="mt-1 space-y-0.5">
                         {getAllItems(d).slice(0, 3).map((item, i) => (
                           <div key={i} className="text-xs text-slate-500">
