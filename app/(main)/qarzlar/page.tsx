@@ -115,12 +115,14 @@ export default function QarzlarPage() {
   const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
 
   const getAllItems = (d: Debt): SaleItem[] => {
+    // Agar debt.sale bor bo'lsa — faqat shu sotuvning tovarlarini qaytaramiz
+    // entries.sale xuddi shu sotuv bo'lishi mumkin → duplicate oldini olish
+    if (d.sale?.items?.length) {
+      return [...d.sale.items]
+    }
+    // Faqat debt.sale yo'q bo'lganda entries dan tovarlarni olamiz
     const seenSaleIds = new Set<string>()
     const items: SaleItem[] = []
-    if (d.sale?.items?.length) {
-      seenSaleIds.add(String(d.sale._id))
-      items.push(...d.sale.items)
-    }
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.items?.length && !seenSaleIds.has(String(entry.sale._id))) {
@@ -133,12 +135,13 @@ export default function QarzlarPage() {
   }
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
+    // Agar debt.sale bor bo'lsa — faqat shu sotuvning qaytarilgan tovarlarini qaytaramiz
+    if (d.sale) {
+      return d.sale.returnedItems ? [...d.sale.returnedItems] : []
+    }
+    // Faqat debt.sale yo'q bo'lganda entries dan olamiz
     const seenSaleIds = new Set<string>()
     const items: ReturnedItem[] = []
-    if (d.sale?.returnedItems?.length) {
-      seenSaleIds.add(String(d.sale._id))
-      items.push(...d.sale.returnedItems)
-    }
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.returnedItems?.length && !seenSaleIds.has(String(entry.sale._id))) {
