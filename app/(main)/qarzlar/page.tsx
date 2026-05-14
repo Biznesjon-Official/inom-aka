@@ -115,41 +115,32 @@ export default function QarzlarPage() {
   const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
 
   const getAllItems = (d: Debt): SaleItem[] => {
-    if (d.sale?.items?.length) {
-      return [...d.sale.items]
-    }
     const seenSaleIds = new Set<string>()
-    const raw: SaleItem[] = []
+    const items: SaleItem[] = []
+    // debt.sale (kassadan yaratilgan asosiy sotuv)
+    if (d.sale?.items?.length) {
+      seenSaleIds.add(String(d.sale._id))
+      items.push(...d.sale.items)
+    }
+    // debt.entries — har bir entry ning sotuvidan tovarlar (duplicate saleId lar o'tkazib yuboriladi)
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.items?.length && !seenSaleIds.has(String(entry.sale._id))) {
           seenSaleIds.add(String(entry.sale._id))
-          raw.push(...entry.sale.items)
+          items.push(...entry.sale.items)
         }
       }
     }
-    // Merge same product+price across different sales to avoid duplicate rows
-    const merged = new Map<string, SaleItem>()
-    for (const item of raw) {
-      const key = `${item.productName}__${item.salePrice}`
-      const existing = merged.get(key)
-      if (existing) {
-        existing.qty = Math.round((existing.qty + item.qty) * 100) / 100
-      } else {
-        merged.set(key, { ...item })
-      }
-    }
-    return [...merged.values()]
+    return items
   }
 
   const getAllReturnedItems = (d: Debt): ReturnedItem[] => {
-    // Agar debt.sale bor bo'lsa — faqat shu sotuvning qaytarilgan tovarlarini qaytaramiz
-    if (d.sale) {
-      return d.sale.returnedItems ? [...d.sale.returnedItems] : []
-    }
-    // Faqat debt.sale yo'q bo'lganda entries dan olamiz
     const seenSaleIds = new Set<string>()
     const items: ReturnedItem[] = []
+    if (d.sale?.returnedItems?.length) {
+      seenSaleIds.add(String(d.sale._id))
+      items.push(...d.sale.returnedItems)
+    }
     if (d.entries?.length) {
       for (const entry of d.entries) {
         if (entry.sale?.returnedItems?.length && !seenSaleIds.has(String(entry.sale._id))) {
