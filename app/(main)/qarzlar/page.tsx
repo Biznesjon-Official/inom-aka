@@ -414,16 +414,13 @@ export default function QarzlarPage() {
                     <div className="font-medium text-slate-800">{debtorName(d)}</div>
                     {debtorPhone(d) && <div className="text-xs text-slate-400">{debtorPhone(d)}</div>}
                     {d.note && <div className="text-xs text-slate-400 italic">{d.note}</div>}
-                    {expandedDebt !== d._id && getAllItems(d).length > 0 && (
+                    {getAllItems(d).length > 0 && (
                       <div className="mt-1 space-y-0.5">
-                        {getAllItems(d).slice(0, 3).map((item, i) => (
+                        {getAllItems(d).map((item, i) => (
                           <div key={i} className="text-xs text-slate-500">
                             {item.productName} <span className="text-slate-400">x{item.qty} {item.unit}</span>
                           </div>
                         ))}
-                        {getAllItems(d).length > 3 && (
-                          <div className="text-xs text-slate-400">+{getAllItems(d).length - 3} ta yana...</div>
-                        )}
                       </div>
                     )}
                   </td>
@@ -563,16 +560,13 @@ export default function QarzlarPage() {
                       {d.category && <Badge variant="secondary" className="text-xs">{d.category.name}</Badge>}
                     </div>
                     {d.note && <div className="text-xs text-slate-400 italic mt-0.5">{d.note}</div>}
-                    {expandedDebt !== d._id && getAllItems(d).length > 0 && (
+                    {getAllItems(d).length > 0 && (
                       <div className="mt-1 space-y-0.5">
-                        {getAllItems(d).slice(0, 3).map((item, i) => (
+                        {getAllItems(d).map((item, i) => (
                           <div key={i} className="text-xs text-slate-500">
                             {item.productName} <span className="text-slate-400">x{item.qty} {item.unit}</span>
                           </div>
                         ))}
-                        {getAllItems(d).length > 3 && (
-                          <div className="text-xs text-slate-400">+{getAllItems(d).length - 3} ta yana...</div>
-                        )}
                       </div>
                     )}
                   </div>
