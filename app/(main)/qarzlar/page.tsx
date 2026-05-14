@@ -468,33 +468,107 @@ export default function QarzlarPage() {
                 {expandedDebt === d._id && (
                   <tr className="bg-slate-50">
                     <td colSpan={7} className="px-4 py-3 space-y-3">
-                      {/* Qarz tarixi (entries) */}
-                      {d.entries && d.entries.length > 0 && (
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 mb-1">Qarz tarixi:</div>
-                          <div className="space-y-1">
-                            {d.entries.map((e, i) => (
-                              <div key={i} className="flex justify-between items-center text-xs bg-orange-50 rounded px-2 py-1 gap-2">
-                                <span className="text-slate-600 flex-1">
-                                  {new Date(e.date).toLocaleDateString('uz-UZ')} — {e.note || 'Qarz'}
+
+                      {/* Har bir sotuv alohida bo'limda */}
+                      {(() => {
+                        const seenIds = new Set<string>()
+                        const sales: Array<{ saleId: string; receiptNo?: number; items: SaleItem[]; returnedItems?: ReturnedItem[]; entryAmount: number; entryDate: string; entryNote?: string }> = []
+
+                        // debt.sale
+                        if (d.sale?._id) {
+                          seenIds.add(String(d.sale._id))
+                          const entryForSale = d.entries?.find(e => e.sale?._id && String(e.sale._id) === String(d.sale!._id))
+                          sales.push({
+                            saleId: String(d.sale._id),
+                            receiptNo: d.sale.receiptNo,
+                            items: d.sale.items || [],
+                            returnedItems: d.sale.returnedItems || [],
+                            entryAmount: entryForSale?.amount || d.totalAmount,
+                            entryDate: entryForSale?.date || d.createdAt,
+                            entryNote: entryForSale?.note,
+                          })
+                        }
+                        // entries.sale (boshqa sotuvlar)
+                        if (d.entries?.length) {
+                          for (const e of d.entries) {
+                            if (e.sale?._id && !seenIds.has(String(e.sale._id))) {
+                              seenIds.add(String(e.sale._id))
+                              sales.push({
+                                saleId: String(e.sale._id),
+                                receiptNo: e.sale.receiptNo,
+                                items: e.sale.items || [],
+                                returnedItems: e.sale.returnedItems || [],
+                                entryAmount: e.amount,
+                                entryDate: e.date,
+                                entryNote: e.note,
+                              })
+                            }
+                          }
+                        }
+
+                        return sales.map((s, si) => (
+                          <div key={si} className="border border-slate-200 rounded-lg overflow-hidden">
+                            {/* Sotuv header */}
+                            <div className="flex items-center justify-between bg-orange-50 px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-orange-700">
+                                  {new Date(s.entryDate).toLocaleDateString('uz-UZ')}
+                                  {s.entryNote ? ` — ${s.entryNote}` : ''}
                                 </span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="font-medium text-orange-700">+{formatPrice(e.amount)}</span>
-                                  {e.sale?._id && (
-                                    <button
-                                      onClick={(ev) => { ev.stopPropagation(); router.push(`/sotuvlar?ids=${e.sale!._id}`) }}
-                                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded px-1.5 py-0.5 transition-colors"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                      <span>#{e.sale.receiptNo ?? '—'}</span>
-                                    </button>
-                                  )}
-                                </div>
+                                {s.receiptNo && (
+                                  <button
+                                    onClick={(ev) => { ev.stopPropagation(); router.push(`/sotuvlar?ids=${s.saleId}`) }}
+                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded px-1.5 py-0.5 text-xs transition-colors"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    #{s.receiptNo}
+                                  </button>
+                                )}
+                              </div>
+                              <span className="text-xs font-bold text-orange-700">+{formatPrice(s.entryAmount)}</span>
+                            </div>
+                            {/* Tovarlar */}
+                            {s.items.length > 0 && (
+                              <div className="px-3 py-2 space-y-1">
+                                {s.items.map((item, ii) => (
+                                  <div key={ii} className="flex justify-between text-xs">
+                                    <span className="text-slate-600">{item.productName} <span className="text-slate-400">x{item.qty} {item.unit}</span></span>
+                                    <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Qaytarilgan tovarlar */}
+                            {s.returnedItems && s.returnedItems.length > 0 && (
+                              <div className="px-3 py-2 border-t border-red-100 bg-red-50 space-y-1">
+                                <div className="text-xs font-medium text-red-600 mb-1">↩ Qaytarilgan:</div>
+                                {s.returnedItems.map((item, ii) => (
+                                  <div key={ii} className="flex justify-between text-xs text-red-600">
+                                    <span>{item.productName} <span className="text-red-400">x{item.qty} {item.unit || 'dona'}</span></span>
+                                    <span className="font-medium">-{formatPrice(item.salePrice * item.qty)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      })()}
+
+                      {/* Qo'lda qo'shilgan qarz entries (sale yo'q) */}
+                      {d.entries?.filter(e => !e.sale).length ? (
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 mb-1">Qo&apos;lda qo&apos;shilgan qarzlar:</div>
+                          <div className="space-y-1">
+                            {d.entries.filter(e => !e.sale).map((e, i) => (
+                              <div key={i} className="flex justify-between text-xs bg-orange-50 rounded px-2 py-1">
+                                <span className="text-slate-600">{new Date(e.date).toLocaleDateString('uz-UZ')} — {e.note || 'Qarz'}</span>
+                                <span className="font-medium text-orange-700">+{formatPrice(e.amount)}</span>
                               </div>
                             ))}
                           </div>
                         </div>
-                      )}
+                      ) : null}
+
                       {/* To'lovlar tarixi */}
                       {d.payments.length > 0 && (
                         <div>
@@ -512,18 +586,7 @@ export default function QarzlarPage() {
                           </div>
                         </div>
                       )}
-                      {/* Barcha sotuvlar tovarlari */}
-                      {getAllItems(d).length > 0 && (
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 mb-1">Sotib olingan tovarlar:</div>
-                          {getAllItems(d).map((item, i) => (
-                            <div key={i} className="flex justify-between text-xs">
-                              <span className="text-slate-600">{item.productName} x{item.qty} {item.unit}</span>
-                              <span className="text-slate-700 font-medium">{formatPrice(item.salePrice * item.qty)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+
                       {!d.sale && (!d.entries || d.entries.length === 0) && d.payments.length === 0 && (
                         <div className="text-xs text-slate-400 italic">Tarix yo&apos;q</div>
                       )}
