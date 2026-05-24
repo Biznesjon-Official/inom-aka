@@ -101,7 +101,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         // T = current entry total, P = total paid (upfront + debt payments), R = return amount
         const entryTotal = entry?.amount || sale.total
-        const entryPaid = entry?.paidAmount ?? (sale.paymentType === 'debt' ? 0 : sale.paid)
+        // entryPaid: entry.paidAmount (upfront) + debt payments for this sale
+        const debtPaymentsForSale = debt.payments
+          .filter((p: { fromSale?: boolean; refunded?: boolean; saleRef?: { toString: () => string } }) =>
+            !p.fromSale && !p.refunded && p.saleRef?.toString() === sale._id.toString()
+          )
+          .reduce((s: number, p: { amount: number }) => s + p.amount, 0)
+        const upfrontPaid = entry?.paidAmount ?? (sale.paymentType === 'debt' ? 0 : sale.paid)
+        const entryPaid = upfrontPaid + debtPaymentsForSale
         const R = effectiveReturnTotal
         const newEntryTotal = Math.round(entryTotal * 100 - R * 100) / 100
         const newRemaining = Math.max(0, Math.round(newEntryTotal * 100 - entryPaid * 100) / 100)
