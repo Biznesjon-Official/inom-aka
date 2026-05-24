@@ -149,8 +149,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             debt.remainingAmount = Math.round(debt.remainingAmount * 100 - debtReduction * 100) / 100
           }
           debt.totalAmount = Math.round(debt.totalAmount * 100 - R * 100) / 100
-          debt.paidAmount = Math.round(debt.paidAmount * 100 - overpaid * 100) / 100
-          if (debt.paidAmount < 0) debt.paidAmount = 0
+          // paidAmount faqat overpaid bo'lganda kamayadi (ortiqcha to'lov qaytarilganda)
+          if (overpaid > 0) {
+            debt.paidAmount = Math.round(debt.paidAmount * 100 - overpaid * 100) / 100
+            if (debt.paidAmount < 0) debt.paidAmount = 0
+          }
           if (debt.remainingAmount <= 0.01) {
             debt.remainingAmount = 0
           }
