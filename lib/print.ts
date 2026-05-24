@@ -222,7 +222,7 @@ export function printDebtReceipt(data: {
   for (const [groupTitle, groupItems] of returnedGroups) {
     returnedHtml += `<div class="return-group-title">${groupTitle}</div>`
     returnedHtml += groupItems.map(i => {
-      const lineTotal = i.salePrice * i.qty
+      const lineTotal = Math.abs(i.salePrice) * Math.abs(i.qty)
       const unit = i.unit || 'dona'
       return `<div class="item returned-item">
       <div class="item-name">↩ ${i.productName}</div>
@@ -234,7 +234,7 @@ export function printDebtReceipt(data: {
     }).join('')
   }
 
-  const returnedTotal = (data.returnedItems ?? []).reduce((s, i) => s + i.salePrice * i.qty, 0)
+  const returnedTotal = (data.returnedItems ?? []).reduce((s, i) => s + Math.abs(i.salePrice) * Math.abs(i.qty), 0)
 
   const html = `<!DOCTYPE html>
 <html>
