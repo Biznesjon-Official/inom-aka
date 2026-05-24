@@ -99,43 +99,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ) : null
         const entry = saleEntry || saleEntryFallback
 
-        // T = current entry total, P = total paid (upfront + debt payments), R = return amount
-        const entryTotal = entry?.amount || sale.total
-        // entryPaid: entry.paidAmount (upfront) + debt payments for this sale
-        const debtPaymentsForSale = debt.payments
-          .filter((p: { fromSale?: boolean; refunded?: boolean; saleRef?: { toString: () => string } }) =>
-            !p.fromSale && !p.refunded && p.saleRef?.toString() === sale._id.toString()
-          )
-          .reduce((s: number, p: { amount: number }) => s + p.amount, 0)
-        const upfrontPaid = entry?.paidAmount ?? (sale.paymentType === 'debt' ? 0 : sale.paid)
-        const entryPaid = upfrontPaid + debtPaymentsForSale
         const R = effectiveReturnTotal
-        const newEntryTotal = Math.round(entryTotal * 100 - R * 100) / 100
-        const newRemaining = Math.max(0, Math.round(newEntryTotal * 100 - entryPaid * 100) / 100)
-        const saleDebtPortion = Math.round(entryTotal * 100 - entryPaid * 100) / 100
-        const debtReduction = Math.round(saleDebtPortion * 100 - newRemaining * 100) / 100
-        const overpaid = Math.max(0, Math.round(entryPaid * 100 - newEntryTotal * 100) / 100)
+        const debtDecrease = Math.min(R, debt.remainingAmount)
+        const overpaid = Math.round((R * 100 - debtDecrease * 100)) / 100
 
-        // Find refundable debt payments for this sale
-        const salePayments = debt.payments.filter(
-          (p: { fromSale?: boolean; refunded?: boolean; saleRef?: { toString: () => string } }) =>
-            !p.fromSale && !p.refunded && p.saleRef?.toString() === sale._id.toString()
-        )
-        const isSingleSaleDebt = debt.entries.length <= 1
-        const refundablePmts = salePayments.length > 0 ? salePayments
-          : isSingleSaleDebt ? debt.payments.filter(
-              (p: { fromSale?: boolean; refunded?: boolean }) => !p.fromSale && !p.refunded
-            ) : []
-
-        // Mark only enough payments as refunded to cover overpaid amount
-        let refundRemaining = overpaid
-        for (const rp of refundablePmts) {
-          if (refundRemaining <= 0) break
-          rp.refunded = true
-          refundRemaining = Math.round(refundRemaining * 100 - rp.amount * 100) / 100
-        }
-
-        // Refund overpaid amount to kassa (reduce Sale.paid + track in payments)
+        // Refund overpaid amount to kassa (only when return > remaining debt)
         if (overpaid > 0) {
           await Sale.findByIdAndUpdate(id, {
             $inc: { paid: -overpaid },
@@ -145,29 +113,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         // Update debt amounts
         if (debt.status === 'active') {
-          if (debtReduction > 0) {
-            debt.remainingAmount = Math.round(debt.remainingAmount * 100 - debtReduction * 100) / 100
-          }
           debt.totalAmount = Math.round(debt.totalAmount * 100 - R * 100) / 100
-          // paidAmount faqat overpaid bo'lganda kamayadi (ortiqcha to'lov qaytarilganda)
+          debt.remainingAmount = Math.round(debt.remainingAmount * 100 - debtDecrease * 100) / 100
           if (overpaid > 0) {
             debt.paidAmount = Math.round(debt.paidAmount * 100 - overpaid * 100) / 100
             if (debt.paidAmount < 0) debt.paidAmount = 0
           }
           if (debt.remainingAmount <= 0.01) {
             debt.remainingAmount = 0
-          }
-          if (debt.remainingAmount <= 0) {
             debt.status = 'paid'
             debt.note = (debt.note || '') + ' [Sotuv qaytarildi]'
           }
         }
 
-        // Update or remove this sale's entry
+        // Update or remove this sale's entry (for display purposes)
+        const entryTotal = entry?.amount || sale.total
+        const newEntryTotal = Math.round(entryTotal * 100 - R * 100) / 100
         if (entry) {
           if (newEntryTotal > 0) {
             entry.amount = newEntryTotal
-            entry.paidAmount = Math.min(entryPaid, newEntryTotal)
           } else {
             debt.entries = debt.entries.filter(
               (e: { sale?: { toString: () => string }; note?: string }) =>
