@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatPrice, calcSaleRevenue, calcSaleProfit, calcSaleDebt, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
+import { formatPrice, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
 import { printReceipt } from '@/lib/print'
 import { RefreshCw, Printer, Undo2, Minus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -111,12 +111,6 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
     fetchSales()
   }
 
-  const todaySalesRevenue = sales.reduce((s, x) => s + calcSaleRevenue(x), 0)
-  const todayDebtRevenue = debtPayments.reduce((s, d) => s + d.todayPaid, 0)
-  const todayRevenue = todaySalesRevenue
-  const todayDebt = sales.reduce((s, x) => s + calcSaleDebt(x), 0)
-  const todayProfit = sales.reduce((s, x) => s + calcSaleProfit(x), 0)
-
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-2">
@@ -125,17 +119,6 @@ export default function SalesLog({ cashierId }: { cashierId?: string }) {
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={fetchSales} disabled={loading}>
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
-          <span>{sales.length} ta sotuv</span>
-          <span>Kirim: <span className="font-medium text-slate-700">{formatPrice(todayRevenue)}</span></span>
-          <span>Foyda: <span className="font-medium text-emerald-700">{formatPrice(todayProfit)}</span></span>
-          {todayDebtRevenue > 0 && (
-            <span>Qarz to&apos;lov: <span className="font-medium text-green-600">+{formatPrice(todayDebtRevenue)}</span></span>
-          )}
-          {todayDebt > 0 && (
-            <span>Qarz: <span className="font-medium text-orange-600">{formatPrice(todayDebt)}</span></span>
-          )}
         </div>
       </CardHeader>
       <CardContent>
