@@ -15,6 +15,7 @@ const CustomerSchema = new Schema({
 
 CustomerSchema.index({ name: 1 })
 CustomerSchema.index({ phone: 1 })
+CustomerSchema.index({ name: 'text' }) // Text search optimization
 
 CustomerSchema.pre('save', async function () {
   if (!this.seqNo) {

@@ -40,5 +40,8 @@ const DebtSchema = new Schema({
 
 DebtSchema.index({ customer: 1, status: 1 })
 DebtSchema.index({ status: 1, createdAt: -1 })
+DebtSchema.index({ customerName: 'text' }) // Text search
+DebtSchema.index({ status: 1, type: 1 })   // Filter optimization
+DebtSchema.index({ createdAt: -1 })        // Sort optimization
 
 export default models.Debt || model('Debt', DebtSchema)

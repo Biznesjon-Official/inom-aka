@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
+import { Types } from 'mongoose'
 import '@/models/Sale' // ensure Sale model is registered for populate
 
 export async function GET(req: Request) {
@@ -11,7 +12,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     const customer = searchParams.get('customer')
-
     const category = searchParams.get('category')
 
     // Bugungi qarz to'lovlarini olish
@@ -39,27 +39,85 @@ export async function GET(req: Request) {
 
     const search = searchParams.get('search')
 
-    const filter: Record<string, unknown> = {}
-    filter.$or = [{ type: 'customer' }, { type: { $exists: false } }]
-    if (status) filter.status = status
-    if (customer) filter.customer = customer
-    if (category) filter.category = category
+    const matchStage: Record<string, unknown> = {}
+    matchStage.$or = [{ type: 'customer' }, { type: { $exists: false } }]
+    
+    if (status) matchStage.status = status
+    if (customer) matchStage.customer = new Types.ObjectId(customer)
+    if (category) matchStage.category = new Types.ObjectId(category)
+    
     if (search) {
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const regex = new RegExp(escapedSearch, 'i')
-      filter.$and = [
-        { $or: filter.$or as unknown[] },
+      matchStage.$and = [
+        { $or: matchStage.$or as unknown[] },
         { $or: [{ customerName: regex }, { customerPhone: regex }] },
       ]
-      delete filter.$or
+      delete matchStage.$or
     }
 
-    const debts = await Debt.find(filter)
-      .populate('category', 'name')
-      .populate({ path: 'sale', select: 'total paid createdAt paymentType items returnedItems receiptNo' })
-      .populate({ path: 'entries.sale', select: 'items returnedItems receiptNo', model: 'Sale' })
-      .sort({ createdAt: -1 })
-      .lean()
+    const debts = await Debt.aggregate([
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'debtcategories',
+          localField: 'category',
+          foreignField: '_id',
+          as: 'category',
+          pipeline: [{ $project: { name: 1 } }]
+        }
+      },
+      {
+        $lookup: {
+          from: 'sales',
+          localField: 'sale',
+          foreignField: '_id',
+          as: 'sale',
+          pipeline: [{ $project: { total: 1, paid: 1, createdAt: 1, paymentType: 1, items: 1, returnedItems: 1, receiptNo: 1 } }]
+        }
+      },
+      {
+        $lookup: {
+          from: 'sales',
+          localField: 'entries.sale',
+          foreignField: '_id',
+          as: 'entrySales',
+          pipeline: [{ $project: { items: 1, returnedItems: 1, receiptNo: 1 } }]
+        }
+      },
+      { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$sale', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          'entries': {
+            $map: {
+              input: '$entries',
+              as: 'entry',
+              in: {
+                $mergeObjects: [
+                  '$$entry',
+                  {
+                    sale: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$entrySales',
+                            cond: { $eq: ['$$this._id', '$$entry.sale'] }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      { $project: { entrySales: 0 } }
+    ]).allowDiskUse(true)
 
     return NextResponse.json(debts)
   } catch (err) { return errorResponse(err) }

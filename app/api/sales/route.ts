@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/utils'
 import Sale from '@/models/Sale'
 import Debt from '@/models/Debt'
 import Product from '@/models/Product'
+import { Types } from 'mongoose'
 
 export async function GET(req: Request) {
   try {
@@ -20,27 +21,56 @@ export async function GET(req: Request) {
 
     // Specific sale IDs mode (for debt archive view)
     if (ids) {
-      const idList = ids.split(',').filter(Boolean)
-      const sales = await Sale.find({ _id: { $in: idList } })
-        .populate('cashier', 'name')
-        .populate('customer', 'name phone')
-        .populate('usta', 'name')
-        .sort({ createdAt: -1 })
-        .lean()
-        .allowDiskUse(true)
+      const idList = ids.split(',').filter(Boolean).map(id => new Types.ObjectId(id))
+      const sales = await Sale.aggregate([
+        { $match: { _id: { $in: idList } } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'cashier',
+            foreignField: '_id',
+            as: 'cashier',
+            pipeline: [{ $project: { name: 1 } }]
+          }
+        },
+        {
+          $lookup: {
+            from: 'customers',
+            localField: 'customer',
+            foreignField: '_id',
+            as: 'customer',
+            pipeline: [{ $project: { name: 1, phone: 1 } }]
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'usta',
+            foreignField: '_id',
+            as: 'usta',
+            pipeline: [{ $project: { name: 1 } }]
+          }
+        },
+        { $unwind: { path: '$cashier', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$usta', preserveNullAndEmptyArrays: true } },
+        { $sort: { createdAt: -1 } }
+      ]).allowDiskUse(true)
+      
       return NextResponse.json(sales)
     }
 
     const search = searchParams.get('search')
 
-    const filter: Record<string, unknown> = {}
+    const matchStage: Record<string, unknown> = {}
+    
     if (search) {
       // Search mode: search across all sales, no date/limit restriction
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const searchNum = Number(search)
       if (!isNaN(searchNum) && search.trim() !== '') {
         // Receipt number exact match
-        filter.receiptNo = searchNum
+        matchStage.receiptNo = searchNum
       } else {
         // Name search: registered customers + debt customers (customerName on Debt)
         const regex = new RegExp(escapedSearch, 'i')
@@ -55,35 +85,72 @@ export async function GET(req: Request) {
           if (d.sale) debtSaleIds.push(d.sale)
           if (d.entries) for (const e of d.entries) if (e.sale) debtSaleIds.push(e.sale)
         }
-        filter.$or = [
+        matchStage.$or = [
           { customer: { $in: matchingCustomers.map(c => c._id) } },
           ...(debtSaleIds.length > 0 ? [{ _id: { $in: debtSaleIds } }] : [{ _id: null }]),
         ]
       }
     } else {
-      if (cashier) filter.cashier = cashier
-      if (customer) filter.customer = customer
-      if (usta) filter.usta = usta
+      if (cashier) matchStage.cashier = new Types.ObjectId(cashier)
+      if (customer) matchStage.customer = new Types.ObjectId(customer)
+      if (usta) matchStage.usta = new Types.ObjectId(usta)
       if (today === '1') {
         const start = new Date()
         start.setHours(0, 0, 0, 0)
-        filter.createdAt = { $gte: start }
+        matchStage.createdAt = { $gte: start }
       } else if (from || to) {
-        filter.createdAt = {}
-        if (from) (filter.createdAt as Record<string, unknown>).$gte = new Date(from)
-        if (to) (filter.createdAt as Record<string, unknown>).$lte = new Date(to)
+        matchStage.createdAt = {}
+        if (from) (matchStage.createdAt as Record<string, unknown>).$gte = new Date(from)
+        if (to) (matchStage.createdAt as Record<string, unknown>).$lte = new Date(to)
       }
     }
 
-    const q = Sale.find(filter)
-      .populate('cashier', 'name')
-      .populate('customer', 'name phone')
-      .populate('usta', 'name')
-      .sort({ createdAt: -1 })
-      .lean()
-      .allowDiskUse(true)
-    if (!search) q.limit(100)
-    const sales = await q
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pipeline: any[] = [
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } },
+    ]
+
+    // Add limit only if not searching
+    if (!search) {
+      pipeline.push({ $limit: 100 })
+    }
+
+    // Add lookups for related data
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'cashier',
+          foreignField: '_id',
+          as: 'cashier',
+          pipeline: [{ $project: { name: 1 } }]
+        }
+      },
+      {
+        $lookup: {
+          from: 'customers',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer',
+          pipeline: [{ $project: { name: 1, phone: 1 } }]
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'usta',
+          foreignField: '_id',
+          as: 'usta',
+          pipeline: [{ $project: { name: 1 } }]
+        }
+      },
+      { $unwind: { path: '$cashier', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$usta', preserveNullAndEmptyArrays: true } }
+    )
+
+    const sales = await Sale.aggregate(pipeline).allowDiskUse(true)
 
     return NextResponse.json(sales)
   } catch (err) { return errorResponse(err) }

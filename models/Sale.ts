@@ -45,6 +45,9 @@ const SaleSchema = new Schema({
 
 SaleSchema.index({ cashier: 1, createdAt: -1 })
 SaleSchema.index({ customer: 1, createdAt: -1 })
+SaleSchema.index({ createdAt: -1 }) // Sort optimization
+SaleSchema.index({ receiptNo: 1 })  // Receipt search
+SaleSchema.index({ usta: 1, createdAt: -1 }) // Usta filter
 
 // Atomic auto-increment receiptNo
 SaleSchema.pre('save', async function () {
