@@ -269,18 +269,18 @@ function SotuvlarContent() {
 
       {/* Sales list */}
       {viewMode === 'table' ? (
-        <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl overflow-hidden shadow-sm border">
+          <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="border-b text-left text-slate-500">
-                <th className="px-4 py-3 font-medium">Chek #</th>
-                <th className="px-4 py-3 font-medium">Sana</th>
-                <th className="px-4 py-3 font-medium">Kassir</th>
-                <th className="px-4 py-3 font-medium">Usta</th>
-                <th className="px-4 py-3 font-medium">Mijoz</th>
-                <th className="px-4 py-3 font-medium">To&apos;lov</th>
-                <th className="px-4 py-3 font-medium text-right">Jami</th>
-                <th className="px-4 py-3 font-medium text-right">Amallar</th>
+              <tr className="bg-slate-50 border-b-2 border-slate-300">
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">Chek #</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">Sana</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">Kassir</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">Usta</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">Mijoz</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 border-r border-slate-200">To&apos;lov</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 text-right border-r border-slate-200">Jami</th>
+                <th className="px-4 py-3 font-semibold text-slate-700 text-right">Amallar</th>
               </tr>
             </thead>
             <tbody>
@@ -290,21 +290,21 @@ function SotuvlarContent() {
                 <React.Fragment key={sale._id}>
                 <tr 
                   data-sale-id={sale._id}
-                  className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
+                  className={`border-b border-slate-200 hover:bg-slate-50 cursor-pointer ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
                   onClick={() => !idsMode && setExpandedSale(expandedSale === sale._id ? null : sale._id)}>
-                  <td className="px-4 py-3 font-medium text-slate-700">#{sale.receiptNo}</td>
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  <td className="px-4 py-3 font-medium text-slate-700 border-r border-slate-200">#{sale.receiptNo}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap border-r border-slate-200">
                     {new Date(sale.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{sale.cashier?.name || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500">{sale.usta?.name || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500">{sale.customer?.name || '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-slate-600 border-r border-slate-200">{sale.cashier?.name || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 border-r border-slate-200">{sale.usta?.name || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 border-r border-slate-200">{sale.customer?.name || '—'}</td>
+                  <td className="px-4 py-3 border-r border-slate-200">
                     <Badge variant={PAYMENT_STATUS[getPaymentType(sale)].variant} className="text-xs">
                       {PAYMENT_STATUS[getPaymentType(sale)].label}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right border-r border-slate-200">
                     <div className="font-bold text-slate-800">{formatPrice(sale.total)}</div>
                     {(sale.returnedTotal || 0) > 0 && (
                       <div className="text-xs text-orange-500">-{formatPrice(sale.returnedTotal!)}</div>
@@ -323,7 +323,7 @@ function SotuvlarContent() {
                   </td>
                 </tr>
                 {(idsMode || expandedSale === sale._id) && (
-                  <tr className="bg-slate-50">
+                  <tr className="bg-slate-50 border-b border-slate-200">
                     <td colSpan={8} className="px-4 py-3">
                       <div className="space-y-1">
                         {sale.items.map((item, i) => (
