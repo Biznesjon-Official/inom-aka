@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useCallback, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Search, RefreshCw, Undo2, Printer, Minus, Plus, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -40,9 +41,11 @@ interface Sale {
 function SotuvlarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { data: session } = useSession()
   const highlightId = searchParams.get('highlight')
   const idsParam = searchParams.get('ids')
   const idsMode = !!(idsParam && idsParam.length > 0)
+  const isAdmin = session?.user?.role === 'admin'
 
   const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
@@ -248,7 +251,8 @@ function SotuvlarContent() {
       </div>
       )}
 
-      {/* Stats */}
+      {/* Stats - faqat admin uchun */}
+      {isAdmin && (
       <div className="flex gap-4 text-sm text-slate-600 flex-wrap items-center">
         {!idsMode && debouncedSearch && <span className="font-medium text-purple-600">Barcha vaqtlar</span>}
         {!idsMode && !debouncedSearch && selectedDate && (
@@ -266,6 +270,7 @@ function SotuvlarContent() {
           <span>Qarz: <span className="font-bold text-orange-600">{formatPrice(totalDebt)}</span></span>
         )}
       </div>
+      )}
 
       {/* Sales list */}
       {viewMode === 'table' ? (

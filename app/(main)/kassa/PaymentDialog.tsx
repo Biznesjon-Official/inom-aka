@@ -186,6 +186,10 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             {discount > 0 && (
               <div className="text-xs text-green-600 mt-1">Chegirma: -{formatPrice(discount)}</div>
             )}
+            {/* Foyda ko'rsatish */}
+            <div className="text-xs mt-1.5 font-medium text-slate-600">
+              Foyda: {formatPrice(profit)}
+            </div>
           </div>
 
           {/* 3 payment inputs */}

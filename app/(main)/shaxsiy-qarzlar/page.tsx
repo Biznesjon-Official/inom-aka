@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Wallet, Search, CreditCard, Plus, Trash2, Settings2, List, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ export default function ShaxsiyQarzlarPage() {
   const [addDialog, setAddDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
   const [selectedDebt, setSelectedDebt] = useState<PersonalDebt | null>(null)
+  const [expandedDebt, setExpandedDebt] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
   const [addAmountValue, setAddAmountValue] = useState('')
   const [note, setNote] = useState('')
@@ -265,7 +266,9 @@ export default function ShaxsiyQarzlarPage() {
             </thead>
             <tbody>
               {filtered.map(d => (
-                <tr key={d._id} className="border-b last:border-0 hover:bg-slate-50">
+                <React.Fragment key={d._id}>
+                <tr className={`border-b hover:bg-slate-50 ${expandedDebt === d._id ? 'bg-slate-50' : ''} ${status === 'paid' ? 'cursor-pointer' : ''}`} 
+                    onClick={() => status === 'paid' && setExpandedDebt(expandedDebt === d._id ? null : d._id)}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{d.name}</div>
                     {d.phone && <div className="text-xs text-slate-400">{d.phone}</div>}
@@ -284,7 +287,7 @@ export default function ShaxsiyQarzlarPage() {
                       <Badge variant={DEBT_STATUS.paid.variant} className="text-xs">{DEBT_STATUS.paid.label}</Badge>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
                       {d.status === 'active' && (
                         <>
@@ -302,6 +305,32 @@ export default function ShaxsiyQarzlarPage() {
                     </div>
                   </td>
                 </tr>
+                {/* Payment History Accordion - faqat to'langan qarzlarda */}
+                {status === 'paid' && expandedDebt === d._id && d.payments && d.payments.length > 0 && (
+                  <tr className="bg-slate-50">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="text-xs font-semibold text-slate-600 mb-2">To&apos;lovlar tarixi:</div>
+                      <div className="space-y-1">
+                        {d.payments.map((p, i) => (
+                          <div key={i} className="flex justify-between text-xs bg-white px-3 py-2 rounded border border-slate-100">
+                            <span className="text-slate-600">
+                              {new Date(p.date).toLocaleString('uz-UZ', { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                year: 'numeric',
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                              {p.note && ` — ${p.note}`}
+                            </span>
+                            <span className="font-medium text-green-700">{formatPrice(p.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
