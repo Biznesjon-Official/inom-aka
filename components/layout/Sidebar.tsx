@@ -25,7 +25,11 @@ const adminNav = [
 
 const workerNav = [
   { href: '/kassa', label: 'Kassa', icon: ShoppingCart },
+  { href: '/tovarlar', label: 'Tovarlar', icon: Package },
+  { href: '/sotuvlar', label: 'Sotuvlar', icon: Receipt },
   { href: '/qarzlar', label: 'Qarz daftarcha', icon: BookOpen },
+  { href: '/xarajatlar', label: 'Xarajatlar', icon: TrendingDown },
+  { href: '/ustalar', label: 'Ustalar', icon: Users },
 ]
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {

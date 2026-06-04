@@ -42,7 +42,7 @@ interface SavedCart {
 
 export default function KassaPage() {
   const { data: session } = useSession()
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>({})
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
@@ -273,6 +273,7 @@ export default function KassaPage() {
       shopName: shopSettings.shopName,
       shopPhone: shopSettings.shopPhone,
       receiptFooter: shopSettings.receiptFooter,
+      bankCard: shopSettings.bankCard,
     })
 
     const debt = finalTotal - paid
@@ -397,7 +398,10 @@ export default function KassaPage() {
         />
 
         <div className="mt-4">
-          <SalesLog cashierId={session?.user.role === 'worker' ? session.user.id : undefined} />
+          <SalesLog 
+            cashierId={session?.user.role === 'worker' ? session.user.id : undefined}
+            shopSettings={shopSettings}
+          />
         </div>
       </div>
 

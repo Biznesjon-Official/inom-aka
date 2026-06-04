@@ -26,6 +26,7 @@
     "dotenv": "^17.3.1",
     "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",
+    "kiro-cli": "^0.0.1",
     "lucide-react": "^0.575.0",
     "mongoose": "^9.2.3",
     "next": "16.1.6",

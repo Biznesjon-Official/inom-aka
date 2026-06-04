@@ -1,6 +1,7 @@
 // Thermal printer via browser window.print()
 // XPrinter: set paper width to 80mm in printer settings (or 58mm)
 import JsBarcode from 'jsbarcode'
+import QRCode from 'qrcode'
 
 function generateBarcode(data: string): string {
   const canvas = document.createElement('canvas')
@@ -13,6 +14,22 @@ function generateBarcode(data: string): string {
     margin: 2,
   })
   return canvas.toDataURL('image/png')
+}
+
+async function generateQRCode(data: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(data, {
+      width: 150,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    })
+  } catch (err) {
+    console.error('QR Code generation error:', err)
+    return ''
+  }
 }
 
 function labelHtml(product: { _id: string; name: string; salePrice: number }): string {
@@ -56,7 +73,7 @@ export interface ReceiptItem {
   salePrice: number
 }
 
-export function printReceipt(data: {
+export async function printReceipt(data: {
   receiptNo: number
   items: ReceiptItem[]
   total: number
@@ -69,6 +86,7 @@ export function printReceipt(data: {
   shopName?: string
   shopPhone?: string
   receiptFooter?: string
+  bankCard?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
   const shopPhone = data.shopPhone || ''
@@ -79,16 +97,32 @@ export function printReceipt(data: {
   const debt = data.total - data.paid
   const receiptNo = data.receiptNo.toString()
 
-  const itemsHtml = data.items.map(i => {
+  // QR Code yaratish (agar bank karta ma'lumoti bo'lsa)
+  let qrCodeHtml = ''
+  if (data.bankCard) {
+    const qrDataUrl = await generateQRCode(data.bankCard)
+    if (qrDataUrl) {
+      qrCodeHtml = `
+      <div class="divider"></div>
+      <div class="qr-section">
+        <div class="qr-title">Karta orqali to'lov</div>
+        <img src="${qrDataUrl}" alt="QR Code" class="qr-code" />
+        <div class="qr-hint">QR kodni skanerlang</div>
+      </div>`
+    }
+  }
+
+  // Table format
+  const tableRows = data.items.map((i, idx) => {
     const lineTotal = i.salePrice * i.qty
     return `
-    <div class="item">
-      <div class="item-name">${i.productName}</div>
-      <div class="item-detail">
-        <span>${i.qty} ${i.unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
-        <span class="bold">${lineTotal.toLocaleString('uz-UZ')}</span>
-      </div>
-    </div>`
+    <tr>
+      <td style="text-align:left">${idx + 1}</td>
+      <td style="text-align:left">${i.productName}</td>
+      <td style="text-align:center">${i.qty} ${i.unit}</td>
+      <td style="text-align:right">${i.salePrice.toLocaleString('uz-UZ')}</td>
+      <td style="text-align:right;font-weight:bold">${lineTotal.toLocaleString('uz-UZ')}</td>
+    </tr>`
   }).join('')
 
   const html = `<!DOCTYPE html>
@@ -102,38 +136,124 @@ export function printReceipt(data: {
   }
   body {
     font-family: 'Courier New', monospace;
-    font-size: 16px;
+    font-size: 14px;
     width: 76mm;
     padding: 2mm;
     box-sizing: border-box;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .shop-name { text-align: center; font-size: 20px; font-weight: bold; }
+  .shop-name { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 1mm; }
   .divider { border-top: 1px dashed #000; margin: 2mm 0; }
-  .item { border-bottom: 1px dotted #ccc; padding: 1.5mm 0; }
-  .item-name { font-weight: bold; font-size: 15px; word-break: break-word; }
-  .item-detail { display: flex; justify-content: space-between; font-size: 14px; margin-top: 0.5mm; }
-  table { width: 100%; border-collapse: collapse; }
-  .total-row td { font-weight: bold; border-top: 1px dashed #000; padding-top: 2mm; font-size: 18px; }
-  td { padding: 1mm 0; vertical-align: top; }
-  .info { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; }
-  .debt-line { background: #f5f5f5; padding: 2mm; text-align: center; font-weight: bold; margin: 2mm 0; font-size: 16px; }
-  .footer { text-align: center; font-size: 13px; margin-top: 3mm; }
+  
+  /* Table styles */
+  .items-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 2mm 0;
+    font-size: 12px;
+  }
+  .items-table thead tr {
+    border-bottom: 1px solid #000;
+  }
+  .items-table th {
+    padding: 1mm 0;
+    font-weight: bold;
+    font-size: 11px;
+  }
+  .items-table td {
+    padding: 1.5mm 1mm;
+    border-bottom: 1px dotted #ccc;
+  }
+  .items-table tbody tr:last-child td {
+    border-bottom: 1px solid #000;
+  }
+  
+  .total-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-top: 2mm;
+  }
+  .total-table td { 
+    padding: 1mm 0; 
+    font-size: 15px;
+  }
+  .total-row td { 
+    font-weight: bold; 
+    font-size: 18px; 
+    padding-top: 2mm;
+  }
+  
+  .info { 
+    display: flex; 
+    justify-content: space-between; 
+    margin: 1mm 0; 
+    font-size: 13px; 
+  }
+  
+  .debt-line { 
+    background: #f5f5f5; 
+    padding: 2mm; 
+    text-align: center; 
+    font-weight: bold; 
+    margin: 2mm 0; 
+    font-size: 16px; 
+  }
+  
+  /* QR Code styles */
+  .qr-section {
+    text-align: center;
+    padding: 2mm 0;
+  }
+  .qr-title {
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 2mm;
+  }
+  .qr-code {
+    width: 35mm;
+    height: 35mm;
+    margin: 1mm auto;
+  }
+  .qr-hint {
+    font-size: 11px;
+    color: #555;
+    margin-top: 1mm;
+  }
+  
+  .footer { 
+    text-align: center; 
+    font-size: 12px; 
+    margin-top: 3mm; 
+  }
 </style>
 </head>
 <body>
   <div class="shop-name">${shopName}</div>
-  ${shopPhone ? `<div class="center" style="font-size:13px">${shopPhone}</div>` : ''}
-  <div class="center" style="font-size:13px">Chek #${receiptNo}</div>
+  ${shopPhone ? `<div class="center" style="font-size:12px">${shopPhone}</div>` : ''}
+  <div class="center" style="font-size:12px;margin:1mm 0">Chek #${receiptNo}</div>
   <div class="divider"></div>
   <div class="info"><span>Sana:</span><span>${dateStr}</span></div>
   <div class="info"><span>Kassir:</span><span>${data.cashier}</span></div>
   ${data.customer ? `<div class="info"><span>Mijoz:</span><span>${data.customer}</span></div>` : ''}
   <div class="divider"></div>
-  ${itemsHtml}
-  <div class="divider"></div>
-  <table>
+  
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width:8%;text-align:left">№</th>
+        <th style="width:37%;text-align:left">Mahsulot</th>
+        <th style="width:18%;text-align:center">Soni</th>
+        <th style="width:18%;text-align:right">Narxi</th>
+        <th style="width:19%;text-align:right">Jami</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+  </table>
+  
+  <table class="total-table">
     <tbody>
       ${data.originalTotal ? `
       <tr class="total-row">
@@ -141,8 +261,8 @@ export function printReceipt(data: {
         <td style="text-align:right">${data.originalTotal.toLocaleString('uz-UZ')}</td>
       </tr>
       <tr>
-        <td style="color:#555">Chegirma:</td>
-        <td style="text-align:right;color:#555">-${(data.originalTotal - data.total).toLocaleString('uz-UZ')}</td>
+        <td style="color:#555;font-size:13px">Chegirma:</td>
+        <td style="text-align:right;color:#555;font-size:13px">-${(data.originalTotal - data.total).toLocaleString('uz-UZ')}</td>
       </tr>
       <tr class="total-row">
         <td>YAKUNIY:</td>
@@ -158,6 +278,7 @@ export function printReceipt(data: {
   <div class="info"><span>To'landi:</span><span class="bold">${data.paid.toLocaleString('uz-UZ')} so'm</span></div>
   ${change > 0 ? `<div class="info"><span>Qaytim:</span><span class="bold">${change.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
   ${debt > 0 ? `<div class="debt-line">⚠ QARZ: ${debt.toLocaleString('uz-UZ')} so'm</div>` : ''}
+  ${qrCodeHtml}
   <div class="footer">${receiptFooter}<br>${shopName}</div>
 </body>
 </html>`
