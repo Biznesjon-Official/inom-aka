@@ -47,11 +47,11 @@ function UstaSelect({ value, onChange, open }: { value: string; onChange: (v: st
 
   return (
     <div className="space-y-1.5">
-      <Label>Usta (ixtiyoriy)</Label>
+      <Label>Usta <span className="text-red-500">*</span></Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger><SelectValue placeholder="Usta tanlang..." /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Ustasiz</SelectItem>
+          <SelectItem value="none">Ustayoq</SelectItem>
           {ustalar.map(u => (
             <SelectItem key={u._id} value={u._id}>
               {u.name}
@@ -102,7 +102,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
       setCardAmount('')
       setTerminalAmount('')
       setEditingTotal(false)
-      setUstaId('none')
+      setUstaId('') // Bo'sh qoldiramiz - majburiy tanlash uchun
       setDebtorName('')
       setDebtorPhone('')
       setShowDebtorSuggestions(false)
@@ -186,9 +186,6 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             {discount > 0 && (
               <div className="text-xs text-green-600 mt-1">Chegirma: -{formatPrice(discount)}</div>
             )}
-            <div className={`text-xs mt-1 font-medium ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {profit >= 0 ? `Foyda: ${formatPrice(profit)}` : `Zarar: -${formatPrice(Math.abs(profit))}`}
-            </div>
           </div>
 
           {/* 3 payment inputs */}
@@ -270,7 +267,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
               debtorName: debtorName.trim() || undefined,
               debtorPhone: debtorPhone.trim() || undefined,
             })}
-            disabled={loading || (isDebt && (!debtorName.trim() || !debtorPhone.trim()))}>
+            disabled={loading || !ustaId || (isDebt && (!debtorName.trim() || !debtorPhone.trim()))}>
             {loading ? 'Saqlanmoqda...' : paidTotal <= 0 ? 'Qarzga berish' : isDebt ? 'Qisman to\'lov' : 'Tasdiqlash'}
           </Button>
         </div>

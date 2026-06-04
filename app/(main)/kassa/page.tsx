@@ -12,7 +12,6 @@ import { printReceipt } from '@/lib/print'
 import { ProductCard } from './ProductCard'
 import { CartPanel } from './CartPanel'
 import { PaymentDialog, type SalePayment } from './PaymentDialog'
-import SalesLog from './SalesLog'
 import BarcodeScanner from './BarcodeScanner'
 
 interface Product {
@@ -294,7 +293,7 @@ export default function KassaPage() {
     <div className="flex flex-col lg:flex-row gap-4">
       {/* Products panel */}
       <div className="flex-1 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-bold text-slate-800">Kassa</h1>
           <div className="flex items-center gap-2">
             <div className="flex border rounded-lg overflow-hidden">
@@ -309,9 +308,9 @@ export default function KassaPage() {
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input placeholder="Mahsulot qidirish..." className="pl-9" value={search}
+          <Input placeholder="Mahsulot qidirish..." className="pl-9 w-full" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
 
@@ -396,13 +395,6 @@ export default function KassaPage() {
           onLoadCart={openSavedCarts}
           savedCartsCount={savedCarts.length}
         />
-
-        <div className="mt-4">
-          <SalesLog 
-            cashierId={session?.user.role === 'worker' ? session.user.id : undefined}
-            shopSettings={shopSettings}
-          />
-        </div>
       </div>
 
       {/* Scanned product modal */}
