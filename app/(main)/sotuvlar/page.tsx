@@ -223,8 +223,8 @@ function SotuvlarContent() {
 
       {/* Filters */}
       {!idsMode && (
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Chek #, mijoz yoki kassir..." className="pl-9" value={search}
             onChange={e => setSearch(e.target.value)} />
@@ -232,7 +232,7 @@ function SotuvlarContent() {
         <div className="flex items-center gap-2">
           <Input
             type="date"
-            className="w-44"
+            className="flex-1 sm:w-44"
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
             placeholder="Sana tanlang"
@@ -253,28 +253,33 @@ function SotuvlarContent() {
 
       {/* Stats - faqat admin uchun */}
       {isAdmin && (
-      <div className="flex gap-4 text-sm text-slate-600 flex-wrap items-center">
-        {!idsMode && debouncedSearch && <span className="font-medium text-purple-600">Barcha vaqtlar</span>}
-        {!idsMode && !debouncedSearch && selectedDate && (
-          <span className="font-medium text-blue-600">
-            📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
-          </span>
-        )}
-        {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
-        <span className="text-slate-300">|</span>
-        <span>{filtered.length} ta sotuv</span>
-        <span>Jami: <span className="font-bold text-slate-800">{formatPrice(totalSales)}</span></span>
-        <span>Kirim: <span className="font-bold text-green-700">{formatPrice(totalRevenue)}</span></span>
-        <span>Foyda: <span className="font-bold text-emerald-700">{formatPrice(totalProfit)}</span></span>
-        {totalDebt > 0 && (
-          <span>Qarz: <span className="font-bold text-orange-600">{formatPrice(totalDebt)}</span></span>
-        )}
+      <div className="space-y-2">
+        <div className="flex gap-2 text-sm text-slate-600 flex-wrap items-center">
+          {!idsMode && debouncedSearch && <span className="font-medium text-purple-600">Barcha vaqtlar</span>}
+          {!idsMode && !debouncedSearch && selectedDate && (
+            <span className="font-medium text-blue-600">
+              📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </span>
+          )}
+          {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
+          <span className="text-slate-300 hidden sm:inline">|</span>
+          <span className="w-full sm:w-auto">{filtered.length} ta sotuv</span>
+        </div>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-sm text-slate-600">
+          <span>Jami: <span className="font-bold text-slate-800 block sm:inline">{formatPrice(totalSales)}</span></span>
+          <span>Kirim: <span className="font-bold text-green-700 block sm:inline">{formatPrice(totalRevenue)}</span></span>
+          <span>Foyda: <span className="font-bold text-emerald-700 block sm:inline">{formatPrice(totalProfit)}</span></span>
+          {totalDebt > 0 && (
+            <span>Qarz: <span className="font-bold text-orange-600 block sm:inline">{formatPrice(totalDebt)}</span></span>
+          )}
+        </div>
       </div>
       )}
 
       {/* Sales list */}
       {viewMode === 'table' ? (
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm border">
+        <div className="bg-white rounded-xl overflow-x-auto shadow-sm border">
+          <div className="min-w-[800px]">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b-2 border-slate-300">
@@ -370,6 +375,7 @@ function SotuvlarContent() {
               )})}
             </tbody>
           </table>
+          </div>
           {!loading && filtered.length === 0 && (
             <div className="text-center text-slate-400 py-12">Sotuv topilmadi</div>
           )}
