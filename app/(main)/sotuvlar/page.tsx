@@ -51,7 +51,9 @@ function SotuvlarContent() {
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [selectedDate, setSelectedDate] = useState('')
+  const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [expandedSale, setExpandedSale] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
 
@@ -68,6 +70,37 @@ function SotuvlarContent() {
 
   const debouncedSearch = useDebounce(search)
 
+  function getPresetDates(key: typeof activePreset): { from: string; to: string } {
+    const now = new Date()
+    const fmt = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    switch (key) {
+      case 'today': return { from: fmt(now), to: fmt(now) }
+      case 'week': {
+        const start = new Date(now)
+        const day = now.getDay()
+        start.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
+        return { from: fmt(start), to: fmt(now) }
+      }
+      case 'month': return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) }
+      case 'year': return { from: fmt(new Date(now.getFullYear(), 0, 1)), to: fmt(now) }
+      default: return { from: fmt(now), to: fmt(now) }
+    }
+  }
+
+  const handlePreset = (key: typeof activePreset) => {
+    setActivePreset(key)
+    if (key !== 'custom') {
+      const { from, to } = getPresetDates(key)
+      setDateFrom(from)
+      setDateTo(to)
+    }
+  }
+
   const fetchSales = useCallback(async () => {
     if (idsMode) return  // ids mode uses separate fetch
     setLoading(true)
@@ -76,10 +109,10 @@ function SotuvlarContent() {
 
       if (debouncedSearch) {
         params.set('search', debouncedSearch)
-      } else if (selectedDate) {
-        const startOfDay = new Date(selectedDate)
+      } else if (dateFrom && dateTo) {
+        const startOfDay = new Date(dateFrom)
         startOfDay.setHours(0, 0, 0, 0)
-        const endOfDay = new Date(selectedDate)
+        const endOfDay = new Date(dateTo)
         endOfDay.setHours(23, 59, 59, 999)
         params.set('from', startOfDay.toISOString())
         params.set('to', endOfDay.toISOString())
@@ -98,7 +131,16 @@ function SotuvlarContent() {
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, idsMode, debouncedSearch])
+  }, [dateFrom, dateTo, idsMode, debouncedSearch])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { 
+    if (activePreset !== 'custom') {
+      const { from, to } = getPresetDates(activePreset)
+      setDateFrom(from)
+      setDateTo(to)
+    }
+  }, [activePreset])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchSales() }, [fetchSales])
@@ -223,32 +265,43 @@ function SotuvlarContent() {
 
       {/* Filters */}
       {!idsMode && (
+      <>
+      {/* Date filter buttons */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'today' as const, label: 'Bugun' },
+          { key: 'week' as const, label: 'Hafta' },
+          { key: 'month' as const, label: 'Oy' },
+          { key: 'year' as const, label: 'Yil' },
+          { key: 'custom' as const, label: 'Tanlash' },
+        ].map(({ key, label }) => (
+          <Button key={key} variant={activePreset === key ? 'default' : 'outline'} size="sm"
+            onClick={() => handlePreset(key)}>
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {/* Custom date range */}
+      {activePreset === 'custom' && (
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex items-center gap-2 flex-1">
+            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1" />
+            <span className="text-slate-400">—</span>
+            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1" />
+          </div>
+        </div>
+      )}
+
+      {/* Search bar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input placeholder="Chek #, mijoz yoki kassir..." className="pl-9" value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            className="flex-1 sm:w-44"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            placeholder="Sana tanlang"
-          />
-          {selectedDate && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate('')}
-              className="whitespace-nowrap"
-            >
-              Bugun
-            </Button>
-          )}
-        </div>
       </div>
+      </>
       )}
 
       {/* Stats - faqat admin uchun */}
@@ -256,12 +309,15 @@ function SotuvlarContent() {
       <div className="space-y-2">
         <div className="flex gap-2 text-sm text-slate-600 flex-wrap items-center">
           {!idsMode && debouncedSearch && <span className="font-medium text-purple-600">Barcha vaqtlar</span>}
-          {!idsMode && !debouncedSearch && selectedDate && (
+          {!idsMode && !debouncedSearch && activePreset === 'today' && <span className="font-medium text-blue-600">📅 Bugun</span>}
+          {!idsMode && !debouncedSearch && activePreset === 'week' && <span className="font-medium text-blue-600">📅 Bu hafta</span>}
+          {!idsMode && !debouncedSearch && activePreset === 'month' && <span className="font-medium text-blue-600">📅 Bu oy</span>}
+          {!idsMode && !debouncedSearch && activePreset === 'year' && <span className="font-medium text-blue-600">📅 Bu yil</span>}
+          {!idsMode && !debouncedSearch && activePreset === 'custom' && dateFrom && dateTo && (
             <span className="font-medium text-blue-600">
-              📅 {new Date(selectedDate).toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
+              📅 {new Date(dateFrom).toLocaleDateString('uz-UZ')} - {new Date(dateTo).toLocaleDateString('uz-UZ')}
             </span>
           )}
-          {!idsMode && !debouncedSearch && !selectedDate && <span className="font-medium text-blue-600">📅 Bugun</span>}
           <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="w-full sm:w-auto">{filtered.length} ta sotuv</span>
         </div>
