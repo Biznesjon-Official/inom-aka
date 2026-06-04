@@ -155,6 +155,7 @@ export default function XarajatlarPage() {
 
       {viewMode === 'table' ? (
         <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <div className="min-w-[600px]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-slate-500">
@@ -181,6 +182,7 @@ export default function XarajatlarPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {expenses.length === 0 && (
             <div className="text-center text-slate-400 py-12">Xarajat topilmadi</div>
           )}

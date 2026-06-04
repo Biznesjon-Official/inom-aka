@@ -384,6 +384,7 @@ export default function QarzlarPage() {
       {/* Table view */}
       {viewMode === 'table' ? (
         <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <div className="min-w-[900px]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-slate-500">
@@ -597,6 +598,7 @@ export default function QarzlarPage() {
               ))}
             </tbody>
           </table>
+          </div>
           {filtered.length === 0 && <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>}
         </div>
       ) : (

@@ -263,6 +263,7 @@ export default function TovarlarPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl overflow-x-auto shadow-sm">
+          <div className="min-w-[700px]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-slate-500">
@@ -319,6 +320,7 @@ export default function TovarlarPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
