@@ -38,6 +38,8 @@ export async function GET(req: Request) {
     }
 
     const search = searchParams.get('search')
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
 
     const matchStage: Record<string, unknown> = {}
     matchStage.$or = [{ type: 'customer' }, { type: { $exists: false } }]
@@ -45,6 +47,14 @@ export async function GET(req: Request) {
     if (status) matchStage.status = status
     if (customer) matchStage.customer = new Types.ObjectId(customer)
     if (category) matchStage.category = new Types.ObjectId(category)
+    
+    // Date filtering
+    if (from || to) {
+      const dateFilter: { $gte?: Date; $lte?: Date } = {}
+      if (from) dateFilter.$gte = new Date(from)
+      if (to) dateFilter.$lte = new Date(to)
+      matchStage.createdAt = dateFilter
+    }
     
     if (search) {
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

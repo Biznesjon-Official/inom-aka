@@ -10,12 +10,22 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
 
     const filter: Record<string, unknown> = {}
     if (status) filter.status = status
     if (search) {
       const regex = new RegExp(escapeRegex(search), 'i')
       filter.$or = [{ name: regex }, { phone: regex }]
+    }
+    
+    // Date filtering
+    if (from || to) {
+      const dateFilter: { $gte?: Date; $lte?: Date } = {}
+      if (from) dateFilter.$gte = new Date(from)
+      if (to) dateFilter.$lte = new Date(to)
+      filter.createdAt = dateFilter
     }
 
     const debts = await PersonalDebt.find(filter)
