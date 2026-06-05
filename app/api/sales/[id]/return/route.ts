@@ -23,10 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
     }
 
-    // Worker can only return own sales
-    if (session?.user?.role === 'worker' && sale.cashier.toString() !== session.user.id) {
-      return NextResponse.json({ error: 'Faqat o\'z sotuvlaringizni qaytara olasiz' }, { status: 403 })
-    }
+    // Note: Both admin and worker can return any sale
+    // (removed worker restriction)
 
     let returnTotal = 0
     let returnCostTotal = 0
