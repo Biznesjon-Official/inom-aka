@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Tree-shake barrel imports — only bundle used icons/components
+    optimizePackageImports: ['lucide-react', 'radix-ui'],
+  },
   images: { formats: ['image/webp'] },
   compress: true,
   poweredByHeader: false,

@@ -29,6 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let returnTotal = 0
     let returnCostTotal = 0
     const returnedItems: { product: string; productName: string; unit: string; qty: number; salePrice: number; costPrice: number }[] = []
+    const stockOps: { updateOne: { filter: { _id: string }; update: { $inc: { stock: number } } } }[] = []
 
     for (const returnItem of items) {
       const saleItem = sale.items.find(
@@ -59,9 +60,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         costPrice: saleItem.costPrice || 0,
       })
 
-      // Restore stock
-      await Product.findByIdAndUpdate(returnItem.product, { $inc: { stock: qty } })
+      // Restore stock (batched below)
+      stockOps.push({ updateOne: { filter: { _id: returnItem.product }, update: { $inc: { stock: qty } } } })
     }
+
+    // Single round-trip for all stock restores
+    if (stockOps.length) await Product.bulkWrite(stockOps)
 
     if (returnedItems.length === 0) {
       return NextResponse.json({ error: 'Nothing to return' }, { status: 400 })

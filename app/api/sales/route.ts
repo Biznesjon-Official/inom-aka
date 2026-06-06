@@ -111,10 +111,9 @@ export async function GET(req: Request) {
       { $sort: { createdAt: -1 } },
     ]
 
-    // Add limit only if not searching
-    if (!search) {
-      pipeline.push({ $limit: 100 })
-    }
+    // Cap result set — unbounded search returned 1000+ rows and froze the UI.
+    // Sorted newest-first, so search shows the 200 most recent matches.
+    pipeline.push({ $limit: search ? 200 : 100 })
 
     // Add lookups for related data
     pipeline.push(

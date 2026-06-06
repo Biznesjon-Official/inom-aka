@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import type { Html5Qrcode } from 'html5-qrcode'
 import { ScanLine, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -34,27 +34,32 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
 
   useEffect(() => {
     if (!open) return
+    let cancelled = false
 
-    const scanner = new Html5Qrcode('barcode-reader')
-    scannerRef.current = scanner
+    // Lazy-load html5-qrcode only when scanner opens
+    import('html5-qrcode').then(({ Html5Qrcode }) => {
+      if (cancelled) return
+      const scanner = new Html5Qrcode('barcode-reader')
+      scannerRef.current = scanner
 
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 120 } },
-      (decodedText) => {
-        const now = Date.now()
-        // Prevent duplicate scans within 2 seconds
-        if (decodedText === lastScanRef.current && now - lastScanTimeRef.current < 2000) return
-        lastScanRef.current = decodedText
-        lastScanTimeRef.current = now
-        onScan(decodedText)
-      },
-      () => { /* ignore scan errors */ }
-    ).catch(() => {
-      // Camera permission denied or not available
+      scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 120 } },
+        (decodedText) => {
+          const now = Date.now()
+          // Prevent duplicate scans within 2 seconds
+          if (decodedText === lastScanRef.current && now - lastScanTimeRef.current < 2000) return
+          lastScanRef.current = decodedText
+          lastScanTimeRef.current = now
+          onScan(decodedText)
+        },
+        () => { /* ignore scan errors */ }
+      ).catch(() => {
+        // Camera permission denied or not available
+      })
     })
 
-    return () => { stopScanner() }
+    return () => { cancelled = true; stopScanner() }
   }, [open, onScan, stopScanner])
 
   if (!open) {

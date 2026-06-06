@@ -80,6 +80,23 @@ export function useFetchWithCache<T>(url: string | null, ttl = 30000): {
   return { data, loading, refresh }
 }
 
+// Shop settings — fetched once per session (rarely change), shared across pages
+let settingsPromise: Promise<unknown> | null = null
+
+export function getSettings<T = unknown>(): Promise<T> {
+  if (!settingsPromise) {
+    settingsPromise = fetch('/api/settings')
+      .then(r => (r.ok ? r.json() : {}))
+      .catch(() => ({}))
+  }
+  return settingsPromise as Promise<T>
+}
+
+// Call after editing settings so other pages reload fresh values
+export function invalidateSettings() {
+  settingsPromise = null
+}
+
 // Barcode scanner hook — detects rapid keystrokes ending with Enter
 export function useBarcodeScan(onScan: (code: string) => void) {
   const bufferRef = useRef('')

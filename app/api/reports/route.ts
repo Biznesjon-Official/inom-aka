@@ -25,10 +25,10 @@ export async function GET(req: NextRequest) {
     const dateFilter = { $gte: fromDate, $lte: toDate }
 
     // Sales count
-    const salesCount = await Sale.countDocuments({ createdAt: dateFilter })
+    const salesCountP = Sale.countDocuments({ createdAt: dateFilter })
 
     // Sales revenue/profit
-    const [salesAgg] = await Sale.aggregate([
+    const salesAggP = Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 
     // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
     // $$saleId — let bilan belgilangan o'zgaruvchi
-    const [manualDebtPaymentsAgg] = await Debt.aggregate([
+    const manualDebtPaymentsAggP = Debt.aggregate([
       {
         $lookup: {
           from: 'sales',
@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Returns on sales created BEFORE this period but returned IN this period
-    const [crossPeriodReturnsAgg] = await Sale.aggregate([
+    const crossPeriodReturnsAggP = Sale.aggregate([
       { $match: { createdAt: { $lt: fromDate } } },
       {
         $addFields: {
@@ -192,13 +192,13 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Expenses
-    const [expensesAgg] = await Expense.aggregate([
+    const expensesAggP = Expense.aggregate([
       { $match: { date: dateFilter } },
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]).allowDiskUse(true)
 
     // newDebt
-    const [newDebtAgg] = await Sale.aggregate([
+    const newDebtAggP = Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $group: {
         _id: null,
@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // paidDebt — faqat oldingi davr sotuvlari uchun to'lovlar
-    const [paidDebtAgg] = await Debt.aggregate([
+    const paidDebtAggP = Debt.aggregate([
       {
         $lookup: {
           from: 'sales',
@@ -233,14 +233,12 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Static data
-    const [customerDebtAgg, personalDebtAgg, productStatsAgg] = await Promise.all([
-      Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
-      PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true),
-      Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]).allowDiskUse(true),
-    ])
+    const customerDebtAggP = Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true)
+    const personalDebtAggP = PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true)
+    const productStatsAggP = Product.aggregate([{ $match: { isActive: true } }, { $group: { _id: null, totalProducts: { $sum: 1 }, warehouseValue: { $sum: { $multiply: ['$costPrice', '$stock'] } } } }]).allowDiskUse(true)
 
     // Daily breakdown
-    const dailyBreakdown = await Sale.aggregate([
+    const dailyBreakdownP = Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$items' },
       {
@@ -320,7 +318,7 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Daily expenses
-    const dailyExpenses = await Expense.aggregate([
+    const dailyExpensesP = Expense.aggregate([
       { $match: { date: dateFilter } },
       {
         $group: {
@@ -332,7 +330,7 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     // Daily qarz to'lovlari
-    const dailyManualDebtPayments = await Debt.aggregate([
+    const dailyManualDebtPaymentsP = Debt.aggregate([
       {
         $lookup: {
           from: 'sales',
@@ -394,34 +392,8 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, date: '$_id', manualPayment: 1, manualProfit: 1 } },
     ]).allowDiskUse(true)
 
-    // Merge daily data
-    const dailyMap = new Map<string, { date: string; revenue: number; profit: number; expense: number; sales: number }>()
-
-    for (const d of dailyBreakdown) {
-      dailyMap.set(d.date, { date: d.date, revenue: d.revenue, profit: d.profit, expense: 0, sales: d.sales })
-    }
-    for (const d of dailyManualDebtPayments) {
-      const existing = dailyMap.get(d.date)
-      if (existing) {
-        existing.revenue += d.manualPayment
-        existing.profit += d.manualProfit || 0
-      } else {
-        dailyMap.set(d.date, { date: d.date, revenue: d.manualPayment, profit: d.manualProfit || 0, expense: 0, sales: 0 })
-      }
-    }
-    for (const d of dailyExpenses) {
-      const existing = dailyMap.get(d.date)
-      if (existing) {
-        existing.expense = d.expense
-      } else {
-        dailyMap.set(d.date, { date: d.date, revenue: 0, profit: 0, expense: d.expense, sales: 0 })
-      }
-    }
-
-    const daily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
-
     // Payment methods
-    const paymentMethodStats = await Sale.aggregate([
+    const paymentMethodStatsP = Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter } },
@@ -429,7 +401,7 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    const manualDebtPaymentsByMethod = await Debt.aggregate([
+    const manualDebtPaymentsByMethodP = Debt.aggregate([
       {
         $lookup: {
           from: 'sales',
@@ -452,20 +424,8 @@ export async function GET(req: NextRequest) {
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
 
-    const paymentMethodMap = new Map(paymentMethodStats.map((p: { method: string; total: number; count: number }) => [p.method, p]))
-    for (const mp of manualDebtPaymentsByMethod) {
-      const existing = paymentMethodMap.get(mp.method)
-      if (existing) {
-        existing.total += mp.total
-        existing.count += mp.count
-      } else {
-        paymentMethodMap.set(mp.method, mp)
-      }
-    }
-    const mergedPaymentMethods = Array.from(paymentMethodMap.values())
-
     // Cashier stats
-    const cashierStats = await Sale.aggregate([
+    const cashierStatsP = Sale.aggregate([
       { $match: { createdAt: dateFilter } },
       {
         $addFields: {
@@ -505,6 +465,82 @@ export async function GET(req: NextRequest) {
       },
       { $sort: { totalAmount: -1 } },
     ]).allowDiskUse(true)
+
+    // Run all independent aggregations in parallel (was sequential — main dashboard bottleneck)
+    const [
+      salesCount,
+      [salesAgg],
+      [manualDebtPaymentsAgg],
+      [crossPeriodReturnsAgg],
+      [expensesAgg],
+      [newDebtAgg],
+      [paidDebtAgg],
+      customerDebtAgg,
+      personalDebtAgg,
+      productStatsAgg,
+      dailyBreakdown,
+      dailyExpenses,
+      dailyManualDebtPayments,
+      paymentMethodStats,
+      manualDebtPaymentsByMethod,
+      cashierStats,
+    ] = await Promise.all([
+      salesCountP,
+      salesAggP,
+      manualDebtPaymentsAggP,
+      crossPeriodReturnsAggP,
+      expensesAggP,
+      newDebtAggP,
+      paidDebtAggP,
+      customerDebtAggP,
+      personalDebtAggP,
+      productStatsAggP,
+      dailyBreakdownP,
+      dailyExpensesP,
+      dailyManualDebtPaymentsP,
+      paymentMethodStatsP,
+      manualDebtPaymentsByMethodP,
+      cashierStatsP,
+    ])
+
+    // Merge daily data
+    const dailyMap = new Map<string, { date: string; revenue: number; profit: number; expense: number; sales: number }>()
+
+    for (const d of dailyBreakdown) {
+      dailyMap.set(d.date, { date: d.date, revenue: d.revenue, profit: d.profit, expense: 0, sales: d.sales })
+    }
+    for (const d of dailyManualDebtPayments) {
+      const existing = dailyMap.get(d.date)
+      if (existing) {
+        existing.revenue += d.manualPayment
+        existing.profit += d.manualProfit || 0
+      } else {
+        dailyMap.set(d.date, { date: d.date, revenue: d.manualPayment, profit: d.manualProfit || 0, expense: 0, sales: 0 })
+      }
+    }
+    for (const d of dailyExpenses) {
+      const existing = dailyMap.get(d.date)
+      if (existing) {
+        existing.expense = d.expense
+      } else {
+        dailyMap.set(d.date, { date: d.date, revenue: 0, profit: 0, expense: d.expense, sales: 0 })
+      }
+    }
+
+    const daily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+
+    // Merge payment methods
+    const paymentMethodMap = new Map(paymentMethodStats.map((p: { method: string; total: number; count: number }) => [p.method, p]))
+    for (const mp of manualDebtPaymentsByMethod) {
+      const existing = paymentMethodMap.get(mp.method)
+      if (existing) {
+        existing.total += mp.total
+        existing.count += mp.count
+      } else {
+        paymentMethodMap.set(mp.method, mp)
+      }
+    }
+    const mergedPaymentMethods = Array.from(paymentMethodMap.values())
 
     // Total calculations
     const manualDebtPayments = manualDebtPaymentsAgg?.totalPayments || 0

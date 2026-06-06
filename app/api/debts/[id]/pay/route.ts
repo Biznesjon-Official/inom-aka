@@ -49,17 +49,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Multi-entry debt: create separate payment entry per sale for accurate profit calculation
     if (saleAllocations.size > 0) {
-      for (const [saleId, allocated] of saleAllocations) {
-        const snap = await Sale.findById(saleId).select('paid').lean() as { paid: number } | null
+      const allocEntries = [...saleAllocations]
+      const snaps = await Promise.all(
+        allocEntries.map(([saleId]) => Sale.findById(saleId).select('paid').lean() as Promise<{ paid: number } | null>)
+      )
+      allocEntries.forEach(([saleId, allocated], i) => {
         debt.payments.push({
           amount: allocated,
           method: validMethod,
           date: new Date(),
           note,
           saleRef: new Types.ObjectId(saleId),
-          salePayedBefore: snap?.paid || 0,
+          salePayedBefore: snaps[i]?.paid || 0,
         })
-      }
+      })
     } else {
       // Single-entry debt: save sale.paid BEFORE this payment for accurate profit calculation
       let salePayedBefore = 0
@@ -83,15 +86,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Sync Sale.paid and Sale.payments for each sale that received payment
     if (saleAllocations.size > 0) {
-      for (const [saleId, allocated] of saleAllocations) {
-        const sale = await Sale.findByIdAndUpdate(saleId, {
+      await Promise.all([...saleAllocations].map(([saleId, allocated]) =>
+        Sale.findByIdAndUpdate(saleId, {
           $inc: { paid: allocated },
           $push: { payments: { method: validMethod, amount: allocated, date: new Date() } },
+        }).then(sale => {
+          if (!sale) console.warn(`Sale ${saleId} not found when updating payment`)
         })
-        if (!sale) {
-          console.warn(`Sale ${saleId} not found when updating payment`)
-        }
-      }
+      ))
     } else if (targetSaleId) {
       const sale = await Sale.findByIdAndUpdate(targetSaleId, {
         $inc: { paid: amount },

@@ -7,7 +7,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   try {
     await connectDB()
     const { id } = await params
-    const product = await Product.findById(id).populate('category')
+    const product = await Product.findById(id).populate('category').lean()
     if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(product)
   } catch (err) { return errorResponse(err) }
@@ -29,7 +29,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (stock !== undefined) update.stock = stock
     if (image !== undefined) update.image = image
     if (description !== undefined) update.description = description
-    const product = await Product.findByIdAndUpdate(id, { $set: update }, { returnDocument: 'after' }).populate('category')
+    const product = await Product.findByIdAndUpdate(id, { $set: update }, { returnDocument: 'after' }).populate('category').lean()
     if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(product)
   } catch (err) { return errorResponse(err) }

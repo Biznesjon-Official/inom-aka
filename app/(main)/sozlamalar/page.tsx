@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { invalidateSettings } from '@/lib/hooks'
 
 const DEFAULTS = {
   shopName: "Inomaka Do'kon",
@@ -67,14 +68,14 @@ export default function SozlamalarPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const entries = Object.entries(form)
-      for (const [key, value] of entries) {
-        await fetch('/api/settings', {
+      await Promise.all(Object.entries(form).map(([key, value]) =>
+        fetch('/api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key, value }),
         })
-      }
+      ))
+      invalidateSettings() // other pages reload fresh settings
       toast.success('Sozlamalar saqlandi')
     } catch {
       toast.error('Saqlashda xato yuz berdi')

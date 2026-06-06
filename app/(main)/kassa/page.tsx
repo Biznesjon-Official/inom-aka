@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatPrice } from '@/lib/utils'
-import { useDebounce, useFetchWithCache, useBarcodeScan } from '@/lib/hooks'
+import { useDebounce, useFetchWithCache, useBarcodeScan, getSettings } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 import { ProductCard } from './ProductCard'
 import { CartPanel } from './CartPanel'
@@ -60,7 +60,7 @@ export default function KassaPage() {
   const [saveName, setSaveName] = useState('')
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>().then(setShopSettings)
   }, [])
 
   const debouncedSearch = useDebounce(search)

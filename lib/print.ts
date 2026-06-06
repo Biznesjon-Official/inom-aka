@@ -1,9 +1,9 @@
 // Thermal printer via browser window.print()
 // XPrinter: set paper width to 80mm in printer settings (or 58mm)
-import JsBarcode from 'jsbarcode'
-import QRCode from 'qrcode'
+// jsbarcode/qrcode are loaded dynamically — only on print, not in page bundle
 
-function generateBarcode(data: string): string {
+async function generateBarcode(data: string): Promise<string> {
+  const { default: JsBarcode } = await import('jsbarcode')
   const canvas = document.createElement('canvas')
   JsBarcode(canvas, data, {
     format: 'CODE128',
@@ -18,6 +18,7 @@ function generateBarcode(data: string): string {
 
 async function generateQRCode(data: string): Promise<string> {
   try {
+    const { default: QRCode } = await import('qrcode')
     return await QRCode.toDataURL(data, {
       width: 150,
       margin: 1,
@@ -32,8 +33,8 @@ async function generateQRCode(data: string): Promise<string> {
   }
 }
 
-function labelHtml(product: { _id: string; name: string; salePrice: number }): string {
-  const barcodeUrl = generateBarcode(product._id)
+async function labelHtml(product: { _id: string; name: string; salePrice: number }): Promise<string> {
+  const barcodeUrl = await generateBarcode(product._id)
   return `<div class="label">
   <div class="name">${product.name}</div>
   <div class="price">${Number(product.salePrice).toLocaleString('uz-UZ')} so'm</div>
@@ -54,14 +55,14 @@ const LABEL_STYLES = `
   .barcode img { width: 50mm; height: auto; }
 `
 
-export function printLabel(product: { _id: string; name: string; salePrice: number }) {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_STYLES}</style></head><body>${labelHtml(product)}</body></html>`
+export async function printLabel(product: { _id: string; name: string; salePrice: number }) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_STYLES}</style></head><body>${await labelHtml(product)}</body></html>`
   openPrintWindow(html)
 }
 
-export function printLabels(products: { _id: string; name: string; salePrice: number }[]) {
+export async function printLabels(products: { _id: string; name: string; salePrice: number }[]) {
   if (!products.length) return
-  const body = products.map(labelHtml).join('')
+  const body = (await Promise.all(products.map(labelHtml))).join('')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${LABEL_STYLES}</style></head><body>${body}</body></html>`
   openPrintWindow(html)
 }

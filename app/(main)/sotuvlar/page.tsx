@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatPrice, calcSaleRevenue, calcSaleProfit, calcSaleDebt, PAYMENT_STATUS, PAYMENT_METHODS } from '@/lib/utils'
-import { useDebounce } from '@/lib/hooks'
+import { useDebounce, getSettings } from '@/lib/hooks'
 import { printReceipt } from '@/lib/print'
 
 interface SaleItem {
@@ -71,7 +71,7 @@ function SotuvlarContent() {
   const [returnLoading, setReturnLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.ok ? r.json() : {}).then(setShopSettings).catch(() => {})
+    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>().then(setShopSettings)
   }, [])
 
   const debouncedSearch = useDebounce(search)
