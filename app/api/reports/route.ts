@@ -232,6 +232,40 @@ export async function GET(req: NextRequest) {
       { $group: { _id: null, paidDebt: { $sum: '$payments.amount' } } },
     ]).allowDiskUse(true)
 
+    // Detail list of the debt payments that make up debtRevenue (who/when/from-whom)
+    const debtPaymentDetailsP = Debt.aggregate([
+      {
+        $lookup: {
+          from: 'sales',
+          let: { saleId: '$sale' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$saleId'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'saleInPeriod',
+        },
+      },
+      { $match: { saleInPeriod: { $size: 0 } } },
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
+      { $lookup: { from: 'users', localField: 'payments.collectedBy', foreignField: '_id', as: 'collector', pipeline: [{ $project: { name: 1 } }] } },
+      {
+        $project: {
+          _id: 0,
+          customerName: 1,
+          amount: '$payments.amount',
+          date: '$payments.date',
+          method: { $ifNull: ['$payments.method', 'cash'] },
+          collectedByName: { $arrayElemAt: ['$collector.name', 0] },
+        },
+      },
+      { $sort: { date: -1 } },
+    ]).allowDiskUse(true)
+
     // Static data
     const customerDebtAggP = Debt.aggregate([{ $match: { status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true)
     const personalDebtAggP = PersonalDebt.aggregate([{ $match: { status: 'active' } }, { $group: { _id: null, total: { $sum: '$remainingAmount' } } }]).allowDiskUse(true)
@@ -484,6 +518,7 @@ export async function GET(req: NextRequest) {
       paymentMethodStats,
       manualDebtPaymentsByMethod,
       cashierStats,
+      debtPaymentDetails,
     ] = await Promise.all([
       salesCountP,
       salesAggP,
@@ -501,6 +536,7 @@ export async function GET(req: NextRequest) {
       paymentMethodStatsP,
       manualDebtPaymentsByMethodP,
       cashierStatsP,
+      debtPaymentDetailsP,
     ])
 
     // Merge daily data
@@ -563,6 +599,7 @@ export async function GET(req: NextRequest) {
       paidDebt: paidDebtAgg?.paidDebt || 0,
       daily,
       cashierStats,
+      debtPaymentDetails,
       paymentMethods: mergedPaymentMethods,
       customerDebt: customerDebtAgg[0]?.total || 0,
       personalDebt: personalDebtAgg[0]?.total || 0,

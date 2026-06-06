@@ -4,10 +4,14 @@ import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
 import Sale from '@/models/Sale'
 import { Types } from 'mongoose'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const session = await getServerSession(authOptions)
+    const collectedBy = (session?.user as { id?: string } | undefined)?.id
     const { id } = await params
     const { amount, note, method } = await req.json()
 
@@ -61,6 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           note,
           saleRef: new Types.ObjectId(saleId),
           salePayedBefore: snaps[i]?.paid || 0,
+          collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined,
         })
       })
     } else {
@@ -70,7 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const saleSnap = await Sale.findById(targetSaleId).select('paid').lean() as { paid: number } | null
         salePayedBefore = saleSnap?.paid || 0
       }
-      debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore })
+      debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore, collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined })
     }
 
     debt.paidAmount = Math.round((debt.paidAmount || 0) * 100 + amount * 100) / 100

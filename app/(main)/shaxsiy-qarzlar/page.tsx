@@ -25,7 +25,7 @@ interface PersonalDebt {
   status: string
   note?: string
   createdAt: string
-  payments: { amount: number; date: string; note?: string }[]
+  payments: { amount: number; date: string; note?: string; collectedBy?: { name?: string } }[]
 }
 
 export default function ShaxsiyQarzlarPage() {
@@ -399,15 +399,32 @@ export default function ShaxsiyQarzlarPage() {
                         {Object.entries(
                           d.payments.reduce((acc, p) => {
                             const day = new Date(p.date).toLocaleDateString('uz-UZ')
-                            acc[day] = (acc[day] || 0) + p.amount
+                            ;(acc[day] ||= []).push(p)
                             return acc
-                          }, {} as Record<string, number>)
-                        ).map(([day, total], i) => (
-                          <div key={i} className="flex justify-between text-xs bg-white px-3 py-2 rounded border border-slate-100">
-                            <span className="text-slate-600">{day}</span>
-                            <span className="font-medium text-green-700">{formatPrice(total)}</span>
-                          </div>
-                        ))}
+                          }, {} as Record<string, PersonalDebt['payments']>)
+                        ).map(([day, ps], i) => {
+                          const dayTotal = ps.reduce((s, p) => s + p.amount, 0)
+                          return (
+                            <div key={i} className="bg-white px-3 py-2 rounded border border-slate-100">
+                              <div className="flex justify-between text-xs font-medium">
+                                <span className="text-slate-600">{day}</span>
+                                <span className="text-green-700">{formatPrice(dayTotal)}</span>
+                              </div>
+                              <div className="mt-1 space-y-0.5">
+                                {ps.map((p, j) => (
+                                  <div key={j} className="flex justify-between gap-2 text-[11px] text-slate-500 pl-2">
+                                    <span className="truncate">
+                                      {new Date(p.date).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                                      {` · ${p.collectedBy?.name || 'Noma\'lum'}`}
+                                      {p.note ? ` · ${p.note}` : ''}
+                                    </span>
+                                    <span className="text-green-600 whitespace-nowrap">{formatPrice(p.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </td>
                   </tr>

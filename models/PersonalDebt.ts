@@ -5,6 +5,7 @@ const PaymentSchema = new Schema({
   amount: { type: Number, required: true },
   date: { type: Date, default: Date.now },
   note: { type: String },
+  collectedBy: { type: Types.ObjectId, ref: 'User' }, // which user accepted this payment
 }, { _id: false })
 
 const PersonalDebtSchema = new Schema({

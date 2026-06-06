@@ -43,8 +43,45 @@ interface Debt {
   status: string
   note?: string
   createdAt: string
-  payments: { amount: number; date: string; note?: string; method?: string }[]
+  payments: { amount: number; date: string; note?: string; method?: string; collectedByName?: string }[]
   entries?: { amount: number; date: string; note?: string; sale?: { _id: string; receiptNo?: number; items: SaleItem[]; returnedItems?: ReturnedItem[] } | null }[]
+}
+
+// Per-day grouped payment history: day total + each individual payment (time, method, collector, note)
+function PaymentHistory({ payments }: { payments: Debt['payments'] }) {
+  const groups = payments.reduce((acc, p) => {
+    const day = new Date(p.date).toLocaleDateString('uz-UZ')
+    ;(acc[day] ||= []).push(p)
+    return acc
+  }, {} as Record<string, Debt['payments']>)
+  return (
+    <div className="space-y-1">
+      {Object.entries(groups).map(([day, ps], i) => {
+        const dayTotal = ps.reduce((s, p) => s + p.amount, 0)
+        return (
+          <div key={i} className="bg-green-50 rounded px-2 py-1.5">
+            <div className="flex justify-between text-xs font-medium">
+              <span className="text-slate-600">{day}</span>
+              <span className="text-green-700">-{formatPrice(dayTotal)}</span>
+            </div>
+            <div className="mt-1 space-y-0.5">
+              {ps.map((p, j) => (
+                <div key={j} className="flex justify-between gap-2 text-[11px] text-slate-500 pl-2">
+                  <span className="truncate">
+                    {new Date(p.date).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                    {p.method ? ` · ${PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] ?? p.method}` : ''}
+                    {` · ${p.collectedByName || 'Noma\'lum'}`}
+                    {p.note ? ` · ${p.note}` : ''}
+                  </span>
+                  <span className="text-green-600 whitespace-nowrap">-{formatPrice(p.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function QarzlarPage() {
@@ -659,20 +696,7 @@ export default function QarzlarPage() {
                       {d.payments.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
-                          <div className="space-y-1">
-                            {Object.entries(
-                              d.payments.reduce((acc, p) => {
-                                const day = new Date(p.date).toLocaleDateString('uz-UZ')
-                                acc[day] = (acc[day] || 0) + p.amount
-                                return acc
-                              }, {} as Record<string, number>)
-                            ).map(([day, total], i) => (
-                              <div key={i} className="flex justify-between text-xs bg-green-50 rounded px-2 py-1">
-                                <span className="text-slate-600">{day}</span>
-                                <span className="font-medium text-green-700">-{formatPrice(total)}</span>
-                              </div>
-                            ))}
-                          </div>
+                          <PaymentHistory payments={d.payments} />
                         </div>
                       )}
 
@@ -750,18 +774,7 @@ export default function QarzlarPage() {
                     {d.payments.length > 0 && (
                       <div>
                         <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
-                        {Object.entries(
-                          d.payments.reduce((acc, p) => {
-                            const day = new Date(p.date).toLocaleDateString('uz-UZ')
-                            acc[day] = (acc[day] || 0) + p.amount
-                            return acc
-                          }, {} as Record<string, number>)
-                        ).map(([day, total], i) => (
-                          <div key={i} className="flex justify-between text-xs bg-green-50 rounded px-2 py-1 mb-0.5">
-                            <span className="text-slate-600">{day}</span>
-                            <span className="font-medium text-green-700">-{formatPrice(total)}</span>
-                          </div>
-                        ))}
+                        <PaymentHistory payments={d.payments} />
                       </div>
                     )}
                     {getAllItems(d).length > 0 && (

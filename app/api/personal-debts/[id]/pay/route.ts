@@ -2,10 +2,15 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import PersonalDebt from '@/models/PersonalDebt'
+import { Types } from 'mongoose'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
+    const session = await getServerSession(authOptions)
+    const collectedBy = (session?.user as { id?: string } | undefined)?.id
     const { id } = await params
     const { amount, note } = await req.json()
 
@@ -20,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Amount exceeds remaining debt' }, { status: 400 })
     }
 
-    debt.payments.push({ amount, date: new Date(), note })
+    debt.payments.push({ amount, date: new Date(), note, collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined })
     debt.paidAmount = Math.round(debt.paidAmount * 100 + amount * 100) / 100
     debt.remainingAmount = Math.round(debt.remainingAmount * 100 - amount * 100) / 100
     if (debt.remainingAmount <= 0.01) {

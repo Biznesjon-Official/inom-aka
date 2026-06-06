@@ -25,6 +25,7 @@ interface ReportData {
   paidDebt: number
   daily: { date: string; revenue: number; profit: number; expense: number; sales: number }[]
   cashierStats: { name: string; salesCount: number; totalAmount: number }[]
+  debtPaymentDetails?: { customerName?: string; amount: number; date: string; method: string; collectedByName?: string | null }[]
   paymentMethods: { method: string; total: number; count: number }[]
   customerDebt: number
   personalDebt: number
@@ -372,9 +373,31 @@ export default function DashboardPage() {
             )}
 
             {detailCard === 'debtRevenue' && (
-              <div className="space-y-2 text-sm">
+              <div className="space-y-3 text-sm">
                 <div className="text-slate-500">Oldingi davrlarda yaratilgan savdolar uchun shu davrda qabul qilingan qarz to&apos;lovlari</div>
                 <div className="font-bold text-teal-700 text-lg">{formatPrice(data.debtRevenue)}</div>
+                {data.debtPaymentDetails && data.debtPaymentDetails.length > 0 ? (
+                  <div>
+                    <div className="text-xs font-medium text-slate-500 mb-2">To&apos;lovlar tarixi:</div>
+                    <div className="space-y-1">
+                      {data.debtPaymentDetails.map((p, i) => (
+                        <div key={i} className="flex justify-between gap-2 text-xs py-1.5 border-b border-slate-100 last:border-0">
+                          <div className="min-w-0">
+                            <div className="text-slate-700 font-medium truncate">{p.customerName || '—'}</div>
+                            <div className="text-slate-400">
+                              {new Date(p.date).toLocaleDateString('uz-UZ')} {new Date(p.date).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                              {' · '}{p.method === 'cash' ? 'Naqd' : p.method === 'card' ? 'Karta' : 'Terminal'}
+                              {' · '}{p.collectedByName || 'Noma\'lum'}
+                            </div>
+                          </div>
+                          <span className="font-medium text-teal-700 whitespace-nowrap">{formatPrice(p.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 text-center py-2">Bu davrda qarz to&apos;lovi yo&apos;q</div>
+                )}
               </div>
             )}
 

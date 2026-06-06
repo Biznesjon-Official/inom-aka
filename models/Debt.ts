@@ -10,6 +10,7 @@ const DebtPaymentSchema = new Schema({
   refunded: { type: Boolean, default: false }, // marked true when sale is returned
   saleRef: { type: Types.ObjectId, ref: 'Sale' }, // which sale this payment belongs to
   salePayedBefore: { type: Number, default: 0 }, // sale.paid value BEFORE this payment (for accurate profit calc)
+  collectedBy: { type: Types.ObjectId, ref: 'User' }, // which user accepted this payment
 }, { _id: false })
 
 const DebtEntrySchema = new Schema({

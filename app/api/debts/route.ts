@@ -126,7 +126,37 @@ export async function GET(req: Request) {
           }
         }
       },
-      { $project: { entrySales: 0 } }
+      // Resolve which user accepted each payment (collectedBy -> name)
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'payments.collectedBy',
+          foreignField: '_id',
+          as: 'paymentCollectors',
+          pipeline: [{ $project: { name: 1 } }]
+        }
+      },
+      {
+        $addFields: {
+          payments: {
+            $map: {
+              input: '$payments',
+              as: 'p',
+              in: {
+                $mergeObjects: ['$$p', {
+                  collectedByName: {
+                    $let: {
+                      vars: { u: { $arrayElemAt: [{ $filter: { input: '$paymentCollectors', cond: { $eq: ['$$this._id', '$$p.collectedBy'] } } }, 0] } },
+                      in: '$$u.name'
+                    }
+                  }
+                }]
+              }
+            }
+          }
+        }
+      },
+      { $project: { entrySales: 0, paymentCollectors: 0 } }
     ]).allowDiskUse(true)
 
     return NextResponse.json(debts)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import PersonalDebt from '@/models/PersonalDebt'
+import '@/models/User' // register User for payments.collectedBy populate
 import { escapeRegex } from '@/lib/utils'
 
 export async function GET(req: Request) {
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
 
     const debts = await PersonalDebt.find(filter)
       .populate('category', 'name')
+      .populate('payments.collectedBy', 'name')
       .sort({ createdAt: -1 })
       .lean()
 
