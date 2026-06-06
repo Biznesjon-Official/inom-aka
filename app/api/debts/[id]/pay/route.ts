@@ -68,6 +68,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined,
         })
       })
+      // Record any portion allocated to non-sale entries (or unallocated) so payments[] = full amount
+      const allocatedTotal = allocEntries.reduce((s, [, a]) => s + a, 0)
+      const leftover = Math.round((amount - allocatedTotal) * 100) / 100
+      if (leftover > 0.01) {
+        debt.payments.push({ amount: leftover, method: validMethod, date: new Date(), note, collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined })
+      }
     } else {
       // Single-entry debt: save sale.paid BEFORE this payment for accurate profit calculation
       let salePayedBefore = 0
