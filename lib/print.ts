@@ -1,6 +1,6 @@
 // Thermal printer via browser window.print()
 // XPrinter: set paper width to 80mm in printer settings (or 58mm)
-// jsbarcode/qrcode are loaded dynamically — only on print, not in page bundle
+// jsbarcode is loaded dynamically — only on print, not in page bundle
 
 async function generateBarcode(data: string): Promise<string> {
   const { default: JsBarcode } = await import('jsbarcode')
@@ -14,23 +14,6 @@ async function generateBarcode(data: string): Promise<string> {
     margin: 2,
   })
   return canvas.toDataURL('image/png')
-}
-
-async function generateQRCode(data: string): Promise<string> {
-  try {
-    const { default: QRCode } = await import('qrcode')
-    return await QRCode.toDataURL(data, {
-      width: 150,
-      margin: 1,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF'
-      }
-    })
-  } catch (err) {
-    console.error('QR Code generation error:', err)
-    return ''
-  }
 }
 
 async function labelHtml(product: { _id: string; name: string; salePrice: number }): Promise<string> {
@@ -87,7 +70,6 @@ export async function printReceipt(data: {
   shopName?: string
   shopPhone?: string
   receiptFooter?: string
-  bankCard?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
   const shopPhone = data.shopPhone || ''
@@ -97,21 +79,6 @@ export async function printReceipt(data: {
   const change = data.paid - data.total
   const debt = data.total - data.paid
   const receiptNo = data.receiptNo.toString()
-
-  // QR Code yaratish (agar bank karta ma'lumoti bo'lsa)
-  let qrCodeHtml = ''
-  if (data.bankCard) {
-    const qrDataUrl = await generateQRCode(data.bankCard)
-    if (qrDataUrl) {
-      qrCodeHtml = `
-      <div class="divider"></div>
-      <div class="qr-section">
-        <div class="qr-title">Karta orqali to'lov</div>
-        <img src="${qrDataUrl}" alt="QR Code" class="qr-code" />
-        <div class="qr-hint">QR kodni skanerlang</div>
-      </div>`
-    }
-  }
 
   // Table format
   const tableRows = data.items.map((i, idx) => {
@@ -200,28 +167,6 @@ export async function printReceipt(data: {
     margin: 2mm 0; 
     font-size: 16px; 
   }
-  
-  /* QR Code styles */
-  .qr-section {
-    text-align: center;
-    padding: 2mm 0;
-  }
-  .qr-title {
-    font-size: 13px;
-    font-weight: bold;
-    margin-bottom: 2mm;
-  }
-  .qr-code {
-    width: 35mm;
-    height: 35mm;
-    margin: 1mm auto;
-  }
-  .qr-hint {
-    font-size: 11px;
-    color: #555;
-    margin-top: 1mm;
-  }
-  
   .footer { 
     text-align: center; 
     font-size: 12px; 
@@ -279,7 +224,6 @@ export async function printReceipt(data: {
   <div class="info"><span>To'landi:</span><span class="bold">${data.paid.toLocaleString('uz-UZ')} so'm</span></div>
   ${change > 0 ? `<div class="info"><span>Qaytim:</span><span class="bold">${change.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
   ${debt > 0 ? `<div class="debt-line">⚠ QARZ: ${debt.toLocaleString('uz-UZ')} so'm</div>` : ''}
-  ${qrCodeHtml}
   <div class="footer">${receiptFooter}<br>${shopName}</div>
 </body>
 </html>`

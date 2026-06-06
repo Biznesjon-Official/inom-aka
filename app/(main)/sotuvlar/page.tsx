@@ -47,7 +47,7 @@ function SotuvlarContent() {
   const idsMode = !!(idsParam && idsParam.length > 0)
   const isAdmin = session?.user?.role === 'admin'
 
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>({})
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -71,7 +71,7 @@ function SotuvlarContent() {
   const [returnLoading, setReturnLoading] = useState(false)
 
   useEffect(() => {
-    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string; bankCard?: string }>().then(setShopSettings)
+    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>().then(setShopSettings)
   }, [])
 
   const debouncedSearch = useDebounce(search)
@@ -388,7 +388,7 @@ function SotuvlarContent() {
                         <Undo2 className="w-3.5 h-3.5 text-orange-400" />
                       </button>
                       <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
-                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter, bankCard: shopSettings.bankCard })}>
+                        onClick={() => printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter })}>
                         <Printer className="w-3.5 h-3.5 text-blue-400" />
                       </button>
                     </div>
@@ -477,7 +477,7 @@ function SotuvlarContent() {
                     <button className="p-1 hover:bg-blue-50 rounded" title="Chop etish"
                       onClick={e => {
                         e.stopPropagation()
-                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter, bankCard: shopSettings.bankCard })
+                        printReceipt({ receiptNo: sale.receiptNo, items: sale.items, total: sale.total, paid: sale.paid, cashier: sale.cashier?.name || 'Kassir', customer: sale.customer?.name, paymentType: sale.paymentType, createdAt: new Date(sale.createdAt), shopName: shopSettings.shopName, shopPhone: shopSettings.shopPhone, receiptFooter: shopSettings.receiptFooter })
                       }}>
                       <Printer className="w-3.5 h-3.5 text-blue-400" />
                     </button>

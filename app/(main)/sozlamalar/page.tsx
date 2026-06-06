@@ -14,7 +14,6 @@ const DEFAULTS = {
   shopPhone: '',
   shopAddress: '',
   receiptFooter: 'Rahmat! Yana tashrif buyuring.',
-  bankCard: '',
 }
 
 export default function SozlamalarPage() {
@@ -58,7 +57,6 @@ export default function SozlamalarPage() {
           shopPhone: data.shopPhone || prev.shopPhone,
           shopAddress: data.shopAddress || prev.shopAddress,
           receiptFooter: data.receiptFooter || prev.receiptFooter,
-          bankCard: data.bankCard || prev.bankCard,
         }))
       })
       .catch(() => toast.error('Sozlamalarni yuklashda xato'))
@@ -165,12 +163,6 @@ export default function SozlamalarPage() {
             <div className="space-y-2">
               <Label htmlFor="receiptFooter">Chek pastidagi matn</Label>
               <Textarea id="receiptFooter" value={form.receiptFooter} onChange={set('receiptFooter')} rows={2} placeholder="Rahmat! Yana tashrif buyuring." />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankCard">Bank karta ma&apos;lumoti (QR Code uchun)</Label>
-              <Input id="bankCard" value={form.bankCard} onChange={set('bankCard')} placeholder="8600 1234 5678 9012 yoki to'lov havolasi" />
-              <p className="text-xs text-muted-foreground">Karta raqami yoki to&apos;lov havolasini kiriting. Chekda QR kod ko&apos;rsatiladi.</p>
             </div>
 
             <Button onClick={handleSave} disabled={saving} className="w-full">
