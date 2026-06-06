@@ -266,16 +266,16 @@ export function printDebtReceipt(data: {
   // Chegirma: agar discount berilgan bo'lsa ishlatamiz, aks holda totalAmount bilan farqdan hisoblaymiz
   const discount = data.discount ?? Math.max(0, itemsTotal - data.totalAmount)
 
-  const itemsHtml = data.items.map(i => {
+  const itemRows = data.items.map((i, idx) => {
     const lineTotal = i.salePrice * i.qty
     return `
-    <div class="item">
-      <div class="item-name">${i.productName}</div>
-      <div class="item-detail">
-        <span>${i.qty} ${i.unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
-        <span class="bold">${lineTotal.toLocaleString('uz-UZ')}</span>
-      </div>
-    </div>`
+    <tr>
+      <td style="text-align:left">${idx + 1}</td>
+      <td style="text-align:left">${i.productName}</td>
+      <td style="text-align:center">${i.qty} ${i.unit}</td>
+      <td style="text-align:right">${i.salePrice.toLocaleString('uz-UZ')}</td>
+      <td style="text-align:right;font-weight:bold">${lineTotal.toLocaleString('uz-UZ')}</td>
+    </tr>`
   }).join('')
 
   const returnedGroups = new Map<string, ReturnedPrintItem[]>()
@@ -284,19 +284,19 @@ export function printDebtReceipt(data: {
     if (!returnedGroups.has(key)) returnedGroups.set(key, [])
     returnedGroups.get(key)!.push(item)
   }
-  let returnedHtml = ''
+  let returnedRows = ''
   for (const [groupTitle, groupItems] of returnedGroups) {
-    returnedHtml += `<div class="return-group-title">${groupTitle}</div>`
-    returnedHtml += groupItems.map(i => {
+    returnedRows += `<tr><td colspan="5" class="ret-group">${groupTitle}</td></tr>`
+    returnedRows += groupItems.map(i => {
       const lineTotal = Math.abs(i.salePrice) * Math.abs(i.qty)
       const unit = i.unit || 'dona'
-      return `<div class="item returned-item">
-      <div class="item-name">↩ ${i.productName}</div>
-      <div class="item-detail">
-        <span>${i.qty} ${unit} × ${i.salePrice.toLocaleString('uz-UZ')}</span>
-        <span class="bold">-${lineTotal.toLocaleString('uz-UZ')}</span>
-      </div>
-    </div>`
+      return `<tr class="ret-row">
+      <td style="text-align:left">↩</td>
+      <td style="text-align:left">${i.productName}</td>
+      <td style="text-align:center">${i.qty} ${unit}</td>
+      <td style="text-align:right">${i.salePrice.toLocaleString('uz-UZ')}</td>
+      <td style="text-align:right;font-weight:bold">-${lineTotal.toLocaleString('uz-UZ')}</td>
+    </tr>`
     }).join('')
   }
 
@@ -322,19 +322,19 @@ export function printDebtReceipt(data: {
   .bold { font-weight: bold; }
   .title { text-align: center; font-size: 18px; font-weight: bold; }
   .divider { border-top: 1px dashed #000; margin: 2mm 0; }
-  .item { border-bottom: 1px dotted #ccc; padding: 1.5mm 0; }
-  .item-name { font-weight: bold; font-size: 15px; word-break: break-word; }
-  .returned-item { background: #fff3f3; }
-  .returned-item .item-name { color: #cc0000; }
-  .returned-item .item-detail { color: #cc0000; }
-  .item-detail { display: flex; justify-content: space-between; font-size: 14px; margin-top: 0.5mm; }
+  .items-table { width:100%; border-collapse:collapse; margin:2mm 0; font-size:13px; }
+  .items-table thead tr { border-bottom:1px solid #000; }
+  .items-table th { padding:1mm 0; font-weight:bold; font-size:12px; }
+  .items-table td { padding:1.5mm 1mm; border-bottom:1px dotted #ccc; vertical-align:top; word-break:break-word; }
+  .items-table tbody tr:last-child td { border-bottom:1px solid #000; }
+  .ret-row td { color:#cc0000; background:#fff3f3; }
+  .ret-group { color:#cc0000; font-weight:bold; font-size:12px; padding-top:1.5mm !important; }
   .info { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; }
   .info-red { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; color: #cc0000; }
   .info-green { display: flex; justify-content: space-between; margin: 1.5mm 0; font-size: 15px; color: #007700; }
   .debt-total { text-align: center; font-size: 18px; font-weight: bold; margin: 2mm 0; padding: 2mm; background: #f5f5f5; }
   .customer-name { text-align: center; font-size: 16px; font-weight: bold; margin: 2mm 0; }
-  .section-title { text-align:center; font-size:14px; font-weight:bold; color:#cc0000; margin:3mm 0; padding:2mm 0; border-top:2px solid #cc0000; border-bottom:2px solid #cc0000; }
-  .return-group-title { font-size:13px; color:#cc0000; font-weight:bold; padding:1mm 0; margin-top:1.5mm; border-bottom:1px dashed #cc0000; }
+  .ret-section { text-align:center; font-weight:bold; color:#cc0000; padding:1.5mm 0 !important; border-top:1px solid #cc0000; border-bottom:1px solid #cc0000; }
 </style>
 </head>
 <body>
@@ -345,12 +345,21 @@ export function printDebtReceipt(data: {
   ${data.customerPhone ? `<div class="info"><span>Tel:</span><span>${data.customerPhone}</span></div>` : ''}
   <div class="info"><span>Sana:</span><span>${date}</span></div>
   <div class="divider"></div>
-  ${itemsHtml}
-  ${returnedTotal > 0 ? `
-  <div class="divider"></div>
-  <div class="section-title">⚠ QAYTARILGAN TOVARLAR ⚠</div>
-  ${returnedHtml}
-  ` : ''}
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width:8%;text-align:left">№</th>
+        <th style="width:37%;text-align:left">Mahsulot</th>
+        <th style="width:18%;text-align:center">Soni</th>
+        <th style="width:18%;text-align:right">Narxi</th>
+        <th style="width:19%;text-align:right">Jami</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+      ${returnedTotal > 0 ? `<tr><td colspan="5" class="ret-section">⚠ QAYTARILGAN TOVARLAR ⚠</td></tr>${returnedRows}` : ''}
+    </tbody>
+  </table>
   <div class="divider"></div>
   <div class="info"><span>Tovarlar jami:</span><span>${itemsTotal.toLocaleString('uz-UZ')} so'm</span></div>
   ${returnedTotal > 0 ? `<div class="info-red"><span>Qaytarilgan:</span><span>-${returnedTotal.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
