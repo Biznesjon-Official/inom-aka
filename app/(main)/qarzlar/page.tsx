@@ -55,8 +55,14 @@ export default function QarzlarPage() {
   const [status, setStatus] = useState('active')
   const [filterCategory, setFilterCategory] = useState('all')
   const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [dateTo, setDateTo] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [payDialog, setPayDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
@@ -654,13 +660,16 @@ export default function QarzlarPage() {
                         <div>
                           <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
                           <div className="space-y-1">
-                            {d.payments.map((p, i) => (
+                            {Object.entries(
+                              d.payments.reduce((acc, p) => {
+                                const day = new Date(p.date).toLocaleDateString('uz-UZ')
+                                acc[day] = (acc[day] || 0) + p.amount
+                                return acc
+                              }, {} as Record<string, number>)
+                            ).map(([day, total], i) => (
                               <div key={i} className="flex justify-between text-xs bg-green-50 rounded px-2 py-1">
-                                <span className="text-slate-600">
-                                  {new Date(p.date).toLocaleDateString('uz-UZ')} — {PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] || p.method}
-                                  {p.note && ` (${p.note})`}
-                                </span>
-                                <span className="font-medium text-green-700">-{formatPrice(p.amount)}</span>
+                                <span className="text-slate-600">{day}</span>
+                                <span className="font-medium text-green-700">-{formatPrice(total)}</span>
                               </div>
                             ))}
                           </div>
@@ -741,10 +750,16 @@ export default function QarzlarPage() {
                     {d.payments.length > 0 && (
                       <div>
                         <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
-                        {d.payments.map((p, i) => (
+                        {Object.entries(
+                          d.payments.reduce((acc, p) => {
+                            const day = new Date(p.date).toLocaleDateString('uz-UZ')
+                            acc[day] = (acc[day] || 0) + p.amount
+                            return acc
+                          }, {} as Record<string, number>)
+                        ).map(([day, total], i) => (
                           <div key={i} className="flex justify-between text-xs bg-green-50 rounded px-2 py-1 mb-0.5">
-                            <span className="text-slate-600">{new Date(p.date).toLocaleDateString('uz-UZ')} — {PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] || p.method}</span>
-                            <span className="font-medium text-green-700">-{formatPrice(p.amount)}</span>
+                            <span className="text-slate-600">{day}</span>
+                            <span className="font-medium text-green-700">-{formatPrice(total)}</span>
                           </div>
                         ))}
                       </div>

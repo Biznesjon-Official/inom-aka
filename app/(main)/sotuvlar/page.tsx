@@ -52,8 +52,14 @@ function SotuvlarContent() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [dateTo, setDateTo] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [expandedSale, setExpandedSale] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
 

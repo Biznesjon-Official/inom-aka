@@ -35,8 +35,14 @@ export default function ShaxsiyQarzlarPage() {
   const [status, setStatus] = useState('active')
   const [filterCategory, setFilterCategory] = useState('all')
   const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [dateTo, setDateTo] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [payDialog, setPayDialog] = useState(false)
   const [addAmountDialog, setAddAmountDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
@@ -346,8 +352,8 @@ export default function ShaxsiyQarzlarPage() {
             <tbody>
               {filtered.map(d => (
                 <React.Fragment key={d._id}>
-                <tr className={`border-b hover:bg-slate-50 ${expandedDebt === d._id ? 'bg-slate-50' : ''} ${status === 'paid' ? 'cursor-pointer' : ''}`} 
-                    onClick={() => status === 'paid' && setExpandedDebt(expandedDebt === d._id ? null : d._id)}>
+                <tr className={`border-b hover:bg-slate-50 ${expandedDebt === d._id ? 'bg-slate-50' : ''} ${d.payments.length > 0 ? 'cursor-pointer' : ''}`}
+                    onClick={() => d.payments.length > 0 && setExpandedDebt(expandedDebt === d._id ? null : d._id)}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{d.name}</div>
                     {d.phone && <div className="text-xs text-slate-400">{d.phone}</div>}
@@ -384,25 +390,22 @@ export default function ShaxsiyQarzlarPage() {
                     </div>
                   </td>
                 </tr>
-                {/* Payment History Accordion - faqat to'langan qarzlarda */}
-                {status === 'paid' && expandedDebt === d._id && d.payments && d.payments.length > 0 && (
+                {/* Payment History Accordion */}
+                {expandedDebt === d._id && d.payments && d.payments.length > 0 && (
                   <tr className="bg-slate-50">
                     <td colSpan={7} className="px-4 py-3">
                       <div className="text-xs font-semibold text-slate-600 mb-2">To&apos;lovlar tarixi:</div>
                       <div className="space-y-1">
-                        {d.payments.map((p, i) => (
+                        {Object.entries(
+                          d.payments.reduce((acc, p) => {
+                            const day = new Date(p.date).toLocaleDateString('uz-UZ')
+                            acc[day] = (acc[day] || 0) + p.amount
+                            return acc
+                          }, {} as Record<string, number>)
+                        ).map(([day, total], i) => (
                           <div key={i} className="flex justify-between text-xs bg-white px-3 py-2 rounded border border-slate-100">
-                            <span className="text-slate-600">
-                              {new Date(p.date).toLocaleString('uz-UZ', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric',
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                              {p.note && ` — ${p.note}`}
-                            </span>
-                            <span className="font-medium text-green-700">{formatPrice(p.amount)}</span>
+                            <span className="text-slate-600">{day}</span>
+                            <span className="font-medium text-green-700">{formatPrice(total)}</span>
                           </div>
                         ))}
                       </div>
