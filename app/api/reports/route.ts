@@ -96,29 +96,32 @@ export async function GET(req: NextRequest) {
     // Qarz to'lovlari — sale shu periodda yaratilmagan bo'lsa kirimga qo'sh
     // $$saleId — let bilan belgilangan o'zgaruvchi
     const manualDebtPaymentsAggP = Debt.aggregate([
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
+      // Count as debt income only if the payment's OWN sale (saleRef) was NOT created in this period.
+      // Period-sale payments are already in salesRevenue via Sale.payments — prevents double counting.
       {
         $lookup: {
           from: 'sales',
-          let: { saleId: '$sale' },
+          let: { srf: '$payments.saleRef' },
           pipeline: [
             { $match: { $expr: { $and: [
-              { $eq: ['$_id', '$$saleId'] },
+              { $eq: ['$_id', '$$srf'] },
               { $gte: ['$createdAt', fromDate] },
               { $lte: ['$createdAt', toDate] },
             ] } } },
             { $project: { _id: 1 } },
           ],
-          as: 'saleInPeriod',
+          as: 'payInPeriod',
         },
       },
-      { $match: { saleInPeriod: { $size: 0 } } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
+      { $match: { payInPeriod: { $size: 0 } } },
+      // Cost/profit from the payment's own sale (saleRef), not the debt's top-level sale
       {
         $lookup: {
           from: 'sales',
-          localField: 'sale',
-          foreignField: '_id',
+          let: { srf: '$payments.saleRef' },
+          pipeline: [ { $match: { $expr: { $eq: ['$_id', '$$srf'] } } } ],
           as: 'saleDoc',
         },
       },
@@ -211,47 +214,47 @@ export async function GET(req: NextRequest) {
 
     // paidDebt — faqat oldingi davr sotuvlari uchun to'lovlar
     const paidDebtAggP = Debt.aggregate([
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.refunded': { $ne: true }, 'payments.fromSale': { $ne: true } } },
       {
         $lookup: {
           from: 'sales',
-          let: { saleId: '$sale' },
+          let: { srf: '$payments.saleRef' },
           pipeline: [
             { $match: { $expr: { $and: [
-              { $eq: ['$_id', '$$saleId'] },
+              { $eq: ['$_id', '$$srf'] },
               { $gte: ['$createdAt', fromDate] },
               { $lte: ['$createdAt', toDate] },
             ] } } },
             { $project: { _id: 1 } },
           ],
-          as: 'saleInPeriod',
+          as: 'payInPeriod',
         },
       },
-      { $match: { saleInPeriod: { $size: 0 } } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.refunded': { $ne: true }, 'payments.fromSale': { $ne: true } } },
+      { $match: { payInPeriod: { $size: 0 } } },
       { $group: { _id: null, paidDebt: { $sum: '$payments.amount' } } },
     ]).allowDiskUse(true)
 
     // Detail list of the debt payments that make up debtRevenue (who/when/from-whom)
     const debtPaymentDetailsP = Debt.aggregate([
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       {
         $lookup: {
           from: 'sales',
-          let: { saleId: '$sale' },
+          let: { srf: '$payments.saleRef' },
           pipeline: [
             { $match: { $expr: { $and: [
-              { $eq: ['$_id', '$$saleId'] },
+              { $eq: ['$_id', '$$srf'] },
               { $gte: ['$createdAt', fromDate] },
               { $lte: ['$createdAt', toDate] },
             ] } } },
             { $project: { _id: 1 } },
           ],
-          as: 'saleInPeriod',
+          as: 'payInPeriod',
         },
       },
-      { $match: { saleInPeriod: { $size: 0 } } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
+      { $match: { payInPeriod: { $size: 0 } } },
       { $lookup: { from: 'users', localField: 'payments.collectedBy', foreignField: '_id', as: 'collector', pipeline: [{ $project: { name: 1 } }] } },
       {
         $project: {
@@ -365,29 +368,29 @@ export async function GET(req: NextRequest) {
 
     // Daily qarz to'lovlari
     const dailyManualDebtPaymentsP = Debt.aggregate([
-      {
-        $lookup: {
-          from: 'sales',
-          let: { saleId: '$sale' },
-          pipeline: [
-            { $match: { $expr: { $and: [
-              { $eq: ['$_id', '$$saleId'] },
-              { $gte: ['$createdAt', fromDate] },
-              { $lte: ['$createdAt', toDate] },
-            ] } } },
-            { $project: { _id: 1 } },
-          ],
-          as: 'saleInPeriod',
-        },
-      },
-      { $match: { saleInPeriod: { $size: 0 } } },
       { $unwind: '$payments' },
       { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       {
         $lookup: {
           from: 'sales',
-          localField: 'sale',
-          foreignField: '_id',
+          let: { srf: '$payments.saleRef' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$_id', '$$srf'] },
+              { $gte: ['$createdAt', fromDate] },
+              { $lte: ['$createdAt', toDate] },
+            ] } } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'payInPeriod',
+        },
+      },
+      { $match: { payInPeriod: { $size: 0 } } },
+      {
+        $lookup: {
+          from: 'sales',
+          let: { srf: '$payments.saleRef' },
+          pipeline: [ { $match: { $expr: { $eq: ['$_id', '$$srf'] } } } ],
           as: 'saleDoc',
         },
       },
@@ -436,24 +439,24 @@ export async function GET(req: NextRequest) {
     ]).allowDiskUse(true)
 
     const manualDebtPaymentsByMethodP = Debt.aggregate([
+      { $unwind: '$payments' },
+      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
       {
         $lookup: {
           from: 'sales',
-          let: { saleId: '$sale' },
+          let: { srf: '$payments.saleRef' },
           pipeline: [
             { $match: { $expr: { $and: [
-              { $eq: ['$_id', '$$saleId'] },
+              { $eq: ['$_id', '$$srf'] },
               { $gte: ['$createdAt', fromDate] },
               { $lte: ['$createdAt', toDate] },
             ] } } },
             { $project: { _id: 1 } },
           ],
-          as: 'saleInPeriod',
+          as: 'payInPeriod',
         },
       },
-      { $match: { saleInPeriod: { $size: 0 } } },
-      { $unwind: '$payments' },
-      { $match: { 'payments.date': dateFilter, 'payments.fromSale': { $ne: true }, 'payments.refunded': { $ne: true } } },
+      { $match: { payInPeriod: { $size: 0 } } },
       { $group: { _id: { $ifNull: ['$payments.method', 'cash'] }, total: { $sum: '$payments.amount' }, count: { $sum: 1 } } },
       { $project: { _id: 0, method: '$_id', total: 1, count: 1 } },
     ]).allowDiskUse(true)
