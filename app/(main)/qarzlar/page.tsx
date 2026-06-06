@@ -47,7 +47,22 @@ interface Debt {
   entries?: { amount: number; date: string; note?: string; sale?: { _id: string; receiptNo?: number; items: SaleItem[]; returnedItems?: ReturnedItem[] } | null }[]
 }
 
-// Per-day grouped payment history: day total + each individual payment (time, method, collector, note)
+// One displayed line per real payment event: a single payment on a multi-sale debt is
+// stored as several saleRef records (same minute, collector, method) — merge them back.
+function mergePaymentEvents(ps: Debt['payments']) {
+  const map = new Map<string, { date: string; method?: string; collectedByName?: string; note?: string; amount: number }>()
+  for (const p of ps) {
+    const d = new Date(p.date)
+    const minute = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`
+    const key = `${minute}|${p.collectedByName || ''}|${p.method || ''}|${p.note || ''}`
+    const e = map.get(key)
+    if (e) e.amount += p.amount
+    else map.set(key, { date: p.date, method: p.method, collectedByName: p.collectedByName, note: p.note, amount: p.amount })
+  }
+  return [...map.values()]
+}
+
+// Per-day grouped payment history: day total + one line per payment event (time, method, collector, note)
 function PaymentHistory({ payments }: { payments: Debt['payments'] }) {
   const groups = payments.reduce((acc, p) => {
     const day = new Date(p.date).toLocaleDateString('uz-UZ')
@@ -58,22 +73,23 @@ function PaymentHistory({ payments }: { payments: Debt['payments'] }) {
     <div className="space-y-1">
       {Object.entries(groups).map(([day, ps], i) => {
         const dayTotal = ps.reduce((s, p) => s + p.amount, 0)
+        const events = mergePaymentEvents(ps)
         return (
           <div key={i} className="bg-green-50 rounded px-2 py-1.5">
             <div className="flex justify-between text-xs font-medium">
-              <span className="text-slate-600">{day}</span>
+              <span className="text-slate-600">{day} — jami</span>
               <span className="text-green-700">-{formatPrice(dayTotal)}</span>
             </div>
             <div className="mt-1 space-y-0.5">
-              {ps.map((p, j) => (
+              {events.map((e, j) => (
                 <div key={j} className="flex justify-between gap-2 text-[11px] text-slate-500 pl-2">
                   <span className="truncate">
-                    {new Date(p.date).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
-                    {p.method ? ` · ${PAYMENT_METHODS[p.method as keyof typeof PAYMENT_METHODS] ?? p.method}` : ''}
-                    {` · ${p.collectedByName || 'Noma\'lum'}`}
-                    {p.note ? ` · ${p.note}` : ''}
+                    {new Date(e.date).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                    {e.method ? ` · ${PAYMENT_METHODS[e.method as keyof typeof PAYMENT_METHODS] ?? e.method}` : ''}
+                    {` · ${e.collectedByName || 'Noma\'lum'}`}
+                    {e.note ? ` · ${e.note}` : ''}
                   </span>
-                  <span className="text-green-600 whitespace-nowrap">-{formatPrice(p.amount)}</span>
+                  <span className="text-green-600 whitespace-nowrap">-{formatPrice(e.amount)}</span>
                 </div>
               ))}
             </div>

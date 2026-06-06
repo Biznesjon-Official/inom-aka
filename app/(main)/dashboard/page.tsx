@@ -33,6 +33,21 @@ interface ReportData {
   warehouseValue: number
 }
 
+// A single debt payment on a multi-sale debt is stored as several saleRef records
+// (same customer, minute, collector, method) — merge them into one displayed event.
+function mergeDebtPayments(list: NonNullable<ReportData['debtPaymentDetails']>) {
+  const map = new Map<string, { customerName?: string; amount: number; date: string; method: string; collectedByName?: string | null }>()
+  for (const p of list) {
+    const d = new Date(p.date)
+    const minute = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`
+    const key = `${p.customerName || ''}|${minute}|${p.collectedByName || ''}|${p.method || ''}`
+    const e = map.get(key)
+    if (e) e.amount += p.amount
+    else map.set(key, { ...p })
+  }
+  return [...map.values()]
+}
+
 type PresetKey = 'today' | 'week' | 'month' | 'year' | 'custom'
 
 function getPresetDates(key: PresetKey): { from: string; to: string } {
@@ -380,7 +395,7 @@ export default function DashboardPage() {
                   <div>
                     <div className="text-xs font-medium text-slate-500 mb-2">To&apos;lovlar tarixi:</div>
                     <div className="space-y-1">
-                      {data.debtPaymentDetails.map((p, i) => (
+                      {mergeDebtPayments(data.debtPaymentDetails).map((p, i) => (
                         <div key={i} className="flex justify-between gap-2 text-xs py-1.5 border-b border-slate-100 last:border-0">
                           <div className="min-w-0">
                             <div className="text-slate-700 font-medium truncate">{p.customerName || '—'}</div>
