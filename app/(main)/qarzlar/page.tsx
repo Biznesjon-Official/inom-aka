@@ -63,12 +63,15 @@ function mergePaymentEvents(ps: Debt['payments']) {
 }
 
 // Per-day grouped payment history: day total + one line per payment event (time, method, collector, note)
-function PaymentHistory({ payments }: { payments: Debt['payments'] }) {
+function PaymentHistory({ payments, paidAmount }: { payments: Debt['payments']; paidAmount?: number }) {
   const groups = payments.reduce((acc, p) => {
     const day = new Date(p.date).toLocaleDateString('uz-UZ')
     ;(acc[day] ||= []).push(p)
     return acc
   }, {} as Record<string, Debt['payments']>)
+  // Older payments (paid before per-entry records existed) aren't in payments[] but are in paidAmount
+  const recorded = payments.reduce((s, p) => s + p.amount, 0)
+  const unlogged = paidAmount != null ? Math.round((paidAmount - recorded) * 100) / 100 : 0
   return (
     <div className="space-y-1">
       {Object.entries(groups).map(([day, ps], i) => {
@@ -96,6 +99,12 @@ function PaymentHistory({ payments }: { payments: Debt['payments'] }) {
           </div>
         )
       })}
+      {unlogged > 1 && (
+        <div className="flex justify-between gap-2 text-[11px] text-slate-400 italic bg-slate-50 rounded px-2 py-1.5">
+          <span className="truncate">Oldingi to&apos;lovlar (sana qayd etilmagan)</span>
+          <span className="text-green-600 whitespace-nowrap">-{formatPrice(unlogged)}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -712,7 +721,7 @@ export default function QarzlarPage() {
                       {d.payments.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
-                          <PaymentHistory payments={d.payments} />
+                          <PaymentHistory payments={d.payments} paidAmount={d.paidAmount} />
                         </div>
                       )}
 
@@ -790,7 +799,7 @@ export default function QarzlarPage() {
                     {d.payments.length > 0 && (
                       <div>
                         <div className="text-xs font-medium text-slate-500 mb-1">To&apos;lovlar:</div>
-                        <PaymentHistory payments={d.payments} />
+                        <PaymentHistory payments={d.payments} paidAmount={d.paidAmount} />
                       </div>
                     )}
                     {getAllItems(d).length > 0 && (
