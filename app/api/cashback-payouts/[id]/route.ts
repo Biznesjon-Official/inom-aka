@@ -10,6 +10,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const body = await req.json()
     const { amount, totalSales, percent, note } = body
 
+    // Reject negative / non-numeric values
+    for (const [k, v] of Object.entries({ amount, totalSales, percent })) {
+      if (v !== undefined && v !== null && v !== '' && (isNaN(Number(v)) || Number(v) < 0)) {
+        return NextResponse.json({ error: `${k} manfiy bo'lmagan raqam bo'lishi kerak` }, { status: 400 })
+      }
+    }
+    if (percent !== undefined && Number(percent) > 100) {
+      return NextResponse.json({ error: 'percent 0-100 oralig\'ida bo\'lishi kerak' }, { status: 400 })
+    }
+
     const payout = await CashbackPayout.findByIdAndUpdate(
       id,
       { amount, totalSales, percent, note },

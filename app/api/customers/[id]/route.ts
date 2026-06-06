@@ -25,6 +25,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const body = await req.json()
     const { name, phone, address, note, cashbackPercent } = body
+    if (cashbackPercent !== undefined && cashbackPercent !== null && cashbackPercent !== '' &&
+        (isNaN(Number(cashbackPercent)) || Number(cashbackPercent) < 0 || Number(cashbackPercent) > 100)) {
+      return NextResponse.json({ error: 'cashbackPercent 0-100 oralig\'ida bo\'lishi kerak' }, { status: 400 })
+    }
+    if (body.totalSalesOverride !== undefined && body.totalSalesOverride !== null && body.totalSalesOverride !== '' && isNaN(Number(body.totalSalesOverride))) {
+      return NextResponse.json({ error: 'totalSalesOverride raqam bo\'lishi kerak' }, { status: 400 })
+    }
     const update: Record<string, unknown> = {}
     if (name !== undefined) update.name = name
     if (phone !== undefined) update.phone = phone

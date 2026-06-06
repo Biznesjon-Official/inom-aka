@@ -19,6 +19,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const body = await req.json()
     const { name, costPrice, salePrice, wholesalePrice, category, unit, stock, image, description } = body
+    // Reject negative / non-numeric money & stock values
+    for (const [k, v] of Object.entries({ costPrice, salePrice, wholesalePrice, stock })) {
+      if (v !== undefined && v !== null && v !== '' && (isNaN(Number(v)) || Number(v) < 0)) {
+        return NextResponse.json({ error: `${k} manfiy bo'lmagan raqam bo'lishi kerak` }, { status: 400 })
+      }
+    }
     const update: Record<string, unknown> = {}
     if (name !== undefined) update.name = name
     if (costPrice !== undefined) update.costPrice = costPrice
