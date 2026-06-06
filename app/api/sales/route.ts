@@ -5,7 +5,7 @@ import { formatPrice } from '@/lib/utils'
 import Sale from '@/models/Sale'
 import Debt from '@/models/Debt'
 import Product from '@/models/Product'
-import { Types } from 'mongoose'
+import mongoose, { Types } from 'mongoose'
 
 export async function GET(req: Request) {
   try {
@@ -184,71 +184,65 @@ export async function POST(req: Request) {
       }
     }
 
-    // Atomic stock decrease — prevents race condition (overselling)
-    for (const item of body.items) {
-      const result = await Product.findOneAndUpdate(
-        { _id: item.product, stock: { $gte: item.qty } },
-        { $inc: { stock: -item.qty } },
-        { returnDocument: 'after' }
-      )
-      if (!result) {
-        // Rollback already decremented stocks
-        const failIdx = body.items.indexOf(item)
-        for (let i = 0; i < failIdx; i++) {
-          await Product.findByIdAndUpdate(body.items[i].product, { $inc: { stock: body.items[i].qty } })
+    // All-or-nothing: stock decrement + sale + debt are committed atomically.
+    const session = await mongoose.startSession()
+    let result: { sale: unknown; debt?: unknown }
+    try {
+      await session.withTransaction(async () => {
+        // Atomic stock decrease — prevents overselling; transaction rolls back on any failure
+        for (const item of body.items) {
+          const dec = await Product.findOneAndUpdate(
+            { _id: item.product, stock: { $gte: item.qty } },
+            { $inc: { stock: -item.qty } },
+            { returnDocument: 'after', session }
+          )
+          if (!dec) {
+            const p = await Product.findById(item.product).select('name stock unit').session(session).lean() as { name?: string; stock?: number; unit?: string } | null
+            const msg = `${p?.name || item.productName}: stokda ${p?.stock ?? 0} ${p?.unit || item.unit || 'ta'}, lekin ${item.qty} ${p?.unit || item.unit || 'ta'} so'ralmoqda`
+            throw Object.assign(new Error(msg), { statusCode: 400 })
+          }
         }
-        const p = await Product.findById(item.product).select('name stock unit').lean() as { name?: string; stock?: number; unit?: string } | null
-        const name = p?.name || item.productName
-        const stock = p?.stock ?? 0
-        const unit = p?.unit || item.unit || 'ta'
-        return NextResponse.json({ error: `${name}: stokda ${stock} ${unit}, lekin ${item.qty} ${unit} so'ralmoqda` }, { status: 400 })
-      }
-    }
 
-    const sale = await Sale.create(body)
+        const [sale] = await Sale.create([body], { session })
 
-    // Qarzga sotuv — xuddi shu nomdagi aktiv qarzga qo'shish yoki yangi yaratish
-    if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.debtorName) {
-      const remaining = body.total - (body.paid || 0)
-      const trimmedName = body.debtorName.trim()
-      const trimmedPhone = body.debtorPhone?.trim() || ''
+        // Qarzga sotuv — xuddi shu nomdagi aktiv qarzga atomik qo'shish/yaratish (race'siz)
+        if ((body.paymentType === 'partial' || body.paymentType === 'debt') && body.debtorName) {
+          const remaining = body.total - (body.paid || 0)
+          const trimmedName = body.debtorName.trim()
+          const trimmedPhone = body.debtorPhone?.trim() || ''
 
-      const initialPayments = body.paid > 0 && Array.isArray(body.payments) && body.payments.length > 0
-        ? body.payments.map((p: { method: string; amount: number }) => ({ amount: p.amount, method: p.method, date: new Date(), fromSale: true, saleRef: sale._id }))
-        : body.paid > 0 ? [{ amount: body.paid, date: new Date(), fromSale: true, saleRef: sale._id }] : []
+          const initialPayments = body.paid > 0 && Array.isArray(body.payments) && body.payments.length > 0
+            ? body.payments.map((p: { method: string; amount: number }) => ({ amount: p.amount, method: p.method, date: new Date(), fromSale: true, saleRef: sale._id }))
+            : body.paid > 0 ? [{ amount: body.paid, date: new Date(), fromSale: true, saleRef: sale._id }] : []
 
-      const saleNote = `Sotuv #${sale.receiptNo || sale._id}: ${formatPrice(body.total)}`
+          const saleNote = `Sotuv #${sale.receiptNo || sale._id}: ${formatPrice(body.total)}`
 
-      // Xuddi shu nomdagi aktiv qarzni topish
-      const existingDebt = await Debt.findOne({ customerName: trimmedName, status: 'active', type: 'customer' })
-
-      if (existingDebt) {
-        existingDebt.totalAmount = Math.round(existingDebt.totalAmount * 100 + body.total * 100) / 100
-        existingDebt.paidAmount = Math.round(existingDebt.paidAmount * 100 + (body.paid || 0) * 100) / 100
-        existingDebt.remainingAmount = Math.round(existingDebt.remainingAmount * 100 + remaining * 100) / 100
-        for (const p of initialPayments) existingDebt.payments.push(p)
-        existingDebt.entries.push({ amount: body.total, paidAmount: body.paid || 0, note: saleNote, date: new Date(), sale: sale._id })
-        if (trimmedPhone && !existingDebt.customerPhone) existingDebt.customerPhone = trimmedPhone
-        await existingDebt.save()
-        await Sale.findByIdAndUpdate(sale._id, { debt: existingDebt._id })
-        return NextResponse.json({ sale, debt: existingDebt }, { status: 201 })
-      }
-
-      const debt = await Debt.create({
-        customerName: trimmedName,
-        customerPhone: trimmedPhone || undefined,
-        totalAmount: body.total,
-        paidAmount: body.paid || 0,
-        remainingAmount: remaining,
-        payments: initialPayments,
-        entries: [{ amount: body.total, paidAmount: body.paid || 0, note: saleNote, date: new Date(), sale: sale._id }],
-        type: 'customer',
-        sale: sale._id,
+          // Atomic find-or-create: upsert eliminates the duplicate-debt race
+          const debt = await Debt.findOneAndUpdate(
+            { customerName: trimmedName, status: 'active', type: 'customer' },
+            {
+              $inc: { totalAmount: body.total, paidAmount: body.paid || 0, remainingAmount: remaining },
+              $push: {
+                entries: { amount: body.total, paidAmount: body.paid || 0, note: saleNote, date: new Date(), sale: sale._id },
+                payments: { $each: initialPayments },
+              },
+              $setOnInsert: { customerPhone: trimmedPhone || undefined, sale: sale._id },
+            },
+            { upsert: true, new: true, session }
+          )
+          await Sale.findByIdAndUpdate(sale._id, { debt: debt._id }, { session })
+          result = { sale, debt }
+        } else {
+          result = { sale }
+        }
       })
-      await Sale.findByIdAndUpdate(sale._id, { debt: debt._id })
-      return NextResponse.json({ sale, debt }, { status: 201 })
+    } finally {
+      await session.endSession()
     }
-
-    return NextResponse.json({ sale }, { status: 201 })
-  } catch (err) { return errorResponse(err) }
+    return NextResponse.json(result!, { status: 201 })
+  } catch (err) {
+    const e = err as { statusCode?: number; message?: string }
+    if (e?.statusCode === 400) return NextResponse.json({ error: e.message }, { status: 400 })
+    return errorResponse(err)
+  }
 }

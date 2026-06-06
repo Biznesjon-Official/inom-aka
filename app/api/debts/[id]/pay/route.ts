@@ -3,7 +3,7 @@ import { connectDB } from '@/lib/db'
 import { errorResponse } from '@/lib/api-utils'
 import Debt from '@/models/Debt'
 import Sale from '@/models/Sale'
-import { Types } from 'mongoose'
+import mongoose, { Types } from 'mongoose'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
@@ -19,100 +19,96 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Summa musbat bo\'lishi kerak' }, { status: 400 })
     }
 
-    const debt = await Debt.findById(id)
-    if (!debt) return NextResponse.json({ error: 'Qarz topilmadi' }, { status: 404 })
-
-    if (amount > debt.remainingAmount + 0.01) {
+    const debt0 = await Debt.findById(id)
+    if (!debt0) return NextResponse.json({ error: 'Qarz topilmadi' }, { status: 404 })
+    if (amount > debt0.remainingAmount + 0.01) {
       return NextResponse.json({ error: 'To\'lov summasi qolgan qarzdan ko\'p' }, { status: 400 })
     }
 
     const validMethod = ['cash', 'card', 'terminal'].includes(method) ? method : 'cash'
+    const collectedByOid = collectedBy ? new Types.ObjectId(collectedBy) : undefined
 
-    // Distribute payment across entries in order (oldest first)
-    // Track per-sale allocations to sync Sale.paid correctly
+    // Per-sale allocations (used after commit for cashback)
     const saleAllocations = new Map<string, number>()
-    let targetSaleId = debt.sale
-    
-    if (debt.entries?.length > 0) {
-      let remaining = amount
-      for (const entry of debt.entries) {
-        if (remaining <= 0.01) break
-        const entryRemaining = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0))
-        if (entryRemaining > 0.01) {
-          const allocated = Math.min(remaining, entryRemaining)
-          entry.paidAmount = Math.round((entry.paidAmount || 0) * 100 + allocated * 100) / 100
-          remaining = Math.round(remaining * 100 - allocated * 100) / 100
-          if (entry.sale) {
-            const saleKey = entry.sale.toString()
-            saleAllocations.set(saleKey, (saleAllocations.get(saleKey) || 0) + allocated)
-            if (!targetSaleId) targetSaleId = entry.sale
+    let targetSaleId: Types.ObjectId | undefined
+
+    // Atomic: debt update + Sale.paid sync committed together (sequential ops — one session)
+    const dbSession = await mongoose.startSession()
+    try {
+      await dbSession.withTransaction(async () => {
+        const debt = await Debt.findById(id).session(dbSession)
+        if (!debt) throw Object.assign(new Error('Qarz topilmadi'), { statusCode: 404 })
+
+        saleAllocations.clear()
+        targetSaleId = debt.sale
+
+        if (debt.entries?.length > 0) {
+          let remaining = amount
+          for (const entry of debt.entries) {
+            if (remaining <= 0.01) break
+            const entryRemaining = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0))
+            if (entryRemaining > 0.01) {
+              const allocated = Math.min(remaining, entryRemaining)
+              entry.paidAmount = Math.round((entry.paidAmount || 0) * 100 + allocated * 100) / 100
+              remaining = Math.round(remaining * 100 - allocated * 100) / 100
+              if (entry.sale) {
+                const saleKey = entry.sale.toString()
+                saleAllocations.set(saleKey, (saleAllocations.get(saleKey) || 0) + allocated)
+                if (!targetSaleId) targetSaleId = entry.sale
+              }
+            }
           }
         }
-      }
-    }
 
-    // Multi-entry debt: create separate payment entry per sale for accurate profit calculation
-    if (saleAllocations.size > 0) {
-      const allocEntries = [...saleAllocations]
-      const snaps = await Promise.all(
-        allocEntries.map(([saleId]) => Sale.findById(saleId).select('paid').lean() as Promise<{ paid: number } | null>)
-      )
-      allocEntries.forEach(([saleId, allocated], i) => {
-        debt.payments.push({
-          amount: allocated,
-          method: validMethod,
-          date: new Date(),
-          note,
-          saleRef: new Types.ObjectId(saleId),
-          salePayedBefore: snaps[i]?.paid || 0,
-          collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined,
-        })
+        if (saleAllocations.size > 0) {
+          const allocEntries = [...saleAllocations]
+          for (const [saleId, allocated] of allocEntries) {
+            const snap = await Sale.findById(saleId).select('paid').session(dbSession).lean() as { paid: number } | null
+            debt.payments.push({
+              amount: allocated, method: validMethod, date: new Date(), note,
+              saleRef: new Types.ObjectId(saleId), salePayedBefore: snap?.paid || 0, collectedBy: collectedByOid,
+            })
+          }
+          // Portion to non-sale entries (or unallocated) so payments[] = full amount
+          const allocatedTotal = allocEntries.reduce((s, [, a]) => s + a, 0)
+          const leftover = Math.round((amount - allocatedTotal) * 100) / 100
+          if (leftover > 0.01) {
+            debt.payments.push({ amount: leftover, method: validMethod, date: new Date(), note, collectedBy: collectedByOid })
+          }
+        } else {
+          let salePayedBefore = 0
+          if (targetSaleId) {
+            const saleSnap = await Sale.findById(targetSaleId).select('paid').session(dbSession).lean() as { paid: number } | null
+            salePayedBefore = saleSnap?.paid || 0
+          }
+          debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore, collectedBy: collectedByOid })
+        }
+
+        debt.paidAmount = Math.round((debt.paidAmount || 0) * 100 + amount * 100) / 100
+        debt.remainingAmount = Math.round(debt.remainingAmount * 100 - amount * 100) / 100
+        if (debt.remainingAmount < 0.01) {
+          debt.remainingAmount = 0
+          debt.status = 'paid'
+        }
+        await debt.save({ session: dbSession })
+
+        // Sync Sale.paid / Sale.payments (sequential within the transaction)
+        if (saleAllocations.size > 0) {
+          for (const [saleId, allocated] of saleAllocations) {
+            await Sale.findByIdAndUpdate(saleId, {
+              $inc: { paid: allocated },
+              $push: { payments: { method: validMethod, amount: allocated, date: new Date() } },
+            }, { session: dbSession })
+          }
+        } else if (targetSaleId) {
+          await Sale.findByIdAndUpdate(targetSaleId, {
+            $inc: { paid: amount },
+            $push: { payments: { method: validMethod, amount, date: new Date() } },
+          }, { session: dbSession })
+        }
       })
-      // Record any portion allocated to non-sale entries (or unallocated) so payments[] = full amount
-      const allocatedTotal = allocEntries.reduce((s, [, a]) => s + a, 0)
-      const leftover = Math.round((amount - allocatedTotal) * 100) / 100
-      if (leftover > 0.01) {
-        debt.payments.push({ amount: leftover, method: validMethod, date: new Date(), note, collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined })
-      }
-    } else {
-      // Single-entry debt: save sale.paid BEFORE this payment for accurate profit calculation
-      let salePayedBefore = 0
-      if (targetSaleId) {
-        const saleSnap = await Sale.findById(targetSaleId).select('paid').lean() as { paid: number } | null
-        salePayedBefore = saleSnap?.paid || 0
-      }
-      debt.payments.push({ amount, method: validMethod, date: new Date(), note, saleRef: targetSaleId, salePayedBefore, collectedBy: collectedBy ? new Types.ObjectId(collectedBy) : undefined })
-    }
-
-    debt.paidAmount = Math.round((debt.paidAmount || 0) * 100 + amount * 100) / 100
-    debt.remainingAmount = Math.round(debt.remainingAmount * 100 - amount * 100) / 100
-    
-    // Handle floating point precision
-    if (debt.remainingAmount < 0.01) {
-      debt.remainingAmount = 0
-      debt.status = 'paid'
-    }
-    
-    await debt.save()
-
-    // Sync Sale.paid and Sale.payments for each sale that received payment
-    if (saleAllocations.size > 0) {
-      await Promise.all([...saleAllocations].map(([saleId, allocated]) =>
-        Sale.findByIdAndUpdate(saleId, {
-          $inc: { paid: allocated },
-          $push: { payments: { method: validMethod, amount: allocated, date: new Date() } },
-        }).then(sale => {
-          if (!sale) console.warn(`Sale ${saleId} not found when updating payment`)
-        })
-      ))
-    } else if (targetSaleId) {
-      const sale = await Sale.findByIdAndUpdate(targetSaleId, {
-        $inc: { paid: amount },
-        $push: { payments: { method: validMethod, amount, date: new Date() } },
-      })
-      if (!sale) {
-        console.warn(`Sale ${targetSaleId} not found when updating payment`)
-      }
+    } finally {
+      await dbSession.endSession()
     }
 
     // Auto-record cashback for usta if the sale is linked to one
@@ -162,6 +158,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
-    return NextResponse.json(debt)
-  } catch (err) { return errorResponse(err) }
+    return NextResponse.json(await Debt.findById(id))
+  } catch (err) {
+    const e = err as { statusCode?: number; message?: string }
+    if (e?.statusCode) return NextResponse.json({ error: e.message }, { status: e.statusCode })
+    return errorResponse(err)
+  }
 }
