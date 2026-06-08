@@ -116,7 +116,6 @@ export default function QarzlarPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('active')
   const [filterCategory, setFilterCategory] = useState('all')
-  const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -145,37 +144,6 @@ export default function QarzlarPage() {
   const [editForm, setEditForm] = useState({ customerName: '', customerPhone: '' })
 
   const debouncedSearch = useDebounce(search, 400)
-
-  function getPresetDates(key: typeof activePreset): { from: string; to: string } {
-    const now = new Date()
-    const fmt = (d: Date) => {
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
-    }
-    switch (key) {
-      case 'today': return { from: fmt(now), to: fmt(now) }
-      case 'week': {
-        const start = new Date(now)
-        const day = now.getDay()
-        start.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
-        return { from: fmt(start), to: fmt(now) }
-      }
-      case 'month': return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) }
-      case 'year': return { from: fmt(new Date(now.getFullYear(), 0, 1)), to: fmt(now) }
-      default: return { from: fmt(now), to: fmt(now) }
-    }
-  }
-
-  const handlePreset = (key: typeof activePreset) => {
-    setActivePreset(key)
-    if (key !== 'custom') {
-      const { from, to } = getPresetDates(key)
-      setDateFrom(from)
-      setDateTo(to)
-    }
-  }
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/debt-categories?scope=customer')
@@ -215,14 +183,6 @@ export default function QarzlarPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchCategories() }, [fetchCategories])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { 
-    if (activePreset !== 'custom') {
-      const { from, to } = getPresetDates(activePreset)
-      setDateFrom(from)
-      setDateTo(to)
-    }
-  }, [activePreset])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchDebts() }, [fetchDebts])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -492,32 +452,11 @@ export default function QarzlarPage() {
 
       {/* Filters */}
       <div className="space-y-3">
-        {/* Date filter buttons */}
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'today' as const, label: 'Bugun' },
-            { key: 'week' as const, label: 'Hafta' },
-            { key: 'month' as const, label: 'Oy' },
-            { key: 'year' as const, label: 'Yil' },
-            { key: 'custom' as const, label: 'Tanlash' },
-          ].map(({ key, label }) => (
-            <Button key={key} variant={activePreset === key ? 'default' : 'outline'} size="sm"
-              onClick={() => handlePreset(key)}>
-              {label}
-            </Button>
-          ))}
+        {/* Sana (bitta kun) */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500">Sana:</span>
+          <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateTo(e.target.value) }} className="w-48" />
         </div>
-
-        {/* Custom date range */}
-        {activePreset === 'custom' && (
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div className="flex items-center gap-2 flex-1">
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1" />
-              <span className="text-slate-400">—</span>
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1" />
-            </div>
-          </div>
-        )}
 
         {/* Search bar */}
         <div className="flex gap-3 flex-wrap">

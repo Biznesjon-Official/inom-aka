@@ -288,14 +288,10 @@ function SotuvlarContent() {
         ))}
       </div>
 
-      {/* Custom date range */}
+      {/* Custom: bitta kunni tanlash */}
       {activePreset === 'custom' && (
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="flex items-center gap-2 flex-1">
-            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1" />
-            <span className="text-slate-400">—</span>
-            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1" />
-          </div>
+        <div className="flex items-center gap-2">
+          <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateTo(e.target.value) }} className="w-48" />
         </div>
       )}
 
@@ -319,9 +315,9 @@ function SotuvlarContent() {
           {!idsMode && !debouncedSearch && activePreset === 'week' && <span className="font-medium text-blue-600">📅 Bu hafta</span>}
           {!idsMode && !debouncedSearch && activePreset === 'month' && <span className="font-medium text-blue-600">📅 Bu oy</span>}
           {!idsMode && !debouncedSearch && activePreset === 'year' && <span className="font-medium text-blue-600">📅 Bu yil</span>}
-          {!idsMode && !debouncedSearch && activePreset === 'custom' && dateFrom && dateTo && (
+          {!idsMode && !debouncedSearch && activePreset === 'custom' && dateFrom && (
             <span className="font-medium text-blue-600">
-              📅 {new Date(dateFrom).toLocaleDateString('uz-UZ')} - {new Date(dateTo).toLocaleDateString('uz-UZ')}
+              📅 {new Date(dateFrom).toLocaleDateString('uz-UZ')}
             </span>
           )}
           <span className="text-slate-300 hidden sm:inline">|</span>
