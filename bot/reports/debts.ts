@@ -4,7 +4,8 @@ import { sendToAll, sendTo } from '../utils/send'
 import { formatPrice, escapeHTML, formatDate } from '../utils/format'
 
 export async function sendDebtsReport(bot: any, chatId?: string | number): Promise<void> {
-  const debts = await Debt.find({ status: 'active' })
+  // Same filter as the Qarz daftarcha page (/api/debts): customer debts only
+  const debts = await Debt.find({ status: 'active', $or: [{ type: 'customer' }, { type: { $exists: false } }] })
     .populate('customer', 'name phone')
     .sort({ remainingAmount: -1 })
     .lean()
@@ -19,8 +20,9 @@ export async function sendDebtsReport(bot: any, chatId?: string | number): Promi
   const lines: string[] = ['<b>QARZDORLAR HISOBOTI</b>', '━━━━━━━━━━━━━━━━━━━━']
 
   debts.forEach((debt: any, i: number) => {
-    const name = escapeHTML(debt.customer?.name || 'Noma\'lum')
-    const phone = debt.customer?.phone || '-'
+    // Debt doc fields first — debt-only customers have no Customer document
+    const name = escapeHTML(debt.customerName || debt.customer?.name || 'Noma\'lum')
+    const phone = debt.customerPhone || debt.customer?.phone || '-'
     const date = formatDate(new Date(debt.createdAt))
     total += debt.remainingAmount
 
