@@ -105,15 +105,46 @@ export async function GET(req: Request) {
       }
     }
 
+    // Period totals for the FULL match (no limit) — aggregation mirror of
+    // calcSaleRevenue/calcSaleDebt/calcSaleProfit in lib/utils.ts
+    if (searchParams.get('stats') === '1') {
+      const [s] = await Sale.aggregate([
+        { $match: matchStage },
+        { $project: {
+          _cost: { $sum: { $map: { input: { $ifNull: ['$items', []] }, as: 'i', in: { $multiply: [{ $ifNull: ['$$i.costPrice', 0] }, '$$i.qty'] } } } },
+          _retCost: { $sum: { $map: { input: { $ifNull: ['$returnedItems', []] }, as: 'i', in: { $multiply: [{ $ifNull: ['$$i.costPrice', 0] }, '$$i.qty'] } } } },
+          _revenue: { $subtract: ['$paid', { $max: [0, { $subtract: [{ $ifNull: ['$returnedTotal', 0] }, { $subtract: ['$total', '$paid'] }] }] }] },
+          _debt: { $max: [0, { $subtract: [{ $subtract: ['$total', '$paid'] }, { $ifNull: ['$returnedTotal', 0] }] }] },
+          _net: { $subtract: ['$total', { $ifNull: ['$returnedTotal', 0] }] },
+        } },
+        // profit is clamped per sale BEFORE summing (matches calcSaleProfit semantics)
+        { $project: { _revenue: 1, _debt: 1, _net: 1,
+          _profit: { $max: [0, { $subtract: ['$_revenue', { $subtract: ['$_cost', '$_retCost'] }] }] } } },
+        { $group: { _id: null,
+          totalRevenue: { $sum: '$_revenue' }, totalDebt: { $sum: '$_debt' },
+          totalSales: { $sum: '$_net' }, totalProfit: { $sum: '$_profit' }, count: { $sum: 1 } } },
+        { $project: { _id: 0 } },
+      ]).allowDiskUse(true)
+      return NextResponse.json(s ?? { totalRevenue: 0, totalDebt: 0, totalSales: 0, totalProfit: 0, count: 0 })
+    }
+
+    const page = Math.max(0, parseInt(searchParams.get('page') || '0', 10) || 0)
+    const limit = Math.min(100, parseInt(searchParams.get('limit') || '30', 10) || 30)
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pipeline: any[] = [
       { $match: matchStage },
-      { $sort: { createdAt: -1 } },
+      { $sort: { createdAt: -1, _id: -1 } },
     ]
 
-    // Cap result set — unbounded search returned 1000+ rows and froze the UI.
-    // Sorted newest-first, so search shows the 200 most recent matches.
-    pipeline.push({ $limit: search ? 200 : 100 })
+    if (page > 0) {
+      // Paginated mode: skip/limit before lookups, fetch one extra doc for hasMore
+      pipeline.push({ $skip: (page - 1) * limit }, { $limit: limit + 1 })
+    } else {
+      // Legacy mode (SalesLog, ustalar): cap result set — unbounded search
+      // returned 1000+ rows and froze the UI.
+      pipeline.push({ $limit: search ? 200 : 100 })
+    }
 
     // Add lookups for related data
     pipeline.push(
@@ -151,6 +182,10 @@ export async function GET(req: Request) {
 
     const sales = await Sale.aggregate(pipeline).allowDiskUse(true)
 
+    if (page > 0) {
+      const hasMore = sales.length > limit
+      return NextResponse.json({ items: hasMore ? sales.slice(0, limit) : sales, hasMore })
+    }
     return NextResponse.json(sales)
   } catch (err) { return errorResponse(err) }
 }

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, CreditCard, Plus, List, LayoutGrid, Trash2, Settings2, ExternalLink, Printer, Pencil } from 'lucide-react'
@@ -109,21 +109,23 @@ function PaymentHistory({ payments, paidAmount }: { payments: Debt['payments']; 
   )
 }
 
+const PAGE_SIZE = 30
+
 export default function QarzlarPage() {
   const router = useRouter()
   const [debts, setDebts] = useState<Debt[]>([])
+  const [stats, setStats] = useState<{ totalDebt: number; byCategory: Record<string, number> } | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [listLoading, setListLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const pageRef = useRef(1)
+  const fetchSeqRef = useRef(0)
+  const loadingMoreRef = useRef(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [categories, setCategories] = useState<DebtCategory[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('active')
   const [filterCategory, setFilterCategory] = useState('all')
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })
-  const [dateTo, setDateTo] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })
   const [payDialog, setPayDialog] = useState(false)
   const [addDialog, setAddDialog] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
@@ -161,32 +163,57 @@ export default function QarzlarPage() {
     }
   }, [])
 
-  const fetchDebts = useCallback(async () => {
+  const fetchStats = useCallback(async () => {
+    const res = await fetch('/api/debts?stats=1')
+    if (res.ok) setStats(await res.json())
+  }, [])
+
+  const fetchPage = useCallback(async (page: number, reset: boolean) => {
+    const seq = reset ? ++fetchSeqRef.current : fetchSeqRef.current
+    if (reset) setListLoading(true)
+    else { loadingMoreRef.current = true; setLoadingMore(true) }
     const params = new URLSearchParams()
     params.set('status', status)
+    params.set('page', String(page))
+    params.set('limit', String(PAGE_SIZE))
     if (filterCategory !== 'all') params.set('category', filterCategory)
-    if (debouncedSearch) {
-      params.set('search', debouncedSearch)
-    } else if (dateFrom && dateTo) {
-      const startOfDay = new Date(dateFrom)
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date(dateTo)
-      endOfDay.setHours(23, 59, 59, 999)
-      params.set('from', startOfDay.toISOString())
-      params.set('to', endOfDay.toISOString())
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    try {
+      const res = await fetch(`/api/debts?${params}`)
+      if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
+      const data = await res.json()
+      if (seq !== fetchSeqRef.current) return // filter changed mid-flight — drop stale response
+      setDebts(prev => {
+        if (reset) return data.items
+        const seen = new Set(prev.map((d: Debt) => d._id))
+        return [...prev, ...data.items.filter((d: Debt) => !seen.has(d._id))]
+      })
+      setHasMore(data.hasMore)
+      pageRef.current = page
+    } finally {
+      if (seq === fetchSeqRef.current) { setListLoading(false); loadingMoreRef.current = false; setLoadingMore(false) }
     }
-    const res = await fetch(`/api/debts?${params}`)
-    if (!res.ok) return toast.error('Qarzlarni yuklashda xato')
-    const data = await res.json()
-    setDebts(Array.isArray(data) ? data : [])
-  }, [status, filterCategory, debouncedSearch, dateFrom, dateTo])
+  }, [status, filterCategory, debouncedSearch])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchCategories() }, [fetchCategories])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchDebts() }, [fetchDebts])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchStats() }, [fetchStats])
   useEffect(() => { fetchTodayStats() }, [fetchTodayStats])
+
+  // Filter/search/tab change resets pagination to page 1
+  useEffect(() => { setDebts([]); setHasMore(true); fetchPage(1, true) }, [fetchPage])
+
+  // Infinite scroll: load next page when sentinel becomes visible
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !loadingMoreRef.current) fetchPage(pageRef.current + 1, false)
+    }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [fetchPage, hasMore, listLoading, viewMode])
+
+  const refreshAll = useCallback(() => { fetchPage(1, true); fetchStats(); fetchTodayStats() }, [fetchPage, fetchStats, fetchTodayStats])
 
   const debtorName = (d: Debt) => d.customerName || d.customer?.name || ''
   const debtorPhone = (d: Debt) => d.customerPhone || d.customer?.phone || ''
@@ -252,13 +279,8 @@ export default function QarzlarPage() {
 
   const filtered = debts
 
-  const totalDebt = filtered.filter(d => d.status === 'active').reduce((s, d) => s + d.remainingAmount, 0)
-
-  const totalByCategory: Record<string, number> = {}
-  for (const d of filtered.filter(x => x.status === 'active')) {
-    const key = d.category?._id || 'other'
-    totalByCategory[key] = (totalByCategory[key] || 0) + d.remainingAmount
-  }
+  const totalDebt = stats?.totalDebt || 0
+  const totalByCategory: Record<string, number> = stats?.byCategory || {}
 
   async function addCategory() {
     if (!newCat.name.trim()) return
@@ -303,7 +325,7 @@ export default function QarzlarPage() {
     toast.success('Qarz qo\'shildi')
     setAddDialog(false)
     setAddForm({ customerName: '', customerPhone: '', amount: '', note: '', categoryId: '' })
-    fetchDebts()
+    refreshAll()
   }
 
   async function handlePay() {
@@ -327,7 +349,7 @@ export default function QarzlarPage() {
     setAmount('')
     setNote('')
     setPayMethod('cash')
-    fetchDebts()
+    refreshAll()
   }
 
   function openDeleteDialog(d: Debt) {
@@ -342,7 +364,7 @@ export default function QarzlarPage() {
     toast.success('Butun qarz o\'chirildi')
     setDeleteDialog(false)
     setDeleteDebt(null)
-    fetchDebts()
+    refreshAll()
   }
 
   async function handleDeleteRemaining() {
@@ -356,7 +378,7 @@ export default function QarzlarPage() {
     toast.success('Qolgan qarz o\'chirildi')
     setDeleteDialog(false)
     setDeleteDebt(null)
-    fetchDebts()
+    refreshAll()
   }
 
   async function handleEdit() {
@@ -372,7 +394,7 @@ export default function QarzlarPage() {
     toast.success('Ma\'lumotlar yangilandi')
     setEditDialog(false)
     setEditDebt(null)
-    fetchDebts()
+    refreshAll()
   }
 
   return (
@@ -450,20 +472,11 @@ export default function QarzlarPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="space-y-3">
-        {/* Sana (bitta kun) */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500">Sana:</span>
-          <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateTo(e.target.value) }} className="w-48" />
-        </div>
-
-        {/* Search bar */}
-        <div className="flex gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
+      {/* Search bar */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input placeholder="Qidirish..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -675,7 +688,7 @@ export default function QarzlarPage() {
             </tbody>
           </table>
           </div>
-          {filtered.length === 0 && <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>}
+          {!listLoading && filtered.length === 0 && <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>}
         </div>
       ) : (
         <div className="space-y-3">
@@ -788,9 +801,13 @@ export default function QarzlarPage() {
               </CardContent>
             </Card>
           ))}
-          {filtered.length === 0 && <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>}
+          {!listLoading && filtered.length === 0 && <div className="text-center text-slate-400 py-12">Qarz topilmadi</div>}
         </div>
       )}
+
+      {listLoading && <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>}
+      {hasMore && !listLoading && <div ref={sentinelRef} className="h-1" />}
+      {loadingMore && <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>}
 
       {/* Category management dialog */}
       <Dialog open={catDialog} onOpenChange={setCatDialog}>

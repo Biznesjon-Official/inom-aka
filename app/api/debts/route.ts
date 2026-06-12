@@ -37,25 +37,29 @@ export async function GET(req: Request) {
       return NextResponse.json(results)
     }
 
+    // Global active-debt totals — fast path, no lookups, ignores pagination
+    if (searchParams.get('stats') === '1') {
+      const rows = await Debt.aggregate([
+        { $match: { $or: [{ type: 'customer' }, { type: { $exists: false } }], status: 'active' } },
+        { $group: { _id: { $ifNull: ['$category', 'other'] }, total: { $sum: '$remainingAmount' } } },
+      ]).allowDiskUse(true)
+      const byCategory: Record<string, number> = {}
+      let totalDebt = 0
+      for (const r of rows) { byCategory[String(r._id)] = r.total; totalDebt += r.total }
+      return NextResponse.json({ totalDebt, byCategory })
+    }
+
     const search = searchParams.get('search')
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
+    const page = Math.max(0, parseInt(searchParams.get('page') || '0', 10) || 0)
+    const limit = Math.min(100, parseInt(searchParams.get('limit') || '30', 10) || 30)
 
     const matchStage: Record<string, unknown> = {}
     matchStage.$or = [{ type: 'customer' }, { type: { $exists: false } }]
-    
+
     if (status) matchStage.status = status
     if (customer) matchStage.customer = new Types.ObjectId(customer)
     if (category) matchStage.category = new Types.ObjectId(category)
-    
-    // Date filtering
-    if (from || to) {
-      const dateFilter: { $gte?: Date; $lte?: Date } = {}
-      if (from) dateFilter.$gte = new Date(from)
-      if (to) dateFilter.$lte = new Date(to)
-      matchStage.createdAt = dateFilter
-    }
-    
+
     if (search) {
       const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const regex = new RegExp(escapedSearch, 'i')
@@ -68,7 +72,9 @@ export async function GET(req: Request) {
 
     const debts = await Debt.aggregate([
       { $match: matchStage },
-      { $sort: { createdAt: -1 } },
+      { $sort: { createdAt: -1, _id: -1 } },
+      // Paginate before the heavy lookups so they only run on the current page
+      ...(page > 0 ? [{ $skip: (page - 1) * limit }, { $limit: limit + 1 }] : []),
       {
         $lookup: {
           from: 'debtcategories',
@@ -159,6 +165,10 @@ export async function GET(req: Request) {
       { $project: { entrySales: 0, paymentCollectors: 0 } }
     ]).allowDiskUse(true)
 
+    if (page > 0) {
+      const hasMore = debts.length > limit
+      return NextResponse.json({ items: hasMore ? debts.slice(0, limit) : debts, hasMore })
+    }
     return NextResponse.json(debts)
   } catch (err) { return errorResponse(err) }
 }

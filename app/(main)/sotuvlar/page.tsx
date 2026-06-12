@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useCallback, useEffect, Suspense } from 'react'
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -38,6 +38,16 @@ interface Sale {
   createdAt: string
 }
 
+const PAGE_SIZE = 30
+
+interface SalesStats {
+  totalRevenue: number
+  totalDebt: number
+  totalSales: number
+  totalProfit: number
+  count: number
+}
+
 function SotuvlarContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -49,7 +59,14 @@ function SotuvlarContent() {
 
   const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
   const [sales, setSales] = useState<Sale[]>([])
+  const [stats, setStats] = useState<SalesStats | null>(null)
   const [loading, setLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const pageRef = useRef(1)
+  const fetchSeqRef = useRef(0)
+  const loadingMoreRef = useRef(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
   const [activePreset, setActivePreset] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today')
   const [dateFrom, setDateFrom] = useState(() => {
@@ -107,40 +124,61 @@ function SotuvlarContent() {
     }
   }
 
-  const fetchSales = useCallback(async () => {
+  // Shared query params for list and stats — keeps both in sync
+  const buildParams = useCallback(() => {
+    const params = new URLSearchParams()
+    if (debouncedSearch) {
+      params.set('search', debouncedSearch)
+    } else if (dateFrom && dateTo) {
+      const startOfDay = new Date(dateFrom)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(dateTo)
+      endOfDay.setHours(23, 59, 59, 999)
+      params.set('from', startOfDay.toISOString())
+      params.set('to', endOfDay.toISOString())
+    }
+    return params
+  }, [debouncedSearch, dateFrom, dateTo])
+
+  const fetchStats = useCallback(async () => {
+    if (!isAdmin || idsMode) return
+    const params = buildParams()
+    params.set('stats', '1')
+    const res = await fetch(`/api/sales?${params}`)
+    if (res.ok) setStats(await res.json())
+  }, [isAdmin, idsMode, buildParams])
+
+  const fetchPage = useCallback(async (page: number, reset: boolean) => {
     if (idsMode) return  // ids mode uses separate fetch
-    setLoading(true)
+    const seq = reset ? ++fetchSeqRef.current : fetchSeqRef.current
+    if (reset) setLoading(true)
+    else { loadingMoreRef.current = true; setLoadingMore(true) }
     try {
-      const params = new URLSearchParams()
-
-      if (debouncedSearch) {
-        params.set('search', debouncedSearch)
-      } else if (dateFrom && dateTo) {
-        const startOfDay = new Date(dateFrom)
-        startOfDay.setHours(0, 0, 0, 0)
-        const endOfDay = new Date(dateTo)
-        endOfDay.setHours(23, 59, 59, 999)
-        params.set('from', startOfDay.toISOString())
-        params.set('to', endOfDay.toISOString())
-      } else {
-        params.set('today', '1')
-      }
-
+      const params = buildParams()
+      params.set('page', String(page))
+      params.set('limit', String(PAGE_SIZE))
       const res = await fetch(`/api/sales?${params}`)
-      if (res.ok) {
-        setSales(await res.json())
-      } else {
-        toast.error('Sotuvlarni yuklashda xato')
-      }
+      if (!res.ok) return toast.error('Sotuvlarni yuklashda xato')
+      const data = await res.json()
+      if (seq !== fetchSeqRef.current) return // filter changed mid-flight — drop stale response
+      setSales(prev => {
+        if (reset) return data.items
+        const seen = new Set(prev.map((s: Sale) => s._id))
+        return [...prev, ...data.items.filter((s: Sale) => !seen.has(s._id))]
+      })
+      setHasMore(data.hasMore)
+      pageRef.current = page
     } catch {
       toast.error('Tarmoq xatosi')
     } finally {
-      setLoading(false)
+      if (seq === fetchSeqRef.current) { setLoading(false); loadingMoreRef.current = false; setLoadingMore(false) }
     }
-  }, [dateFrom, dateTo, idsMode, debouncedSearch])
+  }, [idsMode, buildParams])
+
+  const refreshAll = useCallback(() => { fetchPage(1, true); fetchStats() }, [fetchPage, fetchStats])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { 
+  useEffect(() => {
     if (activePreset !== 'custom') {
       const { from, to } = getPresetDates(activePreset)
       setDateFrom(from)
@@ -148,8 +186,24 @@ function SotuvlarContent() {
     }
   }, [activePreset])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchSales() }, [fetchSales])
+  useEffect(() => { fetchStats() }, [fetchStats])
+
+  // Filter/search change resets pagination to page 1
+  useEffect(() => {
+    if (idsMode) return
+    setSales([]); setHasMore(true); fetchPage(1, true)
+  }, [fetchPage, idsMode])
+
+  // Infinite scroll: load next page when sentinel becomes visible
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !loadingMoreRef.current) fetchPage(pageRef.current + 1, false)
+    }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [fetchPage, hasMore, loading, viewMode])
 
   // ids mode: fetch specific sales
   useEffect(() => {
@@ -232,14 +286,16 @@ function SotuvlarContent() {
     const result = await res.json()
     toast.success(`${formatPrice(result.returnTotal)} qaytarildi`)
     setReturnDialog(false)
-    fetchSales()
+    refreshAll()
     router.refresh()
   }
 
-  const totalRevenue = filtered.reduce((s, x) => s + calcSaleRevenue(x), 0)
-  const totalDebt = filtered.reduce((s, x) => s + calcSaleDebt(x), 0)
-  const totalSales = filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0)
-  const totalProfit = filtered.reduce((s, x) => s + calcSaleProfit(x), 0)
+  // ids mode has no server stats — compute from the (small) loaded list
+  const totalRevenue = idsMode ? filtered.reduce((s, x) => s + calcSaleRevenue(x), 0) : (stats?.totalRevenue || 0)
+  const totalDebt = idsMode ? filtered.reduce((s, x) => s + calcSaleDebt(x), 0) : (stats?.totalDebt || 0)
+  const totalSales = idsMode ? filtered.reduce((s, x) => s + x.total - (x.returnedTotal || 0), 0) : (stats?.totalSales || 0)
+  const totalProfit = idsMode ? filtered.reduce((s, x) => s + calcSaleProfit(x), 0) : (stats?.totalProfit || 0)
+  const salesCount = idsMode ? filtered.length : (stats?.count ?? 0)
 
   return (
     <div className="space-y-4">
@@ -254,7 +310,7 @@ function SotuvlarContent() {
               <List className="w-4 h-4 text-slate-600" />
             </button>
           </div>
-          <Button variant="ghost" size="sm" onClick={fetchSales} disabled={loading}>
+          <Button variant="ghost" size="sm" onClick={refreshAll} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
             Yangilash
           </Button>
@@ -321,7 +377,7 @@ function SotuvlarContent() {
             </span>
           )}
           <span className="text-slate-300 hidden sm:inline">|</span>
-          <span className="w-full sm:w-auto">{filtered.length} ta sotuv</span>
+          <span className="w-full sm:w-auto">{salesCount} ta sotuv</span>
         </div>
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-sm text-slate-600">
           <span>Jami: <span className="font-bold text-slate-800 block sm:inline">{formatPrice(totalSales)}</span></span>
@@ -551,6 +607,10 @@ function SotuvlarContent() {
           )}
         </div>
       )}
+
+      {loading && <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>}
+      {!idsMode && hasMore && !loading && <div ref={sentinelRef} className="h-1" />}
+      {loadingMore && <div className="text-center text-slate-400 py-4 text-sm">Yuklanmoqda...</div>}
 
       {/* Return dialog */}
       <Dialog open={returnDialog} onOpenChange={setReturnDialog}>
