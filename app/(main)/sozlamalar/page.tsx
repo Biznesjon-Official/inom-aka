@@ -16,7 +16,6 @@ const DEFAULTS = {
   shopAddress: '',
   receiptFooter: 'Rahmat! Yana tashrif buyuring.',
   qrEnabled: false,
-  qrImage: '/qr.png',
   qrText: "To'lov uchun skanerlang",
 }
 
@@ -62,7 +61,6 @@ export default function SozlamalarPage() {
           shopAddress: data.shopAddress || prev.shopAddress,
           receiptFooter: data.receiptFooter || prev.receiptFooter,
           qrEnabled: data.qrEnabled ?? prev.qrEnabled,
-          qrImage: data.qrImage || prev.qrImage,
           qrText: data.qrText || prev.qrText,
         }))
       })
@@ -178,17 +176,10 @@ export default function SozlamalarPage() {
                 <Switch id="qrEnabled" checked={form.qrEnabled} onCheckedChange={v => setForm(prev => ({ ...prev, qrEnabled: v }))} />
               </div>
               {form.qrEnabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="qrImage">QR rasm yo&apos;li</Label>
-                    <Input id="qrImage" value={form.qrImage} onChange={set('qrImage')} placeholder="/qr.png" />
-                    <p className="text-xs text-muted-foreground">Rasmni <code>public</code> papkaga joylang (masalan <code>public/qr.png</code> → <code>/qr.png</code>)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="qrText">QR ustidagi matn</Label>
-                    <Input id="qrText" value={form.qrText} onChange={set('qrText')} placeholder="To'lov uchun skanerlang" />
-                  </div>
-                </>
+                <div className="space-y-2">
+                  <Label htmlFor="qrText">QR ustidagi matn</Label>
+                  <Input id="qrText" value={form.qrText} onChange={set('qrText')} placeholder="To'lov uchun skanerlang" />
+                </div>
               )}
             </div>
 

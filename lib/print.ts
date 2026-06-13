@@ -71,13 +71,12 @@ export async function printReceipt(data: {
   shopPhone?: string
   receiptFooter?: string
   qrEnabled?: boolean
-  qrImage?: string
   qrText?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
   const shopPhone = data.shopPhone || ''
   const receiptFooter = data.receiptFooter || 'Rahmat! Yana tashrif buyuring.'
-  const showQr = data.qrEnabled && !!data.qrImage
+  const showQr = !!data.qrEnabled
   const date = data.createdAt || new Date()
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
   const change = data.paid - data.total
@@ -234,7 +233,7 @@ export async function printReceipt(data: {
   <div class="footer">${receiptFooter}<br>${shopName}</div>
   ${showQr ? `<div class="qr">
     ${data.qrText ? `<div class="qr-text">${data.qrText}</div>` : ''}
-    <img src="${data.qrImage}" alt="QR" />
+    <img src="${window.location.origin}/qr.svg" alt="QR" />
   </div>` : ''}
 </body>
 </html>`
