@@ -34,7 +34,7 @@ interface Sale {
   createdAt: string
 }
 
-export default function SalesLog({ cashierId, shopSettings }: { cashierId?: string; shopSettings?: { shopName?: string; shopPhone?: string; receiptFooter?: string } }) {
+export default function SalesLog({ cashierId, shopSettings }: { cashierId?: string; shopSettings?: { shopName?: string; shopPhone?: string; receiptFooter?: string; qrEnabled?: boolean; qrImage?: string; qrText?: string } }) {
   const [sales, setSales] = useState<Sale[]>([])
   const [debtPayments, setDebtPayments] = useState<{ _id: string; customerName: string; totalAmount: number; todayPaid: number; todayPayments: { amount: number; method: string; date: string }[] }[]>([])
   const [loading, setLoading] = useState(false)
@@ -160,6 +160,9 @@ export default function SalesLog({ cashierId, shopSettings }: { cashierId?: stri
                           shopName: shopSettings?.shopName,
                           shopPhone: shopSettings?.shopPhone,
                           receiptFooter: shopSettings?.receiptFooter,
+                          qrEnabled: shopSettings?.qrEnabled,
+                          qrImage: shopSettings?.qrImage,
+                          qrText: shopSettings?.qrText,
                         })}
                       >
                         <Printer className="w-3 h-3 text-blue-400" />

@@ -70,10 +70,14 @@ export async function printReceipt(data: {
   shopName?: string
   shopPhone?: string
   receiptFooter?: string
+  qrEnabled?: boolean
+  qrImage?: string
+  qrText?: string
 }) {
   const shopName = data.shopName || "Inomaka Do'kon"
   const shopPhone = data.shopPhone || ''
   const receiptFooter = data.receiptFooter || 'Rahmat! Yana tashrif buyuring.'
+  const showQr = data.qrEnabled && !!data.qrImage
   const date = data.createdAt || new Date()
   const dateStr = date.toLocaleDateString('uz-UZ') + ' ' + date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
   const change = data.paid - data.total
@@ -167,11 +171,14 @@ export async function printReceipt(data: {
     margin: 2mm 0; 
     font-size: 16px; 
   }
-  .footer { 
-    text-align: center; 
-    font-size: 12px; 
-    margin-top: 3mm; 
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    margin-top: 3mm;
   }
+  .qr { text-align: center; margin-top: 3mm; }
+  .qr-text { font-size: 11px; margin-bottom: 1mm; }
+  .qr img { width: 30mm; height: 30mm; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -225,6 +232,10 @@ export async function printReceipt(data: {
   ${change > 0 ? `<div class="info"><span>Qaytim:</span><span class="bold">${change.toLocaleString('uz-UZ')} so'm</span></div>` : ''}
   ${debt > 0 ? `<div class="debt-line">⚠ QARZ: ${debt.toLocaleString('uz-UZ')} so'm</div>` : ''}
   <div class="footer">${receiptFooter}<br>${shopName}</div>
+  ${showQr ? `<div class="qr">
+    ${data.qrText ? `<div class="qr-text">${data.qrText}</div>` : ''}
+    <img src="${data.qrImage}" alt="QR" />
+  </div>` : ''}
 </body>
 </html>`
   openPrintWindow(html)
@@ -378,8 +389,27 @@ function openPrintWindow(html: string) {
   win.document.write(html)
   win.document.close()
   win.focus()
-  setTimeout(() => {
+
+  let done = false
+  const doPrint = () => {
+    if (done) return
+    done = true
     win.print()
     win.close()
-  }, 300)
+  }
+
+  // Wait for images (QR, barcode) to finish loading before printing
+  const imgs = Array.from(win.document.images)
+  const pending = imgs.filter(img => !img.complete)
+  if (pending.length) {
+    let left = pending.length
+    const onDone = () => { if (--left === 0) doPrint() }
+    pending.forEach(img => {
+      img.addEventListener('load', onDone, { once: true })
+      img.addEventListener('error', onDone, { once: true })
+    })
+    setTimeout(doPrint, 2000) // fallback
+  } else {
+    setTimeout(doPrint, 300)
+  }
 }

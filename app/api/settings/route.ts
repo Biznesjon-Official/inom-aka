@@ -21,7 +21,7 @@ export async function PUT(req: Request) {
   try {
     await connectDB()
     const { key, value } = await req.json()
-    const allowedKeys = ['shopName', 'shopPhone', 'shopAddress', 'receiptHeader', 'receiptFooter', 'currency', 'lowStockThreshold']
+    const allowedKeys = ['shopName', 'shopPhone', 'shopAddress', 'receiptHeader', 'receiptFooter', 'currency', 'lowStockThreshold', 'qrEnabled', 'qrImage', 'qrText']
     if (!key || !allowedKeys.includes(key)) {
       return NextResponse.json({ error: `Invalid key. Allowed: ${allowedKeys.join(', ')}` }, { status: 400 })
     }

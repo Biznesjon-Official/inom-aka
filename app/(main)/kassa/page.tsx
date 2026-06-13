@@ -41,7 +41,7 @@ interface SavedCart {
 
 export default function KassaPage() {
   const { data: session } = useSession()
-  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>({})
+  const [shopSettings, setShopSettings] = useState<{ shopName?: string; shopPhone?: string; receiptFooter?: string; qrEnabled?: boolean; qrImage?: string; qrText?: string }>({})
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [payDialog, setPayDialog] = useState(false)
@@ -60,7 +60,7 @@ export default function KassaPage() {
   const [saveName, setSaveName] = useState('')
 
   useEffect(() => {
-    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string }>().then(setShopSettings)
+    getSettings<{ shopName?: string; shopPhone?: string; receiptFooter?: string; qrEnabled?: boolean; qrImage?: string; qrText?: string }>().then(setShopSettings)
   }, [])
 
   const debouncedSearch = useDebounce(search)
@@ -272,6 +272,9 @@ export default function KassaPage() {
       shopName: shopSettings.shopName,
       shopPhone: shopSettings.shopPhone,
       receiptFooter: shopSettings.receiptFooter,
+      qrEnabled: shopSettings.qrEnabled,
+      qrImage: shopSettings.qrImage,
+      qrText: shopSettings.qrText,
     })
 
     const debt = finalTotal - paid
