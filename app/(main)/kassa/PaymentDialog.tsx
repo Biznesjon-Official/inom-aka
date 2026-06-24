@@ -188,7 +188,7 @@ export const PaymentDialog = React.memo(function PaymentDialog({
             )}
             {/* Foyda ko'rsatish */}
             <div className="text-xs mt-1.5 font-medium text-slate-600">
-              Foyda: {formatPrice(profit)}
+              {formatPrice(profit)}
             </div>
           </div>
 
